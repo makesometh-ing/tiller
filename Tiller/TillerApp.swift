@@ -10,8 +10,8 @@ import SwiftUI
 @main
 struct TillerApp: App {
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        MenuBarExtra("Tiller", systemImage: "bolt.fill") {
+            Text("Hello world")
         }
     }
 }

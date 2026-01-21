@@ -60,3 +60,18 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# bv (beads viewer) local config and caches
+.bv/
+
+# macos
+.DS_Store
+
+# ios
+ios/
+
+# android
+android/
+
+# flutter
+flutter/
