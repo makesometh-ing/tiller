@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AccessibilityManager.shared.onPermissionStatusChanged = { status in
             if status == .granted {
                 MonitorManager.shared.startMonitoring()
+                WindowDiscoveryManager.shared.startMonitoring()
             }
         }
     }
