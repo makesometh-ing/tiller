@@ -59,7 +59,6 @@ final class AutoTilingOrchestrator {
             self?.handleFocusChange(focusedWindow)
         }
 
-        // Perform initial tile
         await performTile()
         isInitialTile = false
     }
@@ -212,7 +211,6 @@ final class AutoTilingOrchestrator {
             duration = config.animationDuration
         }
 
-        // Animate all windows
         let animationResult = await animationService.animateBatch(allAnimations, duration: duration)
 
         let result: TilingResult

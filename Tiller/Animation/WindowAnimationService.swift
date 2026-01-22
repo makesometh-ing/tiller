@@ -70,6 +70,27 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
             return .completed
         }
 
+        // Fast path for instant positioning (duration = 0)
+        if duration <= 0 {
+            print("[WindowAnimationService] Instant positioning (duration=0)")
+            var successCount = 0
+            for animation in animations {
+                let result = positioner.setFrame(
+                    animation.targetFrame,
+                    for: animation.windowID,
+                    pid: animation.pid
+                )
+                if case .success = result {
+                    successCount += 1
+                    print("[WindowAnimationService] Positioned window \(animation.windowID.rawValue) successfully")
+                } else {
+                    print("[WindowAnimationService] Failed to position window \(animation.windowID.rawValue)")
+                }
+            }
+            print("[WindowAnimationService] Instant positioning complete: \(successCount)/\(animations.count) succeeded")
+            return .completed
+        }
+
         // Cancel any existing animations for these windows
         for animation in animations {
             cancelAnimation(for: animation.windowID)
@@ -192,8 +213,8 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
 
             state.updateProgress(easedProgress)
 
-            // Update all window positions
-            var failed: AnimationError?
+            // Update all window positions (continue even if some fail)
+            var successCount = 0
             for target in state.targets {
                 let currentFrame = interpolateFrame(
                     from: target.startFrame,
@@ -202,15 +223,13 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
                 )
 
                 let result = positioner.setFrame(currentFrame, for: target.windowID, pid: target.pid)
-                if case .failure(let error) = result {
-                    failed = error
-                    break
+                if case .success = result {
+                    successCount += 1
                 }
+                // Continue with other windows even if one fails
             }
 
-            if let error = failed {
-                completedAnimations.append((animationID, .failed(error)))
-            } else if rawProgress >= 1.0 {
+            if rawProgress >= 1.0 {
                 completedAnimations.append((animationID, .completed))
             }
         }

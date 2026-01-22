@@ -14,7 +14,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
     static let `default` = TillerConfig(
         margin: 8,
         padding: 8,
-        accordionOffset: 8,
+        accordionOffset: 16,
         floatingApps: []
     )
 

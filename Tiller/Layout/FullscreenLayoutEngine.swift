@@ -5,12 +5,11 @@
 
 import CoreGraphics
 
-/// Pure calculation engine for fullscreen layout with horizontal accordion.
-/// Focused window fills the container, neighbors peek from edges.
+/// Horizontal accordion layout.
+/// All windows same size, overlapping. Focused centered, prev/next offset to show edges.
 final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
 
     func calculate(input: LayoutInput) -> LayoutResult {
-        // Filter to only include tileable windows (not floating, is resizable)
         let tileableWindows = input.windows.filter { window in
             !window.isFloating && window.isResizable
         }
@@ -19,59 +18,62 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
             return LayoutResult(placements: [])
         }
 
-        // Find the focused window or default to first tileable
-        let focusedWindow: WindowInfo
+        var focusedIndex = 0
         if let focusedID = input.focusedWindowID,
-           let found = tileableWindows.first(where: { $0.id == focusedID }) {
-            focusedWindow = found
-        } else {
-            focusedWindow = tileableWindows[0]
+           let idx = tileableWindows.firstIndex(where: { $0.id == focusedID }) {
+            focusedIndex = idx
         }
-
-        // Find focused index in tileable list
-        let focusedIndex = tileableWindows.firstIndex(where: { $0.id == focusedWindow.id }) ?? 0
 
         var placements: [WindowPlacement] = []
         let container = input.containerFrame
-        let offset = CGFloat(input.accordionOffset)
+        let focusedMargin = CGFloat(input.accordionOffset)  // 16px - margin for focused window
+        let peekAmount = focusedMargin / 2  // 8px - how much of prev/next is visible
+
+        // All windows are the same size
+        let windowWidth = container.width - (focusedMargin * 2)
+        let windowHeight = container.height
+
+        // Focused window position
+        let focusedX = container.minX + focusedMargin
+
+        // Ring buffer indices
+        let prevIndex = (focusedIndex - 1 + tileableWindows.count) % tileableWindows.count
+        let nextIndex = (focusedIndex + 1) % tileableWindows.count
 
         for (index, window) in tileableWindows.enumerated() {
             let targetFrame: CGRect
 
-            if window.id == focusedWindow.id {
-                // Focused window fills the container
-                targetFrame = container
-            } else if index == focusedIndex - 1 {
-                // Left neighbor peeks from left edge
+            if index == focusedIndex {
+                // Focused: centered with margins
                 targetFrame = CGRect(
-                    x: container.minX - container.width + offset,
+                    x: focusedX,
                     y: container.minY,
-                    width: container.width,
-                    height: container.height
+                    width: windowWidth,
+                    height: windowHeight
                 )
-            } else if index == focusedIndex + 1 {
-                // Right neighbor peeks from right edge
+            } else if index == prevIndex && tileableWindows.count > 1 {
+                // Previous: offset left by peekAmount, shows 8px on left edge
                 targetFrame = CGRect(
-                    x: container.maxX - offset,
+                    x: focusedX - peekAmount,
                     y: container.minY,
-                    width: container.width,
-                    height: container.height
+                    width: windowWidth,
+                    height: windowHeight
                 )
-            } else if index < focusedIndex {
-                // Windows to the left of left neighbor: hidden offscreen left
+            } else if index == nextIndex && tileableWindows.count > 2 {
+                // Next: offset right by peekAmount, shows 8px on right edge
                 targetFrame = CGRect(
-                    x: container.minX - container.width * 2,
+                    x: focusedX + peekAmount,
                     y: container.minY,
-                    width: container.width,
-                    height: container.height
+                    width: windowWidth,
+                    height: windowHeight
                 )
             } else {
-                // Windows to the right of right neighbor: hidden offscreen right
+                // Others: same position as focused (hidden behind)
                 targetFrame = CGRect(
-                    x: container.maxX + container.width,
+                    x: focusedX,
                     y: container.minY,
-                    width: container.width,
-                    height: container.height
+                    width: windowWidth,
+                    height: windowHeight
                 )
             }
 

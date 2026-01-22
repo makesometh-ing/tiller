@@ -3,6 +3,7 @@
 //  Tiller
 //
 
+import AppKit
 import ApplicationServices
 import CoreGraphics
 import Foundation
@@ -59,6 +60,10 @@ final class WindowPositioner: WindowPositionerProtocol {
     }
 
     func getWindowElement(for windowID: WindowID, pid: pid_t) -> AXUIElement? {
+        // Verify accessibility is actually trusted
+        let isTrusted = AXIsProcessTrusted()
+        print("[WindowPositioner] AXIsProcessTrusted() = \(isTrusted)")
+
         // Check cache first
         if let cached = windowElementCache[windowID] {
             // Verify the cached element is still valid
@@ -71,10 +76,28 @@ final class WindowPositioner: WindowPositionerProtocol {
             windowElementCache.removeValue(forKey: windowID)
         }
 
+        // Verify the PID is valid
+        if let app = NSRunningApplication(processIdentifier: pid) {
+            print("[WindowPositioner] PID \(pid) is valid: \(app.localizedName ?? "unknown") (bundle: \(app.bundleIdentifier ?? "nil"))")
+        } else {
+            print("[WindowPositioner] PID \(pid) is NOT a valid running application!")
+        }
+
+        // Test system-wide element first
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedAppRef: CFTypeRef?
+        let focusedResult = AXUIElementCopyAttributeValue(systemWide, kAXFocusedApplicationAttribute as CFString, &focusedAppRef)
+        print("[WindowPositioner] System-wide focused app check: result=\(focusedResult.rawValue)")
+
         // Look up the window element
         let appElement = AXUIElementCreateApplication(pid)
-        var windowsRef: CFTypeRef?
 
+        // First check if we can get the app's role (basic connectivity test)
+        var roleRef: CFTypeRef?
+        let roleResult = AXUIElementCopyAttributeValue(appElement, kAXRoleAttribute as CFString, &roleRef)
+        print("[WindowPositioner] App role check for pid \(pid): result=\(roleResult.rawValue), role=\(roleRef ?? "nil" as CFTypeRef)")
+
+        var windowsRef: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(
             appElement,
             kAXWindowsAttribute as CFString,
@@ -83,12 +106,17 @@ final class WindowPositioner: WindowPositionerProtocol {
 
         guard result == .success,
               let windows = windowsRef as? [AXUIElement] else {
+            print("[WindowPositioner] Failed to get windows for pid \(pid), result: \(result.rawValue)")
             return nil
         }
 
+        print("[WindowPositioner] Looking for window \(windowID.rawValue) in \(windows.count) windows from pid \(pid)")
+
         for window in windows {
             var currentWindowID: CGWindowID = 0
-            if _AXUIElementGetWindow(window, &currentWindowID) == .success,
+            let getResult = _AXUIElementGetWindow(window, &currentWindowID)
+            print("[WindowPositioner]   - AX window ID: \(currentWindowID), getResult: \(getResult.rawValue)")
+            if getResult == .success,
                currentWindowID == windowID.rawValue {
                 // Cache the element
                 windowElementCache[windowID] = window
@@ -96,6 +124,7 @@ final class WindowPositioner: WindowPositionerProtocol {
             }
         }
 
+        print("[WindowPositioner] Window \(windowID.rawValue) not found in AX windows")
         return nil
     }
 

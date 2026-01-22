@@ -15,7 +15,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         ConfigManager.shared.loadConfiguration()
 
-        // Set callback BEFORE requesting permissions (callback fires synchronously if already granted)
         AccessibilityManager.shared.onPermissionStatusChanged = { [weak self] status in
             if status == .granted {
                 MonitorManager.shared.startMonitoring()

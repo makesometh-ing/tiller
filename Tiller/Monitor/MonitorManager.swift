@@ -15,20 +15,39 @@ protocol MonitorServiceProtocol {
 
 final class SystemMonitorService: MonitorServiceProtocol {
     func getConnectedMonitors() -> [MonitorInfo] {
+        // Get the primary screen height for coordinate conversion
+        // NSScreen uses bottom-left origin, CGWindow uses top-left origin
+        guard let mainScreen = NSScreen.main else {
+            return []
+        }
+        let primaryScreenHeight = mainScreen.frame.height
+
         return NSScreen.screens.compactMap { screen in
             guard let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32 else {
                 return nil
             }
 
+            // Convert from AppKit (bottom-left origin) to CG (top-left origin) coordinates
+            let cgFrame = convertToCGCoordinates(screen.frame, primaryScreenHeight: primaryScreenHeight)
+            let cgVisibleFrame = convertToCGCoordinates(screen.visibleFrame, primaryScreenHeight: primaryScreenHeight)
+
             return MonitorInfo(
                 id: MonitorID(rawValue: screenNumber),
                 name: screen.localizedName,
-                frame: screen.frame,
-                visibleFrame: screen.visibleFrame,
+                frame: cgFrame,
+                visibleFrame: cgVisibleFrame,
                 isMain: screen == NSScreen.main,
                 scaleFactor: screen.backingScaleFactor
             )
         }
+    }
+
+    private func convertToCGCoordinates(_ rect: CGRect, primaryScreenHeight: CGFloat) -> CGRect {
+        // In AppKit: origin is at bottom-left, Y increases upward
+        // In CG: origin is at top-left, Y increases downward
+        // CG_Y = primaryScreenHeight - AppKit_Y - rect.height
+        let cgY = primaryScreenHeight - rect.origin.y - rect.height
+        return CGRect(x: rect.origin.x, y: cgY, width: rect.width, height: rect.height)
     }
 
     func getMonitor(containingPoint point: CGPoint) -> MonitorInfo? {
