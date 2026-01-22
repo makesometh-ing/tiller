@@ -74,6 +74,7 @@ final class MockWindowService: WindowServiceProtocol {
                 bundleID: oldWindow.bundleID,
                 frame: newFrame,
                 isResizable: oldWindow.isResizable,
+                isFloating: oldWindow.isFloating,
                 ownerPID: oldWindow.ownerPID
             )
             windows[index] = updatedWindow
@@ -93,6 +94,7 @@ final class MockWindowService: WindowServiceProtocol {
                 bundleID: oldWindow.bundleID,
                 frame: newFrame,
                 isResizable: oldWindow.isResizable,
+                isFloating: oldWindow.isFloating,
                 ownerPID: oldWindow.ownerPID
             )
             windows[index] = updatedWindow
@@ -111,6 +113,7 @@ final class MockWindowService: WindowServiceProtocol {
         bundleID: String? = "com.test.app",
         frame: CGRect = CGRect(x: 100, y: 100, width: 800, height: 600),
         isResizable: Bool = true,
+        isFloating: Bool = false,
         ownerPID: pid_t = 1234
     ) -> WindowInfo {
         return WindowInfo(
@@ -120,6 +123,7 @@ final class MockWindowService: WindowServiceProtocol {
             bundleID: bundleID,
             frame: frame,
             isResizable: isResizable,
+            isFloating: isFloating,
             ownerPID: ownerPID
         )
     }

@@ -152,7 +152,7 @@ final class SystemWindowService: WindowServiceProtocol {
             frame = CGRect(x: x, y: y, width: width, height: height)
         }
 
-        let isResizable = queryIsResizable(pid: ownerPID, windowID: windowID)
+        let attributes = queryWindowAttributes(pid: ownerPID, windowID: windowID, bundleID: bundleID)
 
         return WindowInfo(
             id: WindowID(rawValue: windowID),
@@ -160,12 +160,21 @@ final class SystemWindowService: WindowServiceProtocol {
             appName: ownerName,
             bundleID: bundleID,
             frame: frame,
-            isResizable: isResizable,
+            isResizable: attributes.isResizable,
+            isFloating: attributes.isFloating,
             ownerPID: ownerPID
         )
     }
 
-    private func queryIsResizable(pid: pid_t, windowID: CGWindowID) -> Bool {
+    private func queryWindowAttributes(pid: pid_t, windowID: CGWindowID, bundleID: String?) -> (isResizable: Bool, isFloating: Bool) {
+        // Check if app is in floatingApps config
+        if let bundleID = bundleID {
+            let floatingApps = ConfigManager.shared.getConfig().floatingApps
+            if floatingApps.contains(bundleID) {
+                return (isResizable: true, isFloating: true)
+            }
+        }
+
         let appElement = AXUIElementCreateApplication(pid)
         var windowsRef: CFTypeRef?
 
@@ -177,7 +186,7 @@ final class SystemWindowService: WindowServiceProtocol {
 
         guard result == .success,
               let windows = windowsRef as? [AXUIElement] else {
-            return true
+            return (isResizable: true, isFloating: false)
         }
 
         for window in windows {
@@ -185,6 +194,39 @@ final class SystemWindowService: WindowServiceProtocol {
             let windowIDResult = _AXUIElementGetWindow(window, &currentWindowID)
 
             if windowIDResult == .success && currentWindowID == windowID {
+                // Check AXRole for dialog or sheet
+                var roleRef: CFTypeRef?
+                let roleResult = AXUIElementCopyAttributeValue(
+                    window,
+                    kAXRoleAttribute as CFString,
+                    &roleRef
+                )
+                if roleResult == .success, let role = roleRef as? String {
+                    // AXDialog and AXSheet roles indicate floating windows
+                    if role == "AXDialog" || role == "AXSheet" {
+                        return (isResizable: true, isFloating: true)
+                    }
+                }
+
+                // Check AXSubrole for floating window types
+                var subroleRef: CFTypeRef?
+                let subroleResult = AXUIElementCopyAttributeValue(
+                    window,
+                    kAXSubroleAttribute as CFString,
+                    &subroleRef
+                )
+                if subroleResult == .success, let subrole = subroleRef as? String {
+                    let floatingSubroles = [
+                        "AXFloatingWindow",
+                        "AXSystemFloatingWindow",
+                        "AXDialog"
+                    ]
+                    if floatingSubroles.contains(subrole) {
+                        return (isResizable: true, isFloating: true)
+                    }
+                }
+
+                // Check AXResizable
                 var resizableRef: CFTypeRef?
                 let resizableResult = AXUIElementCopyAttributeValue(
                     window,
@@ -194,13 +236,14 @@ final class SystemWindowService: WindowServiceProtocol {
 
                 if resizableResult == .success,
                    let resizable = resizableRef as? Bool {
-                    return resizable
+                    // Non-resizable windows are considered floating
+                    return (isResizable: resizable, isFloating: !resizable)
                 }
                 break
             }
         }
 
-        return true
+        return (isResizable: true, isFloating: false)
     }
 
     private func setupWorkspaceObservers() {

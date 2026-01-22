@@ -17,6 +17,7 @@ struct WindowInfo: Equatable, Identifiable, Sendable {
     let bundleID: String?
     let frame: CGRect
     let isResizable: Bool
+    let isFloating: Bool
     let ownerPID: pid_t
 }
 
