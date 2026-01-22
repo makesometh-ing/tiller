@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         AccessibilityManager.shared.onPermissionStatusChanged = { status in
             if status == .granted {
-                // Future: initialize WindowDiscoveryService
+                MonitorManager.shared.startMonitoring()
             }
         }
     }
