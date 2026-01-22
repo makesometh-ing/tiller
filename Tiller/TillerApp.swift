@@ -9,15 +9,36 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+
+    private var orchestrator: AutoTilingOrchestrator?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         ConfigManager.shared.loadConfiguration()
         AccessibilityManager.shared.requestPermissionsOnLaunch()
 
-        AccessibilityManager.shared.onPermissionStatusChanged = { status in
+        AccessibilityManager.shared.onPermissionStatusChanged = { [weak self] status in
             if status == .granted {
                 MonitorManager.shared.startMonitoring()
                 WindowDiscoveryManager.shared.startMonitoring()
+
+                Task { @MainActor in
+                    self?.startOrchestrator()
+                }
             }
+        }
+    }
+
+    private func startOrchestrator() {
+        orchestrator = AutoTilingOrchestrator(
+            windowDiscoveryManager: WindowDiscoveryManager.shared,
+            monitorManager: MonitorManager.shared,
+            configManager: ConfigManager.shared,
+            layoutEngine: FullscreenLayoutEngine(),
+            animationService: WindowAnimationService()
+        )
+
+        Task {
+            await orchestrator?.start()
         }
     }
 }
