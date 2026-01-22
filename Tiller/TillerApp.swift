@@ -14,8 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ConfigManager.shared.loadConfiguration()
-        AccessibilityManager.shared.requestPermissionsOnLaunch()
 
+        // Set callback BEFORE requesting permissions (callback fires synchronously if already granted)
         AccessibilityManager.shared.onPermissionStatusChanged = { [weak self] status in
             if status == .granted {
                 MonitorManager.shared.startMonitoring()
@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+
+        AccessibilityManager.shared.requestPermissionsOnLaunch()
     }
 
     private func startOrchestrator() {
