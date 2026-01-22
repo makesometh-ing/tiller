@@ -26,56 +26,39 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
 
         var placements: [WindowPlacement] = []
         let container = input.containerFrame
-        let focusedMargin = CGFloat(input.accordionOffset)  // 16px - margin for focused window
-        let peekAmount = focusedMargin / 2  // 8px - how much of prev/next is visible
+        let accordionOffset = CGFloat(input.accordionOffset)
 
-        // All windows are the same size
-        let windowWidth = container.width - (focusedMargin * 2)
+        // All windows same size: container minus accordionOffset
+        let windowWidth = container.width - accordionOffset
         let windowHeight = container.height
-
-        // Focused window position
-        let focusedX = container.minX + focusedMargin
 
         // Ring buffer indices
         let prevIndex = (focusedIndex - 1 + tileableWindows.count) % tileableWindows.count
         let nextIndex = (focusedIndex + 1) % tileableWindows.count
 
         for (index, window) in tileableWindows.enumerated() {
-            let targetFrame: CGRect
+            let targetX: CGFloat
 
             if index == focusedIndex {
-                // Focused: centered with margins
-                targetFrame = CGRect(
-                    x: focusedX,
-                    y: container.minY,
-                    width: windowWidth,
-                    height: windowHeight
-                )
+                // Focused: centered
+                targetX = container.minX + (accordionOffset / 2)
             } else if index == prevIndex && tileableWindows.count > 1 {
-                // Previous: offset left by peekAmount, shows 8px on left edge
-                targetFrame = CGRect(
-                    x: focusedX - peekAmount,
-                    y: container.minY,
-                    width: windowWidth,
-                    height: windowHeight
-                )
+                // Previous: left aligned
+                targetX = container.minX
             } else if index == nextIndex && tileableWindows.count > 2 {
-                // Next: offset right by peekAmount, shows 8px on right edge
-                targetFrame = CGRect(
-                    x: focusedX + peekAmount,
-                    y: container.minY,
-                    width: windowWidth,
-                    height: windowHeight
-                )
+                // Next: right aligned
+                targetX = container.minX + accordionOffset
             } else {
-                // Others: same position as focused (hidden behind)
-                targetFrame = CGRect(
-                    x: focusedX,
-                    y: container.minY,
-                    width: windowWidth,
-                    height: windowHeight
-                )
+                // Others: centered (hidden behind focused)
+                targetX = container.minX + (accordionOffset / 2)
             }
+
+            let targetFrame = CGRect(
+                x: targetX,
+                y: container.minY,
+                width: windowWidth,
+                height: windowHeight
+            )
 
             placements.append(WindowPlacement(
                 windowID: window.id,
