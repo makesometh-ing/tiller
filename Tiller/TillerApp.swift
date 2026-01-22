@@ -11,6 +11,13 @@ import SwiftUI
 struct TillerApp: App {
     init() {
         ConfigManager.shared.loadConfiguration()
+        AccessibilityManager.shared.requestPermissionsOnLaunch()
+
+        AccessibilityManager.shared.onPermissionStatusChanged = { status in
+            if status == .granted {
+                // Future: initialize WindowDiscoveryService
+            }
+        }
     }
 
     var body: some Scene {
