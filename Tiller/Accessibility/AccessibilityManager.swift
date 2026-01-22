@@ -85,7 +85,7 @@ final class AccessibilityManager {
             return .permissionGranted
         }
 
-        let wasPromptShown = accessibilityService.requestAccessibility(showPrompt: true)
+        _ = accessibilityService.requestAccessibility(showPrompt: true)
 
         if accessibilityService.isAccessibilityGranted() {
             updateStatus(.granted)
@@ -94,12 +94,7 @@ final class AccessibilityManager {
 
         updateStatus(.denied)
         notificationService.showAccessibilityPermissionDenied()
-
-        if wasPromptShown {
-            startPolling()
-            return .promptShown
-        }
-
+        startPolling()
         return .permissionDenied
     }
 

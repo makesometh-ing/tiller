@@ -7,9 +7,9 @@
 
 import SwiftUI
 
-@main
-struct TillerApp: App {
-    init() {
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
         ConfigManager.shared.loadConfiguration()
         AccessibilityManager.shared.requestPermissionsOnLaunch()
 
@@ -19,6 +19,11 @@ struct TillerApp: App {
             }
         }
     }
+}
+
+@main
+struct TillerApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
         MenuBarExtra("Tiller", systemImage: "bolt.fill") {
