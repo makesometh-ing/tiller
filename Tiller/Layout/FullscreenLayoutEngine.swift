@@ -10,9 +10,13 @@ import CoreGraphics
 final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
 
     func calculate(input: LayoutInput) -> LayoutResult {
+        print("[LayoutEngine] Received \(input.windows.count) windows, focused=\(input.focusedWindowID?.rawValue ?? 0)")
+
         let tileableWindows = input.windows.filter { window in
             !window.isFloating && window.isResizable
         }
+
+        print("[LayoutEngine] Tileable: \(tileableWindows.count), mode=\(tileableWindows.count == 1 ? "1" : tileableWindows.count == 2 ? "2" : "3+")")
 
         guard !tileableWindows.isEmpty else {
             return LayoutResult(placements: [])
@@ -48,6 +52,9 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
         // Ring buffer indices for prev/next
         let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
         let nextIndex = (focusedIndex + 1) % windowCount
+
+        print("[LayoutEngine] Ring: prev=\(prevIndex) focused=\(focusedIndex) next=\(nextIndex)")
+        print("[LayoutEngine] Container: \(container), offset=\(offset), windowWidth=\(windowWidth)")
 
         for (index, window) in tileableWindows.enumerated() {
             let targetX: CGFloat

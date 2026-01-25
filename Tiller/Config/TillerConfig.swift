@@ -15,7 +15,9 @@ struct TillerConfig: Codable, Equatable, Sendable {
         margin: 8,
         padding: 8,
         accordionOffset: 16,
-        floatingApps: []
+        floatingApps: [
+            "pro.betterdisplay.BetterDisplay"  // Overlay/utility windows that can't be positioned
+        ]
     )
 
     enum ValidationRange {

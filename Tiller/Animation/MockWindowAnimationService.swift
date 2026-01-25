@@ -127,6 +127,10 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
         return animatingWindows.contains(windowID)
     }
 
+    func raiseWindowsInOrder(_ windows: [(windowID: WindowID, pid: pid_t)]) {
+        // No-op for mock
+    }
+
     // MARK: - Test Helpers
 
     func reset() {
@@ -173,6 +177,10 @@ final class MockWindowPositioner: WindowPositionerProtocol {
     func getWindowElement(for windowID: WindowID, pid: pid_t) -> AXUIElement? {
         getWindowElementCalls.append((windowID, pid))
         return windowElementToReturn
+    }
+
+    func raiseWindow(_ windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError> {
+        return .success(())
     }
 
     func reset() {

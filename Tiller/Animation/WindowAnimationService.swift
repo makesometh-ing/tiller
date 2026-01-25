@@ -25,6 +25,9 @@ protocol WindowAnimationServiceProtocol {
     func cancelAnimation(for windowID: WindowID)
     func cancelAllAnimations()
     func isAnimating(_ windowID: WindowID) -> Bool
+
+    /// Raise windows in z-order (first = back, last = front)
+    func raiseWindowsInOrder(_ windows: [(windowID: WindowID, pid: pid_t)])
 }
 
 final class WindowAnimationService: WindowAnimationServiceProtocol {
@@ -157,6 +160,13 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
         }
 
         return !state.isCancelled && state.progress < 1.0
+    }
+
+    func raiseWindowsInOrder(_ windows: [(windowID: WindowID, pid: pid_t)]) {
+        // Raise windows from back to front (first in list = backmost)
+        for window in windows {
+            _ = positioner.raiseWindow(window.windowID, pid: window.pid)
+        }
     }
 
     // MARK: - Display Link Management

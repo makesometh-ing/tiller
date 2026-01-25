@@ -13,15 +13,32 @@ private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMut
 
 protocol WindowPositionerProtocol {
     func setFrame(_ frame: CGRect, for windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError>
+    func raiseWindow(_ windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError>
     func getWindowElement(for windowID: WindowID, pid: pid_t) -> AXUIElement?
 }
 
 final class WindowPositioner: WindowPositionerProtocol {
     private var windowElementCache: [WindowID: AXUIElement] = [:]
+    private var isTrustedCache: Bool?
+    private var lastTrustedCheck: Date?
 
     func setFrame(_ frame: CGRect, for windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError> {
         guard let windowElement = getWindowElement(for: windowID, pid: pid) else {
             return .failure(.windowElementNotFound(windowID))
+        }
+
+        // Check if window is minimized - don't position minimized windows
+        var minimizedRef: CFTypeRef?
+        let minimizedResult = AXUIElementCopyAttributeValue(
+            windowElement,
+            kAXMinimizedAttribute as CFString,
+            &minimizedRef
+        )
+        if minimizedResult == .success,
+           let isMinimized = minimizedRef as? Bool,
+           isMinimized {
+            print("[WindowPositioner] Skipping minimized window \(windowID.rawValue)")
+            return .success(())  // Treat as success but don't position
         }
 
         // Set position
@@ -59,10 +76,47 @@ final class WindowPositioner: WindowPositionerProtocol {
         return .success(())
     }
 
+    func raiseWindow(_ windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError> {
+        guard let windowElement = getWindowElement(for: windowID, pid: pid) else {
+            return .failure(.windowElementNotFound(windowID))
+        }
+
+        // Check if window is minimized - don't raise minimized windows
+        var minimizedRef: CFTypeRef?
+        let minimizedResult = AXUIElementCopyAttributeValue(
+            windowElement,
+            kAXMinimizedAttribute as CFString,
+            &minimizedRef
+        )
+        if minimizedResult == .success,
+           let isMinimized = minimizedRef as? Bool,
+           isMinimized {
+            print("[WindowPositioner] Skipping raise for minimized window \(windowID.rawValue)")
+            return .success(())
+        }
+
+        let result = AXUIElementPerformAction(windowElement, kAXRaiseAction as CFString)
+        if result != .success {
+            print("[WindowPositioner] Failed to raise window \(windowID.rawValue): \(result.rawValue)")
+            return .failure(.accessibilityError(result.rawValue))
+        }
+
+        return .success(())
+    }
+
     func getWindowElement(for windowID: WindowID, pid: pid_t) -> AXUIElement? {
-        // Verify accessibility is actually trusted
-        let isTrusted = AXIsProcessTrusted()
-        print("[WindowPositioner] AXIsProcessTrusted() = \(isTrusted)")
+        // Check accessibility trust (cached for 10 seconds to avoid spam)
+        let now = Date()
+        if isTrustedCache == nil || lastTrustedCheck == nil || now.timeIntervalSince(lastTrustedCheck!) > 10 {
+            isTrustedCache = AXIsProcessTrusted()
+            lastTrustedCheck = now
+            print("[WindowPositioner] AXIsProcessTrusted() = \(isTrustedCache!)")
+        }
+
+        guard isTrustedCache == true else {
+            print("[WindowPositioner] Not trusted, cannot position windows")
+            return nil
+        }
 
         // Check cache first
         if let cached = windowElementCache[windowID] {

@@ -25,6 +25,12 @@ final class AutoTilingOrchestrator {
     private var isInitialTile: Bool = true
     private var lastTileResult: TilingResult?
 
+    /// Stable window order for ring buffer navigation (not affected by z-order changes)
+    private var stableWindowOrder: [WindowID] = []
+
+    /// Suppress focus-triggered retiles while we're adjusting z-order
+    private var isAdjustingZOrder: Bool = false
+
     // MARK: - Initialization
 
     init(
@@ -88,6 +94,11 @@ final class AutoTilingOrchestrator {
     }
 
     private func handleFocusChange(_ focusedWindow: FocusedWindowInfo?) {
+        // Ignore focus changes caused by our own z-order adjustments
+        guard !isAdjustingZOrder else {
+            print("[Orchestrator] Ignoring focus change during z-order adjustment")
+            return
+        }
         // Focus changes trigger retile to update accordion positioning
         scheduleRetile()
     }
@@ -124,10 +135,28 @@ final class AutoTilingOrchestrator {
         let focusedWindow = windowDiscoveryManager.focusedWindow
 
         guard !windows.isEmpty else {
+            stableWindowOrder.removeAll()
             let result = TilingResult.noWindowsToTile
             lastTileResult = result
             return result
         }
+
+        // Update stable window order: keep existing order, add new windows, remove closed ones
+        let currentWindowIDs = Set(windows.map { $0.id })
+        stableWindowOrder.removeAll { !currentWindowIDs.contains($0) }
+        for window in windows {
+            if !stableWindowOrder.contains(window.id) {
+                stableWindowOrder.append(window.id)
+            }
+        }
+
+        // Create window lookup for sorting
+        let windowByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
+
+        // Sort windows by stable order
+        let stableOrderedWindows = stableWindowOrder.compactMap { windowByID[$0] }
+
+        print("[Orchestrator] Stable window order: \(stableWindowOrder.map { $0.rawValue })")
 
         let tillerConfig = configManager.getConfig()
         let monitors = monitorManager.connectedMonitors
@@ -138,10 +167,10 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Group windows by monitor using their center point
+        // Group windows by monitor using their center point (maintaining stable order)
         var windowsByMonitor: [MonitorID: [WindowInfo]] = [:]
 
-        for window in windows {
+        for window in stableOrderedWindows {
             let centerPoint = CGPoint(
                 x: window.frame.midX,
                 y: window.frame.midY
@@ -179,21 +208,21 @@ final class AutoTilingOrchestrator {
 
             let result = layoutEngine.calculate(input: input)
 
-            // Collect animations for windows where frame changed
+            // Position ALL windows - don't skip based on current position
             for placement in result.placements {
                 guard let window = monitorWindows.first(where: { $0.id == placement.windowID }) else {
+                    print("[Orchestrator] Window \(placement.windowID.rawValue) not found in monitorWindows")
                     continue
                 }
 
-                // Only animate if the frame actually changed
-                if window.frame != placement.targetFrame {
-                    allAnimations.append((
-                        windowID: placement.windowID,
-                        pid: placement.pid,
-                        startFrame: window.frame,
-                        targetFrame: placement.targetFrame
-                    ))
-                }
+                print("[Orchestrator] Window \(window.appName) (ID: \(window.id.rawValue)) -> \(placement.targetFrame.origin.x)")
+
+                allAnimations.append((
+                    windowID: placement.windowID,
+                    pid: placement.pid,
+                    startFrame: window.frame,
+                    targetFrame: placement.targetFrame
+                ))
             }
         }
 
@@ -201,6 +230,52 @@ final class AutoTilingOrchestrator {
             let result = TilingResult.success(tiledCount: 0)
             lastTileResult = result
             return result
+        }
+
+        // Set z-order BEFORE positioning to avoid flickering
+        // Order: others (back) -> prev -> next -> focused (front)
+        let focusedID = focusedWindow?.windowID
+        var focusedIndex = 0
+        if let fid = focusedID, let idx = stableWindowOrder.firstIndex(of: fid) {
+            focusedIndex = idx
+        }
+
+        let windowCount = stableWindowOrder.count
+        if windowCount > 0 {
+            let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
+            let nextIndex = (focusedIndex + 1) % windowCount
+
+            // Build z-order: others first (back), then prev, then next, then focused (front)
+            var zOrder: [(windowID: WindowID, pid: pid_t)] = []
+
+            // Add "others" (not prev, focused, or next)
+            for (idx, windowID) in stableWindowOrder.enumerated() {
+                if idx != focusedIndex && idx != prevIndex && idx != nextIndex {
+                    if let window = windowByID[windowID] {
+                        zOrder.append((windowID: windowID, pid: window.ownerPID))
+                    }
+                }
+            }
+
+            // Add prev (if different from focused and next)
+            if windowCount > 2, let window = windowByID[stableWindowOrder[prevIndex]] {
+                zOrder.append((windowID: stableWindowOrder[prevIndex], pid: window.ownerPID))
+            }
+
+            // Add next (if different from focused)
+            if windowCount > 1, let window = windowByID[stableWindowOrder[nextIndex]] {
+                zOrder.append((windowID: stableWindowOrder[nextIndex], pid: window.ownerPID))
+            }
+
+            // Add focused (front)
+            if let fid = focusedID, let window = windowByID[fid] {
+                zOrder.append((windowID: fid, pid: window.ownerPID))
+            }
+
+            print("[Orchestrator] Z-order (back to front): \(zOrder.map { $0.windowID.rawValue })")
+            isAdjustingZOrder = true
+            animationService.raiseWindowsInOrder(zOrder)
+            isAdjustingZOrder = false
         }
 
         // Determine animation duration

@@ -16,6 +16,13 @@ final class SystemWindowService: WindowServiceProtocol {
     private var workspaceObservers: [NSObjectProtocol] = []
     private var trackedWindows: [WindowID: WindowInfo] = [:]
 
+    /// Apps that should always be treated as floating (system utilities, overlays, etc.)
+    private static let alwaysFloatingApps: Set<String> = [
+        "pro.betterdisplay.BetterDisplay",
+        "com.apple.controlcenter",
+        "com.apple.notificationcenterui"
+    ]
+
     func getVisibleWindows() -> [WindowInfo] {
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
@@ -167,7 +174,12 @@ final class SystemWindowService: WindowServiceProtocol {
     }
 
     private func queryWindowAttributes(pid: pid_t, windowID: CGWindowID, bundleID: String?) -> (isResizable: Bool, isFloating: Bool) {
-        // Check if app is in floatingApps config
+        // Check if app is in always-floating list (system utilities that can't be positioned)
+        if let bundleID = bundleID, Self.alwaysFloatingApps.contains(bundleID) {
+            return (isResizable: true, isFloating: true)
+        }
+
+        // Check if app is in user-configured floatingApps
         if let bundleID = bundleID {
             let floatingApps = ConfigManager.shared.getConfig().floatingApps
             if floatingApps.contains(bundleID) {
