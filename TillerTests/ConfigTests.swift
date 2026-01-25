@@ -57,8 +57,9 @@ final class ConfigTests: XCTestCase {
 
         XCTAssertEqual(defaultConfig.margin, 8)
         XCTAssertEqual(defaultConfig.padding, 8)
-        XCTAssertEqual(defaultConfig.accordionOffset, 8)
-        XCTAssertEqual(defaultConfig.floatingApps, [])
+        XCTAssertEqual(defaultConfig.accordionOffset, 16)
+        // BetterDisplay is in default floatingApps (overlay utility that can't be positioned)
+        XCTAssertEqual(defaultConfig.floatingApps, ["pro.betterdisplay.BetterDisplay"])
     }
 
     // MARK: - Test 3: Config Directory Creation

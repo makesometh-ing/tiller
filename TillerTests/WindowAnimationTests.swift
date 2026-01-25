@@ -373,7 +373,8 @@ final class WindowAnimationTests: XCTestCase {
         XCTAssertGreaterThan(window2Calls.count, 0)
     }
 
-    func testRealServiceAnimationFailsOnPositionerError() async {
+    func testRealServiceContinuesOnPositionerError() async {
+        // Animation continues even if positioner fails (for robustness)
         let positioner = MockWindowPositioner()
         let windowID = WindowID(rawValue: 1)
         positioner.resultToReturn = .failure(.windowElementNotFound(windowID))
@@ -388,11 +389,10 @@ final class WindowAnimationTests: XCTestCase {
             duration: 0.05
         )
 
-        if case .failed(let error) = result {
-            XCTAssertEqual(error, .windowElementNotFound(windowID))
-        } else {
-            XCTFail("Expected failed result")
-        }
+        // Animation completes even if positioning fails (we don't stop other windows)
+        XCTAssertEqual(result, .completed)
+        // Positioner was still called (multiple times during animation)
+        XCTAssertGreaterThan(positioner.setFrameCalls.count, 0)
     }
 
     func testRealServiceIsAnimatingDuringAnimation() async {

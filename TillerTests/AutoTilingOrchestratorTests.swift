@@ -349,14 +349,31 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         ])
 
         await sut.start()
+
+        // Wait for z-order suppression window (200ms) to expire
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
         mockLayoutEngine.reset()
         mockAnimationService.reset()
 
+        // Re-set the result after reset (reset clears it to empty)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039)),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: CGRect(x: 1912, y: 33, width: 1904, height: 1039))
+        ])
+
         // When: Focus changes to window2
+        // Update the mock's focused window (simulating the system focus change)
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window2.id,
+            appName: window2.appName,
+            bundleID: window2.bundleID
+        )
         mockWindowService.simulateWindowFocusSync(window2.id)
 
-        // Wait for debounce and retile
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        // Yield to allow the scheduled task to start, then wait for debounce
+        await Task.yield()
+        try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms > 10ms debounce
 
         // Then: Retile was triggered with new focused window
         XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
@@ -499,7 +516,7 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
     }
 
-    func testOnlyAnimatesChangedFrames() async {
+    func testAlwaysPositionsAllWindows() async {
         // Given: A window that's already at its target position
         let alreadyPositionedFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
         let window1 = makeWindow(id: 1, frame: alreadyPositionedFrame)
@@ -512,8 +529,157 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         // When: Orchestrator starts
         await sut.start()
 
-        // Then: No animations were triggered (frame unchanged)
-        XCTAssertEqual(mockAnimationService.batchAnimationCalls.count, 0)
-        XCTAssertEqual(sut.lastResult, .success(tiledCount: 0))
+        // Then: Animation is still triggered (we always position for z-order consistency)
+        // Initial tile has duration=0 so we use instant positioning, but the batch call still happens
+        XCTAssertEqual(mockAnimationService.batchAnimationCalls.count, 1)
+        XCTAssertEqual(sut.lastResult, .success(tiledCount: 1))
+    }
+
+    // MARK: - Stable Window Order Tests
+
+    func testWindowOrderRemainsStableAcrossFocusChanges() async {
+        // Given: Multiple windows in a specific order
+        let window1 = makeWindow(id: 1)
+        let window2 = makeWindow(id: 2)
+        let window3 = makeWindow(id: 3)
+        mockWindowService.windows = [window1, window2, window3]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id,
+            appName: window1.appName,
+            bundleID: window1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+
+        // Record initial input order
+        let initialInputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
+
+        // Wait for z-order suppression window (200ms) to expire
+        try? await Task.sleep(nanoseconds: 250_000_000)
+
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // Re-set the result after reset (reset clears it to empty)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: Focus changes to window3
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window3.id,
+            appName: window3.appName,
+            bundleID: window3.bundleID
+        )
+        mockWindowService.simulateWindowFocusSync(window3.id)
+
+        // Yield to allow the scheduled task to start, then wait for debounce
+        await Task.yield()
+        try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms > 10ms debounce
+
+        // Then: Window order in layout input should be stable (not reordered by z-order)
+        let newInputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
+        XCTAssertEqual(initialInputOrder, newInputOrder, "Window order should remain stable across focus changes")
+    }
+
+    func testNewWindowsAppendedToStableOrder() async {
+        // Given: One window
+        let window1 = makeWindow(id: 1)
+        mockWindowService.windows = [window1]
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+
+        // When: A new window is added
+        let window2 = makeWindow(id: 2)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        mockWindowService.simulateWindowOpenSync(window2)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        // Then: New window should be appended (window1 stays first)
+        let inputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
+        XCTAssertEqual(inputOrder.first, window1.id, "Original window should remain first in order")
+        XCTAssertEqual(inputOrder.last, window2.id, "New window should be appended to order")
+    }
+
+    func testClosedWindowsRemovedFromStableOrder() async {
+        // Given: Two windows
+        let window1 = makeWindow(id: 1)
+        let window2 = makeWindow(id: 2)
+        mockWindowService.windows = [window1, window2]
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+
+        // When: Window1 is closed
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        mockWindowService.simulateWindowCloseSync(window1.id)
+        try? await Task.sleep(nanoseconds: 50_000_000)
+
+        // Then: Only window2 remains
+        let inputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
+        XCTAssertEqual(inputOrder.count, 1)
+        XCTAssertEqual(inputOrder.first, window2.id)
+    }
+
+    // MARK: - Focus Event Suppression Tests
+
+    func testDuplicateFocusEventsIgnored() async {
+        // Given: Orchestrator is running with focused window
+        let window1 = makeWindow(id: 1)
+        let window2 = makeWindow(id: 2)
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id,
+            appName: window1.appName,
+            bundleID: window1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+
+        // When: Same window is focused multiple times rapidly
+        for _ in 1...5 {
+            mockWindowService.simulateWindowFocusSync(window1.id)
+        }
+
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Then: Should have minimal retiles (debounced + duplicate ignored)
+        XCTAssertLessThanOrEqual(mockLayoutEngine.calculateCallCount, 1,
+            "Duplicate focus events for same window should be ignored")
     }
 }
