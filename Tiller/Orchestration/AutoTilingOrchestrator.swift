@@ -28,8 +28,11 @@ final class AutoTilingOrchestrator {
     /// Stable window order for ring buffer navigation (not affected by z-order changes)
     private var stableWindowOrder: [WindowID] = []
 
-    /// Suppress focus-triggered retiles while we're adjusting z-order
-    private var isAdjustingZOrder: Bool = false
+    /// Track when we last adjusted z-order to ignore async focus events
+    private var lastZOrderAdjustment: Date?
+
+    /// Track last focused window to avoid redundant z-order changes
+    private var lastFocusedWindowID: WindowID?
 
     // MARK: - Initialization
 
@@ -86,7 +89,8 @@ final class AutoTilingOrchestrator {
         case .windowOpened, .windowClosed:
             scheduleRetile()
         case .windowFocused:
-            scheduleRetile()
+            // Focus is handled by onFocusedWindowChanged callback with dedup logic
+            break
         case .windowMoved, .windowResized:
             // Ignore move/resize to avoid fighting with user-initiated changes
             break
@@ -94,11 +98,20 @@ final class AutoTilingOrchestrator {
     }
 
     private func handleFocusChange(_ focusedWindow: FocusedWindowInfo?) {
-        // Ignore focus changes caused by our own z-order adjustments
-        guard !isAdjustingZOrder else {
-            print("[Orchestrator] Ignoring focus change during z-order adjustment")
+        // Ignore focus changes caused by our own z-order adjustments (within 200ms)
+        if let lastAdjust = lastZOrderAdjustment,
+           Date().timeIntervalSince(lastAdjust) < 0.2 {
+            print("[Orchestrator] Ignoring focus change within 200ms of z-order adjustment")
             return
         }
+
+        // Ignore if focus hasn't actually changed
+        if focusedWindow?.windowID == lastFocusedWindowID {
+            print("[Orchestrator] Ignoring duplicate focus event for same window")
+            return
+        }
+
+        lastFocusedWindowID = focusedWindow?.windowID
         // Focus changes trigger retile to update accordion positioning
         scheduleRetile()
     }
@@ -232,8 +245,9 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Set z-order BEFORE positioning to avoid flickering
-        // Order: others (back) -> prev -> next -> focused (front)
+        // Set z-order for non-focused windows only (focused is already front)
+        // Order: others (back) -> prev -> next
+        // DON'T raise focused window - it triggers focus events and it's already in front
         let focusedID = focusedWindow?.windowID
         var focusedIndex = 0
         if let fid = focusedID, let idx = stableWindowOrder.firstIndex(of: fid) {
@@ -241,11 +255,11 @@ final class AutoTilingOrchestrator {
         }
 
         let windowCount = stableWindowOrder.count
-        if windowCount > 0 {
+        if windowCount > 1 {
             let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
             let nextIndex = (focusedIndex + 1) % windowCount
 
-            // Build z-order: others first (back), then prev, then next, then focused (front)
+            // Build z-order for non-focused windows: others first (back), then prev, then next
             var zOrder: [(windowID: WindowID, pid: pid_t)] = []
 
             // Add "others" (not prev, focused, or next)
@@ -263,19 +277,17 @@ final class AutoTilingOrchestrator {
             }
 
             // Add next (if different from focused)
-            if windowCount > 1, let window = windowByID[stableWindowOrder[nextIndex]] {
+            if windowCount > 1, nextIndex != focusedIndex, let window = windowByID[stableWindowOrder[nextIndex]] {
                 zOrder.append((windowID: stableWindowOrder[nextIndex], pid: window.ownerPID))
             }
 
-            // Add focused (front)
-            if let fid = focusedID, let window = windowByID[fid] {
-                zOrder.append((windowID: fid, pid: window.ownerPID))
-            }
+            // DON'T add focused - it's already in front from user interaction
 
-            print("[Orchestrator] Z-order (back to front): \(zOrder.map { $0.windowID.rawValue })")
-            isAdjustingZOrder = true
-            animationService.raiseWindowsInOrder(zOrder)
-            isAdjustingZOrder = false
+            if !zOrder.isEmpty {
+                print("[Orchestrator] Z-order (back to front, excluding focused): \(zOrder.map { $0.windowID.rawValue })")
+                lastZOrderAdjustment = Date()
+                animationService.raiseWindowsInOrder(zOrder)
+            }
         }
 
         // Determine animation duration
