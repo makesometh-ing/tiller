@@ -26,31 +26,56 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
 
         var placements: [WindowPlacement] = []
         let container = input.containerFrame
-        let accordionOffset = CGFloat(input.accordionOffset)
+        let offset = CGFloat(input.accordionOffset)
+        let windowCount = tileableWindows.count
 
-        // All windows same size: container minus accordionOffset
-        let windowWidth = container.width - accordionOffset
+        // Window dimensions depend on count
+        // 1 window: fills container
+        // 2 windows: width = container - offset
+        // 3+ windows: width = container - 2*offset
+        let windowWidth: CGFloat
         let windowHeight = container.height
 
-        // Ring buffer indices
-        let prevIndex = (focusedIndex - 1 + tileableWindows.count) % tileableWindows.count
-        let nextIndex = (focusedIndex + 1) % tileableWindows.count
+        switch windowCount {
+        case 1:
+            windowWidth = container.width
+        case 2:
+            windowWidth = container.width - offset
+        default:
+            windowWidth = container.width - (2 * offset)
+        }
+
+        // Ring buffer indices for prev/next
+        let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
+        let nextIndex = (focusedIndex + 1) % windowCount
 
         for (index, window) in tileableWindows.enumerated() {
             let targetX: CGFloat
 
-            if index == focusedIndex {
-                // Focused: centered
-                targetX = container.minX + (accordionOffset / 2)
-            } else if index == prevIndex && tileableWindows.count > 1 {
-                // Previous: left aligned
+            switch windowCount {
+            case 1:
+                // Single window fills container
                 targetX = container.minX
-            } else if index == nextIndex && tileableWindows.count > 2 {
-                // Next: right aligned
-                targetX = container.minX + accordionOffset
-            } else {
-                // Others: centered (hidden behind focused)
-                targetX = container.minX + (accordionOffset / 2)
+            case 2:
+                // Two windows: focused left-aligned, other offset right
+                if index == focusedIndex {
+                    targetX = container.minX
+                } else {
+                    targetX = container.minX + offset
+                }
+            default:
+                // 3+ windows: prev at minX, focused at minX+offset, next at minX+2*offset
+                // Others hidden behind focused at minX+offset
+                if index == prevIndex {
+                    targetX = container.minX
+                } else if index == focusedIndex {
+                    targetX = container.minX + offset
+                } else if index == nextIndex {
+                    targetX = container.minX + (2 * offset)
+                } else {
+                    // Others: same position as focused (hidden behind)
+                    targetX = container.minX + offset
+                }
             }
 
             let targetFrame = CGRect(

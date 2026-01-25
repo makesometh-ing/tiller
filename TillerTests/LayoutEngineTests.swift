@@ -107,17 +107,23 @@ final class LayoutEngineTests: XCTestCase {
 
         XCTAssertEqual(result.placements.count, 2)
 
-        // Find placements by window ID
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
 
-        // Focused window (window2) fills container
-        XCTAssertEqual(placement2.targetFrame, containerFrame)
+        // Both windows have width = container - offset
+        let expectedWidth = containerFrame.width - CGFloat(defaultAccordionOffset)
+        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
 
-        // Left neighbor (window1) peeks from left
-        let expectedLeftX = containerFrame.minX - containerFrame.width + CGFloat(defaultAccordionOffset)
-        XCTAssertEqual(placement1.targetFrame.origin.x, expectedLeftX)
-        XCTAssertEqual(placement1.targetFrame.size, containerFrame.size)
+        // Focused window (window2) is left-aligned at container origin
+        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX)
+
+        // Other window (window1) is offset right, showing strip on right of focused
+        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX + CGFloat(defaultAccordionOffset))
+
+        // All windows stay on screen
+        XCTAssertGreaterThanOrEqual(placement1.targetFrame.minX, containerFrame.minX)
+        XCTAssertGreaterThanOrEqual(placement2.targetFrame.minX, containerFrame.minX)
     }
 
     func testTwoWindowLayoutFocusedFirst() {
@@ -135,12 +141,15 @@ final class LayoutEngineTests: XCTestCase {
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
 
-        // Focused window (window1) fills container
-        XCTAssertEqual(placement1.targetFrame, containerFrame)
+        let expectedWidth = containerFrame.width - CGFloat(defaultAccordionOffset)
 
-        // Right neighbor (window2) peeks from right
-        let expectedRightX = containerFrame.maxX - CGFloat(defaultAccordionOffset)
-        XCTAssertEqual(placement2.targetFrame.origin.x, expectedRightX)
+        // Focused window (window1) left-aligned
+        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
+        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
+
+        // Other window (window2) offset right
+        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + CGFloat(defaultAccordionOffset))
+        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
     }
 
     // MARK: - Three Window Tests
@@ -164,16 +173,28 @@ final class LayoutEngineTests: XCTestCase {
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
         let placement3 = result.placements.first(where: { $0.windowID == window3.id })!
 
-        // Focused window (window2) fills container
-        XCTAssertEqual(placement2.targetFrame, containerFrame)
+        let offset = CGFloat(defaultAccordionOffset)
+        // 3+ windows: width = container - 2*offset
+        let expectedWidth = containerFrame.width - (2 * offset)
 
-        // Left neighbor (window1) peeks from left
-        let expectedLeftX = containerFrame.minX - containerFrame.width + CGFloat(defaultAccordionOffset)
-        XCTAssertEqual(placement1.targetFrame.origin.x, expectedLeftX)
+        // All windows have same width
+        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement3.targetFrame.width, expectedWidth)
 
-        // Right neighbor (window3) peeks from right
-        let expectedRightX = containerFrame.maxX - CGFloat(defaultAccordionOffset)
-        XCTAssertEqual(placement3.targetFrame.origin.x, expectedRightX)
+        // Previous (window1) at minX
+        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
+
+        // Focused (window2) at minX + offset
+        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + offset)
+
+        // Next (window3) at minX + 2*offset
+        XCTAssertEqual(placement3.targetFrame.origin.x, containerFrame.minX + (2 * offset))
+
+        // All windows stay on screen
+        XCTAssertGreaterThanOrEqual(placement1.targetFrame.minX, containerFrame.minX)
+        XCTAssertGreaterThanOrEqual(placement2.targetFrame.minX, containerFrame.minX)
+        XCTAssertGreaterThanOrEqual(placement3.targetFrame.minX, containerFrame.minX)
     }
 
     // MARK: - Four+ Window Tests
@@ -201,22 +222,36 @@ final class LayoutEngineTests: XCTestCase {
         let placement4 = result.placements.first(where: { $0.windowID == window4.id })!
         let placement5 = result.placements.first(where: { $0.windowID == window5.id })!
 
-        // Focused window (window3) fills container
-        XCTAssertEqual(placement3.targetFrame, containerFrame)
+        let offset = CGFloat(defaultAccordionOffset)
+        let expectedWidth = containerFrame.width - (2 * offset)
 
-        // Left neighbor (window2) peeks from left
-        let expectedLeftX = containerFrame.minX - containerFrame.width + CGFloat(defaultAccordionOffset)
-        XCTAssertEqual(placement2.targetFrame.origin.x, expectedLeftX)
+        // All windows have same width
+        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement3.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement4.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement5.targetFrame.width, expectedWidth)
 
-        // Right neighbor (window4) peeks from right
-        let expectedRightX = containerFrame.maxX - CGFloat(defaultAccordionOffset)
-        XCTAssertEqual(placement4.targetFrame.origin.x, expectedRightX)
+        // Previous (window2) at minX
+        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX)
 
-        // Window1 (far left) is offscreen left
-        XCTAssertLessThan(placement1.targetFrame.maxX, containerFrame.minX)
+        // Focused (window3) at minX + offset
+        XCTAssertEqual(placement3.targetFrame.origin.x, containerFrame.minX + offset)
 
-        // Window5 (far right) is offscreen right
-        XCTAssertGreaterThan(placement5.targetFrame.minX, containerFrame.maxX)
+        // Next (window4) at minX + 2*offset
+        XCTAssertEqual(placement4.targetFrame.origin.x, containerFrame.minX + (2 * offset))
+
+        // Others (window1, window5) positioned same as focused (hidden behind)
+        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX + offset)
+        XCTAssertEqual(placement5.targetFrame.origin.x, containerFrame.minX + offset)
+
+        // CRITICAL: All windows stay ON screen
+        for placement in result.placements {
+            XCTAssertGreaterThanOrEqual(placement.targetFrame.minX, containerFrame.minX,
+                "Window must not be positioned off-screen left")
+            XCTAssertLessThanOrEqual(placement.targetFrame.maxX, containerFrame.maxX,
+                "Window must not be positioned off-screen right")
+        }
     }
 
     // MARK: - Floating Window Tests
@@ -290,15 +325,25 @@ final class LayoutEngineTests: XCTestCase {
         let result = sut.calculate(input: input)
 
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
+        let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
         let placement3 = result.placements.first(where: { $0.windowID == window3.id })!
 
-        // Left neighbor peeks by customOffset
-        let expectedLeftX = containerFrame.minX - containerFrame.width + CGFloat(customOffset)
-        XCTAssertEqual(placement1.targetFrame.origin.x, expectedLeftX)
+        let offset = CGFloat(customOffset)
 
-        // Right neighbor peeks by customOffset
-        let expectedRightX = containerFrame.maxX - CGFloat(customOffset)
-        XCTAssertEqual(placement3.targetFrame.origin.x, expectedRightX)
+        // Previous at minX
+        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
+
+        // Focused at minX + offset
+        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + offset)
+
+        // Next at minX + 2*offset
+        XCTAssertEqual(placement3.targetFrame.origin.x, containerFrame.minX + (2 * offset))
+
+        // Width = container - 2*offset
+        let expectedWidth = containerFrame.width - (2 * offset)
+        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
+        XCTAssertEqual(placement3.targetFrame.width, expectedWidth)
     }
 
     func testZeroAccordionOffset() {
@@ -314,10 +359,13 @@ final class LayoutEngineTests: XCTestCase {
         let result = sut.calculate(input: input)
 
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
+        let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
 
-        // With 0 offset, left neighbor should be completely hidden
-        let expectedLeftX = containerFrame.minX - containerFrame.width
-        XCTAssertEqual(placement1.targetFrame.origin.x, expectedLeftX)
+        // With 0 offset, both windows at same position, full container width
+        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
+        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX)
+        XCTAssertEqual(placement1.targetFrame.width, containerFrame.width)
+        XCTAssertEqual(placement2.targetFrame.width, containerFrame.width)
     }
 
     // MARK: - Container Frame Tests
@@ -393,9 +441,12 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        // First window should be treated as focused
+        // First window (window1) should be treated as focused (left-aligned)
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
-        XCTAssertEqual(placement1.targetFrame, containerFrame)
+        let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
+
+        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
+        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + CGFloat(defaultAccordionOffset))
     }
 
     func testFocusedFloatingWindowFallsBackToFirstTileable() {

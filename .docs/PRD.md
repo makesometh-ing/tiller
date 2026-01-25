@@ -122,13 +122,31 @@ Strict Layout and Containment
 
 Accordion Visual Logic
 
-* Each container displays up to three windows:
+* **Critical Rule:** All windows remain ON screen at all times. No windows are ever positioned off-screen.
 
-  * Focused window is fully visible with subtle inset.
+* **Window Positioning (Horizontal Accordion):**
 
-  * Neighboring windows are partially visible on each side (vertically or horizontally).
+  * **1 window:** Fills container completely. Position at container origin, size = container size.
 
-  * Only focused and immediate neighbor windows appear; others are hidden behind.
+  * **2 windows:**
+    * Window width = container.width - accordionOffset
+    * Focused window: left-aligned at container origin (minX)
+    * Other window: same size, positioned at (minX + accordionOffset)
+    * Result: accordionOffset visible on RIGHT of focused window showing the other window behind
+
+  * **3+ windows:**
+    * Window width = container.width - (2 * accordionOffset)
+    * Previous window: positioned at container origin (minX)
+    * Focused window: centered at (minX + accordionOffset)
+    * Next window: positioned at (minX + 2 * accordionOffset)
+    * Other windows: same position/size as focused (hidden behind it)
+    * Result: accordionOffset visible on LEFT (previous), accordionOffset visible on RIGHT (next)
+
+* **Z-Order (front to back):**
+  1. Focused window
+  2. Next window
+  3. Previous window
+  4. Other windows (behind focused)
 
 * **Configurable Accordion Offset:**
 
