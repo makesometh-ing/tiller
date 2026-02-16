@@ -49,7 +49,7 @@ struct TillerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Tiller", systemImage: "bolt.fill") {
+        MenuBarExtra("Tiller", image: "MenuBarIcon") {
             Text("Hello world")
         }
     }
