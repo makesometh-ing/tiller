@@ -24,35 +24,52 @@ linear issue update            # Update current issue
 
 For full workflow context and current issue state: `/prime`
 
+## Git Workflow
+
+All work happens on feature branches and lands in `main` via pull requests.
+
+1. `linear issue start <ID>` — creates a feature branch and moves the issue to In Progress
+2. Commit and push to the feature branch
+3. `linear issue pr` — creates a GitHub PR with issue details auto-populated
+4. PR merges into `main`
+
+Work is **NOT done** until the PR is merged into `main`.
+
 ## Landing the Plane (Session Completion)
 
-**When ending a work session**, complete ALL steps. Work is NOT complete until `git push` succeeds.
+**When ending a work session**, complete ALL steps. Work is NOT complete until the PR is merged into `main`.
 
 **MANDATORY WORKFLOW:**
 
-1. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
-2. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
-3. **Run quality gates** (if code changed) — Tests, linters, builds. File P0 issues if broken
-4. **Push to remote**:
+1. **Run quality gates** (if code changed) — Tests, linters, builds. File P0 issues if broken
+2. **Commit and push to the feature branch**:
 
    ```bash
    git add <files>
    git commit -m "<LINEAR-ID>: description"
-   git pull --rebase
    git push
    git status  # MUST show "up to date with origin"
    ```
 
-5. **Verify** — All changes committed AND pushed, Linear reflects actual state
-6. **Hand off** — Provide context for next session: what was done, what's next, any blockers
+3. **Create PR and merge into main**:
+
+   ```bash
+   linear issue pr                # Create PR from current branch
+   gh pr merge --squash --auto    # Auto-merge when checks pass
+   ```
+
+4. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
+5. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
+6. **Verify** — PR is merged into `main`, Linear reflects actual state
+7. **Hand off** — Provide context for next session: what was done, what's next, any blockers
 
 **CRITICAL RULES:**
 
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing — that leaves work stranded locally
-- NEVER say "ready to push when you are" — YOU must push
-- If push fails, resolve and retry until it succeeds
-- Commit messages MUST reference the Linear issue ID (e.g. `ENG-123: fix auth token refresh`)
+- Work is NOT complete until the PR is merged into `main`
+- NEVER stop before the PR is created and set to merge — that leaves work stranded on a branch
+- NEVER say "ready to push when you are" — YOU must push, create the PR, and merge
+- If push or merge fails, resolve and retry until it succeeds
+- Commit messages MUST reference the Linear issue ID (e.g. `TILLER-27: fix auth token refresh`)
 - Do NOT use TodoWrite, TaskCreate, or markdown files for task tracking — use Linear
 
 ## Project documentation
