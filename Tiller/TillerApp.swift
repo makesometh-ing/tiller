@@ -30,16 +30,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func startOrchestrator() {
-        orchestrator = AutoTilingOrchestrator(
+        let orch = AutoTilingOrchestrator(
             windowDiscoveryManager: WindowDiscoveryManager.shared,
             monitorManager: MonitorManager.shared,
             configManager: ConfigManager.shared,
             layoutEngine: FullscreenLayoutEngine(),
             animationService: WindowAnimationService()
         )
+        self.orchestrator = orch
+
+        TillerMenuState.shared.configure(orchestrator: orch)
 
         Task {
-            await orchestrator?.start()
+            await orch.start()
+            TillerMenuState.shared.isTilingEnabled = true
         }
     }
 }
@@ -50,7 +54,7 @@ struct TillerApp: App {
 
     var body: some Scene {
         MenuBarExtra("Tiller", image: "MenuBarIcon") {
-            Text("Hello world")
+            TillerMenuView(menuState: TillerMenuState.shared)
         }
     }
 }
