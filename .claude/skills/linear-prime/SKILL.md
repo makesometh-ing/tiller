@@ -8,13 +8,16 @@ description: Load current Linear project context. Run at session start to orient
 ## Current State
 
 ### In Progress
+
 !`linear issue list -s started`
 
 ### Unstarted (Ready to Work)
+
 !`linear issue list`
 
 ### Current Branch Issue
-!`linear issue view`
+
+!`linear issue view 2>/dev/null || echo "Not on an issue branch. List issues to find out waht's next"`
 
 ## Workflow Rules
 
@@ -27,6 +30,7 @@ description: Load current Linear project context. Run at session start to orient
 ## Essential Commands
 
 ### Finding Work
+
 - `linear issue list` — Your unstarted assigned issues
 - `linear issue list -s started` — Your in-progress work
 - `linear issue list -A` — All assignees (team view)
@@ -34,6 +38,7 @@ description: Load current Linear project context. Run at session start to orient
 - `linear issue view -w` — Open current issue in browser
 
 ### Creating & Updating
+
 - `linear issue create` — Interactive issue creation
 - `linear issue create -t "Title" -d "Description"` — Non-interactive creation
 - `linear issue start <ID>` — Start issue, create/switch to branch
@@ -41,12 +46,15 @@ description: Load current Linear project context. Run at session start to orient
 - `linear issue comment add` — Add comment to current issue
 
 ### Project Context
+
 - `linear issue list -A -s started` — Everything in flight across the team
 - `linear project list` — Active projects
 - `linear project view` — Project details
 
 ### Direct API (escape hatch)
+
 For queries the CLI doesn't cover, use the GraphQL API directly:
+
 ```bash
 linear schema -o /tmp/linear-schema.graphql
 curl -s -X POST https://api.linear.app/graphql \
@@ -63,12 +71,14 @@ Before ending any session, complete ALL of the following:
 2. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups
 3. **Quality gates** (if code changed) — Run tests, linters, builds
 4. **Push**:
+
    ```bash
    git add <files>
    git commit -m "<LINEAR-ID>: description"
    git pull --rebase
    git push
    ```
+
 5. **Verify** — `git status` must show up to date with origin. Linear must reflect actual state.
 6. **Hand off** — State what was done, what's next, and any blockers for the next session.
 

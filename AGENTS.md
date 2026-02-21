@@ -54,3 +54,16 @@ For full workflow context and current issue state: `/prime`
 - If push fails, resolve and retry until it succeeds
 - Commit messages MUST reference the Linear issue ID (e.g. `ENG-123: fix auth token refresh`)
 - Do NOT use TodoWrite, TaskCreate, or markdown files for task tracking — use Linear
+
+## Project documentation
+
+Project documentation is always available in `docs/`. This includes:
+
+- PRDs
+- Diagrams
+- Mock ups
+- Technical specifications
+
+### Sticking to requirements
+
+**Before beginning work on an issue**, re-read the PRD to verify if the PRD has changed since the issue was created or if the issue does not capture all relevant info from the documentation. If there is missing information, notify the user and offer to update the issue before starting work.
