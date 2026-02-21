@@ -9,19 +9,23 @@ struct TillerMenuView: View {
     let menuState: TillerMenuState
 
     var body: some View {
-        Toggle("Tiling", isOn: Binding(
-            get: { menuState.isTilingEnabled },
-            set: { _ in menuState.toggleTiling() }
-        ))
+        Button {
+            menuState.toggleTiling()
+        } label: {
+            if menuState.isTilingEnabled {
+                Text("✓  Tiller is tiling your windows...")
+            } else {
+                Text("✗  Tiller is sleeping...")
+            }
+        }
         .disabled(!menuState.canToggleTiling)
 
         Divider()
 
         ForEach(Array(menuState.monitors.enumerated()), id: \.element.id) { index, monitor in
             let monitorIndex = index + 1
-            let isActive = monitor.id == menuState.activeMonitorID
 
-            Text(monitorLabel(index: monitorIndex, name: monitor.name, isActive: isActive))
+            Text("[\(monitorIndex)] \(monitor.name)")
 
             Button("  1-Monocle") {
                 // No-op — Monocle is the only layout in Phase 1
@@ -42,13 +46,5 @@ struct TillerMenuView: View {
             menuState.quit()
         }
         .keyboardShortcut("q")
-    }
-
-    private func monitorLabel(index: Int, name: String, isActive: Bool) -> String {
-        if isActive {
-            return "[\(index)] \(index)-\(name)"
-        } else {
-            return "      \(index)-\(name)"
-        }
     }
 }
