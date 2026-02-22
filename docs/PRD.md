@@ -42,27 +42,35 @@
 
 * A dynamic status string is always displayed to the right of the Tiller menu bar icon.
 
-* **Format:** `[<active monitor number>] <layer indicator>`
+* **Format:** `<monitor_number> | <layout_number | D> | <layer_key | * | ->`
 
-* **Layer indicator values:**
+* **Segments:**
 
-  * `-` — leader mode is not active (idle state)
+  * **Monitor number** — 1-indexed number of the currently active monitor
 
-  * `L` — leader mode is active, at the root layer
+  * **Layout indicator** — the display number of the active built-in layout (1–9), or `D` when a dynamic layout is active (container manually resized)
 
-  * `<KEY>*` — leader mode is active and the user has entered a sub-layer, where `<KEY>` is the uppercased sub-layer key and `*` denotes it is a layer (e.g. `M*` for the monitor sub-layer)
+  * **Layer indicator:**
+
+    * `-` — leader mode is not active (idle state)
+
+    * `*` — leader mode is active, at the root layer
+
+    * `<key>` — leader mode is active and the user has entered a sub-layer, where `<key>` is the sub-layer key (e.g. `m` for the monitor sub-layer)
 
 * **Examples:**
 
-  * `[1] -` — monitor 1 focused, leader not active
+  * `1 | 1 | -` — monitor 1 focused, monocle layout, leader not active
 
-  * `[1] L` — monitor 1 focused, leader active (root)
+  * `1 | 2 | *` — monitor 1 focused, split halves layout, leader active (root)
 
-  * `[1] M*` — monitor 1 focused, leader active, in monitor sub-layer
+  * `2 | D | m` — monitor 2 focused, dynamic layout, in monitor sub-layer
 
-  * `[2] F*` — monitor 2 focused, leader active, in a sub-layer mapped to `f`
+  * `1 | 1 | f` — monitor 1 focused, monocle layout, in a sub-layer mapped to `f`
 
-* The status text updates in real-time as the active monitor or leader state changes.
+* The status text updates in real-time as the active monitor, layout, or leader state changes.
+
+* When a monitor has no layout memory (first seen), layout defaults to 1 (monocle).
 
 * **Monitor Navigation Row:**
 

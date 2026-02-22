@@ -189,12 +189,12 @@ final class TillerMenuStateTests: XCTestCase {
     // MARK: - Status Text
 
     func testStatusTextDefaultsToMonitor1Idle() {
-        XCTAssertEqual(sut.statusText, "[1] -")
+        XCTAssertEqual(sut.statusText, "1 | 1 | -")
     }
 
     func testStatusTextReflectsLeaderActive() {
         sut.leaderState = .leaderActive
-        XCTAssertEqual(sut.statusText, "[1] L")
+        XCTAssertEqual(sut.statusText, "1 | 1 | *")
     }
 
     func testStatusTextCombinesMonitorAndLeader() {
@@ -211,13 +211,34 @@ final class TillerMenuStateTests: XCTestCase {
         sut.activeMonitorID = MonitorID(rawValue: 2)
         sut.leaderState = .leaderActive
 
-        XCTAssertEqual(sut.statusText, "[2] L")
+        XCTAssertEqual(sut.statusText, "2 | 1 | *")
     }
 
     func testStatusTextDefaultsToMonitor1WhenNoActiveMonitor() {
         sut.activeMonitorID = nil
         sut.leaderState = .leaderActive
-        XCTAssertEqual(sut.statusText, "[1] L")
+        XCTAssertEqual(sut.statusText, "1 | 1 | *")
+    }
+
+    func testStatusTextShowsSubLayerKey() {
+        sut.configure(orchestrator: orchestrator)
+        sut.leaderState = .subLayerActive(key: "m")
+        XCTAssertEqual(sut.statusText, "1 | 1 | m")
+    }
+
+    func testStatusTextShowsLayoutNumber() async {
+        let window = MockWindowService.createTestWindow(id: 1, title: "W1", frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window]
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window.id, pid: window.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039))
+        ])
+
+        sut.configure(orchestrator: orchestrator)
+        await orchestrator.start()
+
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+
+        XCTAssertEqual(sut.statusText, "1 | 2 | -")
     }
 
     // MARK: - Monitor Updates

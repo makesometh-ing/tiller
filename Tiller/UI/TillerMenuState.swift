@@ -24,14 +24,27 @@ final class TillerMenuState {
     // MARK: - Status Text
 
     var statusText: String {
-        let layer = leaderState == .leaderActive ? "L" : "-"
-        return "[\(activeMonitorNumber)] \(layer)"
+        let layerSegment: String
+        switch leaderState {
+        case .idle: layerSegment = "-"
+        case .leaderActive: layerSegment = "*"
+        case .subLayerActive(let key): layerSegment = key
+        }
+        return "\(activeMonitorNumber) | \(activeLayoutDisplayNumber) | \(layerSegment)"
     }
 
     private var activeMonitorNumber: Int {
         guard let activeID = activeMonitorID,
               let index = monitors.firstIndex(where: { $0.id == activeID }) else { return 1 }
         return index + 1
+    }
+
+    private var activeLayoutDisplayNumber: String {
+        guard let activeID = activeMonitorID,
+              let layout = activeLayoutPerMonitor[activeID] else {
+            return "1"
+        }
+        return String(layout.displayNumber)
     }
 
     // MARK: - Dependencies
