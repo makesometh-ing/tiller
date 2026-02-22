@@ -34,6 +34,9 @@ final class AutoTilingOrchestrator {
     /// Track last focused window to avoid redundant z-order changes
     private var lastFocusedWindowID: WindowID?
 
+    /// Track last focused tileable window for accordion freeze when non-resizable is focused
+    private var lastFocusedTileableWindowID: WindowID?
+
     // MARK: - Initialization
 
     init(
@@ -154,32 +157,27 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Separate tileable windows (accordion ring buffer) from non-resizable (centered only)
-        // Non-resizable windows get placements from the layout engine but don't participate
-        // in the ring buffer or z-order management
+        // Identify tileable windows (for accordion positioning and z-order)
         let tileableWindows = windows.filter { !$0.isFloating && $0.isResizable }
         let tileableIDs = Set(tileableWindows.map { $0.id })
 
-        // Update stable window order with tileable windows only
-        stableWindowOrder.removeAll { !tileableIDs.contains($0) }
-        for window in tileableWindows {
+        // Ring buffer includes all non-floating windows (tileable + non-resizable)
+        // so non-resizable windows can be cycled to via keyboard shortcuts
+        let nonFloatingWindows = windows.filter { !$0.isFloating }
+        let nonFloatingIDs = Set(nonFloatingWindows.map { $0.id })
+
+        stableWindowOrder.removeAll { !nonFloatingIDs.contains($0) }
+        for window in nonFloatingWindows {
             if !stableWindowOrder.contains(window.id) {
                 stableWindowOrder.append(window.id)
             }
         }
 
-        // Create window lookup for sorting (all windows, not just tileable)
+        // Create window lookup for sorting
         let windowByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
 
-        // Sort all windows by stable order (tileable first in ring order, then others)
-        let stableOrderedWindows: [WindowInfo] = {
-            var ordered = stableWindowOrder.compactMap { windowByID[$0] }
-            // Append non-tileable, non-floating windows (they'll be passed to the layout engine)
-            for window in windows where !window.isFloating && !window.isResizable {
-                ordered.append(window)
-            }
-            return ordered
-        }()
+        // Order windows by ring buffer position (floating windows excluded)
+        let stableOrderedWindows = stableWindowOrder.compactMap { windowByID[$0] }
 
         print("[Orchestrator] Stable window order: \(stableWindowOrder.map { $0.rawValue })")
 
@@ -212,6 +210,18 @@ final class AutoTilingOrchestrator {
             }
         }
 
+        // Track last focused tileable window for accordion freeze
+        let focusedID = focusedWindow?.windowID
+        let focusedIsTileable = focusedID.map { tileableIDs.contains($0) } ?? false
+
+        if let fid = focusedID, tileableIDs.contains(fid) {
+            lastFocusedTileableWindowID = fid
+        }
+
+        // When a non-resizable window is focused, freeze the accordion:
+        // pass the last focused tileable window ID so accordion positioning stays put
+        let accordionFocusID: WindowID? = focusedIsTileable ? focusedID : lastFocusedTileableWindowID
+
         // Calculate layouts and collect animations for each monitor
         var allAnimations: [(windowID: WindowID, pid: pid_t, startFrame: CGRect, targetFrame: CGRect)] = []
 
@@ -226,7 +236,7 @@ final class AutoTilingOrchestrator {
 
             let input = LayoutInput(
                 windows: monitorWindows,
-                focusedWindowID: focusedWindow?.windowID,
+                focusedWindowID: accordionFocusID,
                 containerFrame: containerFrame,
                 accordionOffset: tillerConfig.accordionOffset
             )
@@ -257,31 +267,28 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Set z-order for tileable (accordion) windows only.
-        // Non-resizable windows are centered and not part of the ring buffer — don't manage their z-order.
-        // Order: others (back) -> prev -> next
-        // DON'T raise focused window - it triggers focus events and it's already in front
-        let focusedID = focusedWindow?.windowID
+        // Z-order management: accordion z-order uses tileable windows only,
+        // even though stableWindowOrder includes non-resizable windows for cycling.
+        // DON'T raise focused window - it triggers focus events and it's already in front.
+        let tileableRingOrder = stableWindowOrder.filter { tileableIDs.contains($0) }
+        let tileableCount = tileableRingOrder.count
+        let focusedIsNonResizable = focusedID.map { nonFloatingIDs.contains($0) && !tileableIDs.contains($0) } ?? false
 
-        // Only adjust z-order if the focused window is tileable (in the ring buffer).
-        // When a non-resizable window is focused, leave z-order unchanged.
-        let focusedIsTileable = focusedID.map { tileableIDs.contains($0) } ?? false
-        var focusedIndex = 0
-        if focusedIsTileable, let fid = focusedID, let idx = stableWindowOrder.firstIndex(of: fid) {
-            focusedIndex = idx
-        }
+        if tileableCount > 1 && focusedIsTileable {
+            // Accordion z-order: position tileable windows as prev/focused/next
+            var focusedTileableIdx = 0
+            if let fid = focusedID, let idx = tileableRingOrder.firstIndex(of: fid) {
+                focusedTileableIdx = idx
+            }
 
-        let windowCount = stableWindowOrder.count
-        if windowCount > 1 && focusedIsTileable {
-            let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
-            let nextIndex = (focusedIndex + 1) % windowCount
+            let prevIndex = (focusedTileableIdx - 1 + tileableCount) % tileableCount
+            let nextIndex = (focusedTileableIdx + 1) % tileableCount
 
-            // Build z-order for non-focused windows: others first (back), then prev, then next
             var zOrder: [(windowID: WindowID, pid: pid_t)] = []
 
             // Add "others" (not prev, focused, or next)
-            for (idx, windowID) in stableWindowOrder.enumerated() {
-                if idx != focusedIndex && idx != prevIndex && idx != nextIndex {
+            for (idx, windowID) in tileableRingOrder.enumerated() {
+                if idx != focusedTileableIdx && idx != prevIndex && idx != nextIndex {
                     if let window = windowByID[windowID] {
                         zOrder.append((windowID: windowID, pid: window.ownerPID))
                     }
@@ -289,22 +296,25 @@ final class AutoTilingOrchestrator {
             }
 
             // Add prev (if different from focused and next)
-            if windowCount > 2, let window = windowByID[stableWindowOrder[prevIndex]] {
-                zOrder.append((windowID: stableWindowOrder[prevIndex], pid: window.ownerPID))
+            if tileableCount > 2, let window = windowByID[tileableRingOrder[prevIndex]] {
+                zOrder.append((windowID: tileableRingOrder[prevIndex], pid: window.ownerPID))
             }
 
             // Add next (if different from focused)
-            if windowCount > 1, nextIndex != focusedIndex, let window = windowByID[stableWindowOrder[nextIndex]] {
-                zOrder.append((windowID: stableWindowOrder[nextIndex], pid: window.ownerPID))
+            if tileableCount > 1, nextIndex != focusedTileableIdx, let window = windowByID[tileableRingOrder[nextIndex]] {
+                zOrder.append((windowID: tileableRingOrder[nextIndex], pid: window.ownerPID))
             }
-
-            // DON'T add focused - it's already in front from user interaction
 
             if !zOrder.isEmpty {
                 print("[Orchestrator] Z-order (back to front, excluding focused): \(zOrder.map { $0.windowID.rawValue })")
                 lastZOrderAdjustment = Date()
                 animationService.raiseWindowsInOrder(zOrder)
             }
+        } else if focusedIsNonResizable, let fid = focusedID, let focusedWin = windowByID[fid] {
+            // Non-resizable overlay: raise it above the frozen accordion
+            print("[Orchestrator] Raising non-resizable window \(fid.rawValue) to top (overlay)")
+            lastZOrderAdjustment = Date()
+            animationService.raiseWindowsInOrder([(windowID: fid, pid: focusedWin.ownerPID)])
         }
 
         // Determine animation duration
