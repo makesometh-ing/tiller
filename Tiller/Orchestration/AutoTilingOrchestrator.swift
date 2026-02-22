@@ -92,10 +92,29 @@ final class AutoTilingOrchestrator {
         windowDiscoveryManager.onFocusedWindowChanged = nil
     }
 
-    // MARK: - Layout Switching (stubs for TILLER-46)
+    // MARK: - Layout Switching
 
     func switchLayout(to layout: LayoutID, on monitorID: MonitorID) {
-        // Will be wired in TILLER-46
+        guard var state = monitorStates[monitorID] else { return }
+        guard state.activeLayout != layout else { return }
+
+        let tillerConfig = configManager.getConfig()
+        guard let monitor = monitorManager.connectedMonitors.first(where: { $0.id == monitorID }) else { return }
+
+        let containerFrames = LayoutDefinitions.containerFrames(
+            for: layout,
+            in: monitor.visibleFrame,
+            margin: CGFloat(tillerConfig.margin),
+            padding: CGFloat(tillerConfig.padding)
+        )
+
+        let windows = windowDiscoveryManager.visibleWindows
+        let windowFrames = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0.frame) })
+
+        state.switchLayout(to: layout, containerFrames: containerFrames, windowFrames: windowFrames)
+        monitorStates[monitorID] = state
+
+        scheduleRetile()
     }
 
     // MARK: - Window/Container Operations (stubs for TILLER-48)
