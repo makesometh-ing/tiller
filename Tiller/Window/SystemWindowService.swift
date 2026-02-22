@@ -6,7 +6,6 @@
 import AppKit
 import ApplicationServices
 import Foundation
-import os
 
 @_silgen_name("_AXUIElementGetWindow")
 private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
@@ -176,6 +175,12 @@ final class SystemWindowService: WindowServiceProtocol {
     }
 
     private func queryWindowAttributes(pid: pid_t, windowID: CGWindowID, bundleID: String?) -> (isResizable: Bool, isFloating: Bool) {
+        let result = queryWindowAttributesInner(pid: pid, windowID: windowID, bundleID: bundleID)
+        TillerLogger.debug("window-discovery", "Window \(windowID) (\(bundleID ?? "unknown")) -> isResizable=\(result.isResizable), isFloating=\(result.isFloating)")
+        return result
+    }
+
+    private func queryWindowAttributesInner(pid: pid_t, windowID: CGWindowID, bundleID: String?) -> (isResizable: Bool, isFloating: Bool) {
         // Check if app is in always-floating list (system utilities that can't be positioned)
         if let bundleID = bundleID, Self.alwaysFloatingApps.contains(bundleID) {
             return (isResizable: true, isFloating: true)
@@ -258,11 +263,11 @@ final class SystemWindowService: WindowServiceProtocol {
 
                 if resizableResult == .success,
                    let resizable = resizableRef as? Bool {
-                    TillerLogger.windowDiscovery.debug("Window \(windowID) (\(bundleID ?? "unknown")): AXResizable = \(resizable)")
+                    TillerLogger.debug("window-discovery", "Window \(windowID) (\(bundleID ?? "unknown")): AXResizable = \(resizable)")
                     return (isResizable: resizable, isFloating: false)
                 }
 
-                TillerLogger.windowDiscovery.debug("Window \(windowID) (\(bundleID ?? "unknown")): AXResizable query failed (error \(resizableResult.rawValue))")
+                TillerLogger.debug("window-discovery", "Window \(windowID) (\(bundleID ?? "unknown")): AXResizable query failed (error \(resizableResult.rawValue))")
 
                 // AXResizable failed — try min/max size probe as fallback.
                 var minSizeRef: CFTypeRef?
@@ -279,7 +284,7 @@ final class SystemWindowService: WindowServiceProtocol {
                     if AXValueGetValue(minVal as! AXValue, .cgSize, &minSize),
                        AXValueGetValue(maxVal as! AXValue, .cgSize, &maxSize) {
                         let isFixed = (minSize.width == maxSize.width && minSize.height == maxSize.height)
-                        TillerLogger.windowDiscovery.info("Window \(windowID) min/max probe: min=\(String(describing: minSize)), max=\(String(describing: maxSize)), fixed=\(isFixed)")
+                        TillerLogger.debug("window-discovery", "Window \(windowID) (\(bundleID ?? "unknown")): min/max probe: min=\(minSize), max=\(maxSize), fixed=\(isFixed)")
                         return (isResizable: !isFixed, isFloating: false)
                     }
                 }
@@ -288,7 +293,7 @@ final class SystemWindowService: WindowServiceProtocol {
                 // and the app has .regular activation policy.
                 // Default to resizable: these are normal app windows where attribute
                 // queries failed (can happen in debug builds or certain app frameworks).
-                TillerLogger.windowDiscovery.info("Window \(windowID) (\(bundleID ?? "unknown")): all probes failed, defaulting to resizable (window found in AX tree)")
+                TillerLogger.debug("window-discovery", "Window \(windowID) (\(bundleID ?? "unknown")): all probes failed, defaulting to resizable (window found in AX tree)")
                 return (isResizable: true, isFloating: false)
             }
         }

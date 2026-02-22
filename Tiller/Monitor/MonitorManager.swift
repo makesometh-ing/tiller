@@ -5,7 +5,6 @@
 
 import AppKit
 import Foundation
-import os
 
 protocol MonitorServiceProtocol {
     func getConnectedMonitors() -> [MonitorInfo]
@@ -141,18 +140,18 @@ final class MonitorManager {
     }
 
     func startMonitoring() {
-        TillerLogger.monitor.info("Starting monitor detection")
+        TillerLogger.debug("monitor","Starting monitor detection")
 
         let monitors = monitorService.getConnectedMonitors()
-        TillerLogger.monitor.info("Found \(monitors.count) connected monitor(s)")
+        TillerLogger.debug("monitor","Found \(monitors.count) connected monitor(s)")
         for monitor in monitors {
-            TillerLogger.monitor.info("  - \(monitor.name) (ID: \(monitor.id.rawValue), main: \(monitor.isMain))")
+            TillerLogger.debug("monitor","  - \(monitor.name) (ID: \(monitor.id.rawValue), main: \(monitor.isMain))")
         }
 
         if _activeMonitor == nil {
             _activeMonitor = monitorService.getMainMonitor()
             if let active = _activeMonitor {
-                TillerLogger.monitor.info("Set initial active monitor: \(active.name)")
+                TillerLogger.debug("monitor","Set initial active monitor: \(active.name)")
             }
         }
 
@@ -172,7 +171,7 @@ final class MonitorManager {
             NotificationCenter.default.removeObserver(observer)
             notificationObserver = nil
         }
-        TillerLogger.monitor.info("Stopped monitor detection")
+        TillerLogger.debug("monitor","Stopped monitor detection")
     }
 
     func updateActiveMonitor(forWindowAtPoint point: CGPoint) {
@@ -195,16 +194,16 @@ final class MonitorManager {
     }
 
     func handleScreenConfigurationChange() {
-        TillerLogger.monitor.info("Screen configuration changed")
+        TillerLogger.debug("monitor","Screen configuration changed")
 
         let currentMonitors = monitorService.getConnectedMonitors()
-        TillerLogger.monitor.info("Now \(currentMonitors.count) connected monitor(s)")
+        TillerLogger.debug("monitor","Now \(currentMonitors.count) connected monitor(s)")
 
         onMonitorChange?(.configurationChanged)
 
         if let activeID = _activeMonitor?.id {
             if !currentMonitors.contains(where: { $0.id == activeID }) {
-                TillerLogger.monitor.info("Active monitor disconnected, falling back to main")
+                TillerLogger.debug("monitor","Active monitor disconnected, falling back to main")
                 _activeMonitor = monitorService.getMainMonitor()
                 onActiveMonitorChanged?(_activeMonitor)
             }

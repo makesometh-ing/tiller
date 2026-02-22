@@ -698,6 +698,7 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 | Show Dock Icon | Boolean | true/false | false | Yes | — |
 | Animation Duration | Integer (ms) | 150–300 | 200 | Yes | Out-of-range: Red border |
 | Floating App List | List | App names | None | Yes | Typos: Suggest correction |
+| Log Location | String (path) | Absolute file path or null | ~/.tiller/logs/tiller-debug.log | No (requires relaunch) | Invalid path: Falls back to default |
 
 ## Performance and Scalability
 
@@ -715,13 +716,22 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
 ### Structured Logging
 
-* Tiller uses macOS unified logging (OSLog) with subsystem `ing.makesometh.Tiller` and the following categories: `orchestration`, `window-discovery`, `layout`, `animation`, `monitor`, `config`.
+Tiller uses a two-tier logging system:
 
-* Logs can be queried via:
-  * `log stream --predicate 'subsystem == "ing.makesometh.Tiller"' --level debug` (live)
-  * `log show --predicate 'subsystem == "ing.makesometh.Tiller"' --last 1h > tiller-logs.txt` (export)
+**File-based debug logging (primary diagnostics):**
 
-* Log levels: `.debug` for frame coordinates and per-window iteration, `.info` for window classification decisions and state changes, `.error` for failures.
+* All debug and informational messages are written to a log file that is replaced on each app launch (current session only).
+* Default path: `~/.tiller/logs/tiller-debug.log`
+* Configurable via `logLocation` in the config file (`~/.config/tiller/config.json`). Set to any absolute path. When `null` or absent, the default path is used.
+* Categories: `orchestration`, `window-discovery`, `layout`, `animation`, `monitor`, `config`
+* Format: `[HH:mm:ss.SSS] [category] message`
+
+**OSLog (production errors only):**
+
+* Subsystem: `ing.makesometh.Tiller`
+* Only `.error` level messages go through OSLog — these are always persisted by the unified logging system.
+* Query via: `log show --predicate 'subsystem == "ing.makesometh.Tiller"' --info --debug --last 1h`
+* Note: use `--info --debug` flags, NOT `--level debug` (which is not a valid flag).
 
 ---
 

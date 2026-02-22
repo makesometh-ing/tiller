@@ -38,7 +38,7 @@ final class WindowPositioner: WindowPositionerProtocol {
         if minimizedResult == .success,
            let isMinimized = minimizedRef as? Bool,
            isMinimized {
-            TillerLogger.animation.debug("Skipping minimized window \(windowID.rawValue)")
+            TillerLogger.debug("animation", "Skipping minimized window \(windowID.rawValue)")
             return .success(())  // Treat as success but don't position
         }
 
@@ -73,7 +73,7 @@ final class WindowPositioner: WindowPositionerProtocol {
         if sizeResult != .success {
             // Non-resizable windows can be positioned but not resized — this is expected.
             // Position was already set successfully above, so treat this as success.
-            TillerLogger.animation.debug("Size-set failed for window \(windowID.rawValue) (error \(sizeResult.rawValue)), position was set — tolerating")
+            TillerLogger.debug("animation", "Size-set failed for window \(windowID.rawValue) (error \(sizeResult.rawValue)), position was set — tolerating")
             return .success(())
         }
 
@@ -95,7 +95,7 @@ final class WindowPositioner: WindowPositionerProtocol {
         if minimizedResult == .success,
            let isMinimized = minimizedRef as? Bool,
            isMinimized {
-            TillerLogger.animation.debug("Skipping raise for minimized window \(windowID.rawValue)")
+            TillerLogger.debug("animation", "Skipping raise for minimized window \(windowID.rawValue)")
             return .success(())
         }
 
@@ -114,7 +114,7 @@ final class WindowPositioner: WindowPositionerProtocol {
         if isTrustedCache == nil || lastTrustedCheck == nil || now.timeIntervalSince(lastTrustedCheck!) > 10 {
             isTrustedCache = AXIsProcessTrusted()
             lastTrustedCheck = now
-            TillerLogger.animation.info("AXIsProcessTrusted() = \(self.isTrustedCache!)")
+            TillerLogger.debug("animation", "AXIsProcessTrusted() = \(self.isTrustedCache!)")
         }
 
         guard isTrustedCache == true else {
@@ -157,7 +157,7 @@ final class WindowPositioner: WindowPositionerProtocol {
             }
         }
 
-        TillerLogger.animation.debug("Window \(windowID.rawValue) not found in \(windows.count) AX windows for pid \(pid)")
+        TillerLogger.debug("animation", "Window \(windowID.rawValue) not found in \(windows.count) AX windows for pid \(pid)")
         return nil
     }
 

@@ -10,6 +10,12 @@ struct TillerConfig: Codable, Equatable, Sendable {
     var padding: Int
     var accordionOffset: Int
     var floatingApps: [String]
+    var logLocation: String?
+
+    static let defaultLogPath: String = {
+        let home = NSHomeDirectory()
+        return (home as NSString).appendingPathComponent(".tiller/logs/tiller-debug.log")
+    }()
 
     static let `default` = TillerConfig(
         margin: 8,
@@ -17,7 +23,8 @@ struct TillerConfig: Codable, Equatable, Sendable {
         accordionOffset: 16,
         floatingApps: [
             "pro.betterdisplay.BetterDisplay"  // Overlay/utility windows that can't be positioned
-        ]
+        ],
+        logLocation: nil  // nil = use default: ~/.tiller/logs/tiller-debug.log
     )
 
     enum ValidationRange {

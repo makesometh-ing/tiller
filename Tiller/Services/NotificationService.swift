@@ -27,7 +27,7 @@ final class SystemNotificationService: NotificationServiceProtocol {
     }
 
     func showAccessibilityPermissionGranted() {
-        TillerLogger.config.info("Accessibility permission granted.")
+        TillerLogger.debug("config", "Accessibility permission granted.")
     }
 }
 

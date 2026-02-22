@@ -4,14 +4,13 @@
 //
 
 import CoreGraphics
-import os
 
 /// Horizontal accordion layout.
 /// All windows same size, overlapping. Focused centered, prev/next offset to show edges.
 final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
 
     func calculate(input: LayoutInput) -> LayoutResult {
-        TillerLogger.layout.debug("Received \(input.windows.count) windows, focused=\(input.focusedWindowID?.rawValue ?? 0)")
+        TillerLogger.debug("layout","Received \(input.windows.count) windows, focused=\(input.focusedWindowID?.rawValue ?? 0)")
 
         let tileableWindows = input.windows.filter { window in
             !window.isFloating && window.isResizable
@@ -21,7 +20,7 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
             !window.isFloating && !window.isResizable
         }
 
-        TillerLogger.layout.debug("Tileable: \(tileableWindows.count), non-resizable: \(nonResizableWindows.count)")
+        TillerLogger.debug("layout","Tileable: \(tileableWindows.count), non-resizable: \(nonResizableWindows.count)")
 
         guard !tileableWindows.isEmpty || !nonResizableWindows.isEmpty else {
             return LayoutResult(placements: [])
@@ -62,8 +61,8 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
             let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
             let nextIndex = (focusedIndex + 1) % windowCount
 
-            TillerLogger.layout.debug("Ring: prev=\(prevIndex) focused=\(focusedIndex) next=\(nextIndex)")
-            TillerLogger.layout.debug("Container: \(String(describing: container)), offset=\(offset), windowWidth=\(windowWidth)")
+            TillerLogger.debug("layout","Ring: prev=\(prevIndex) focused=\(focusedIndex) next=\(nextIndex)")
+            TillerLogger.debug("layout","Container: \(String(describing: container)), offset=\(offset), windowWidth=\(windowWidth)")
 
             for (index, window) in tileableWindows.enumerated() {
                 let targetX: CGFloat
@@ -127,7 +126,7 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
                     height: windowSize.height
                 )
 
-                TillerLogger.layout.info("Centering non-resizable window \(window.id.rawValue) (\(window.appName)) at \(String(describing: centeredFrame))")
+                TillerLogger.debug("layout","Centering non-resizable window \(window.id.rawValue) (\(window.appName)) at \(String(describing: centeredFrame))")
 
                 placements.append(WindowPlacement(
                     windowID: window.id,
@@ -135,7 +134,7 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
                     targetFrame: centeredFrame
                 ))
             } else {
-                TillerLogger.layout.info("Non-resizable window \(window.id.rawValue) (\(window.appName)) too large for container, skipping")
+                TillerLogger.debug("layout","Non-resizable window \(window.id.rawValue) (\(window.appName)) too large for container, skipping")
             }
         }
 
