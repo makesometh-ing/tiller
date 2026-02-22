@@ -29,6 +29,7 @@ final class LayoutEngineTests: XCTestCase {
         title: String = "Window",
         isFloating: Bool = false,
         isResizable: Bool = true,
+        frame: CGRect = CGRect(x: 100, y: 100, width: 800, height: 600),
         pid: pid_t = 1
     ) -> WindowInfo {
         WindowInfo(
@@ -36,7 +37,7 @@ final class LayoutEngineTests: XCTestCase {
             title: title,
             appName: "TestApp",
             bundleID: "com.test.app",
-            frame: CGRect(x: 100, y: 100, width: 800, height: 600),
+            frame: frame,
             isResizable: isResizable,
             isFloating: isFloating,
             ownerPID: pid
@@ -290,11 +291,82 @@ final class LayoutEngineTests: XCTestCase {
 
     // MARK: - Non-Resizable Window Tests
 
-    func testNonResizableWindowsExcluded() {
-        let resizableWindow = makeWindow(id: 1, isResizable: true)
-        let nonResizableWindow = makeWindow(id: 2, isResizable: false)
+    func testNonResizableWindowCenteredInContainer() {
+        let nonResizableWindow = makeWindow(
+            id: 1,
+            isResizable: false,
+            frame: CGRect(x: 0, y: 0, width: 400, height: 300)
+        )
         let input = LayoutInput(
-            windows: [resizableWindow, nonResizableWindow],
+            windows: [nonResizableWindow],
+            focusedWindowID: nonResizableWindow.id,
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+
+        XCTAssertEqual(result.placements.count, 1)
+        let placement = result.placements[0]
+        XCTAssertEqual(placement.windowID, nonResizableWindow.id)
+
+        // Should be centered: (1920 - 400) / 2 = 760, (1080 - 300) / 2 = 390
+        XCTAssertEqual(placement.targetFrame.origin.x, 760)
+        XCTAssertEqual(placement.targetFrame.origin.y, 390)
+    }
+
+    func testNonResizableWindowPreservesSize() {
+        let originalSize = CGSize(width: 500, height: 350)
+        let nonResizableWindow = makeWindow(
+            id: 1,
+            isResizable: false,
+            frame: CGRect(origin: .zero, size: originalSize)
+        )
+        let input = LayoutInput(
+            windows: [nonResizableWindow],
+            focusedWindowID: nonResizableWindow.id,
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+
+        XCTAssertEqual(result.placements.count, 1)
+        let placement = result.placements[0]
+        XCTAssertEqual(placement.targetFrame.width, originalSize.width)
+        XCTAssertEqual(placement.targetFrame.height, originalSize.height)
+    }
+
+    func testNonResizableWindowTooLargeIsSkipped() {
+        let oversizedWindow = makeWindow(
+            id: 1,
+            isResizable: false,
+            frame: CGRect(x: 0, y: 0, width: 3000, height: 2000)
+        )
+        let input = LayoutInput(
+            windows: [oversizedWindow],
+            focusedWindowID: oversizedWindow.id,
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+
+        // Too large for container — no placement (auto-float)
+        XCTAssertTrue(result.placements.isEmpty)
+    }
+
+    func testMixedWindowTypes() {
+        let resizableWindow = makeWindow(id: 1, isResizable: true)
+        let nonResizableWindow = makeWindow(
+            id: 2,
+            isResizable: false,
+            frame: CGRect(x: 0, y: 0, width: 400, height: 300)
+        )
+        let floatingWindow = makeWindow(id: 3, isFloating: true)
+
+        let input = LayoutInput(
+            windows: [resizableWindow, nonResizableWindow, floatingWindow],
             focusedWindowID: resizableWindow.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
@@ -302,9 +374,23 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        // Only the resizable window should be in placements
-        XCTAssertEqual(result.placements.count, 1)
-        XCTAssertEqual(result.placements[0].windowID, resizableWindow.id)
+        // 2 placements: resizable (tiled) + non-resizable (centered). Floating excluded.
+        XCTAssertEqual(result.placements.count, 2)
+
+        let tiledPlacement = result.placements.first(where: { $0.windowID == resizableWindow.id })!
+        let centeredPlacement = result.placements.first(where: { $0.windowID == nonResizableWindow.id })!
+
+        // Resizable fills container (single tileable window)
+        XCTAssertEqual(tiledPlacement.targetFrame, containerFrame)
+
+        // Non-resizable centered with original size
+        XCTAssertEqual(centeredPlacement.targetFrame.width, 400)
+        XCTAssertEqual(centeredPlacement.targetFrame.height, 300)
+        XCTAssertEqual(centeredPlacement.targetFrame.origin.x, (1920 - 400) / 2)
+        XCTAssertEqual(centeredPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+
+        // Floating window has no placement
+        XCTAssertNil(result.placements.first(where: { $0.windowID == floatingWindow.id }))
     }
 
     // MARK: - Accordion Offset Tests
