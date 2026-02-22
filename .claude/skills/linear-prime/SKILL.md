@@ -11,13 +11,13 @@ description: Load current Linear project context. Run at session start to orient
 
 !`linear issue list -s started`
 
-### Unstarted (Ready to Work)
+### Upcoming (Backlog, Triage & Unstarted)
 
-!`linear issue list`
+!`linear issue list -s backlog -s triage -s unstarted -A`
 
 ### Current Branch Issue
 
-!`linear issue view 2>/dev/null || echo "Not on an issue branch. List issues to find out waht's next"`
+!`linear issue view`
 
 ## Workflow Rules
 
@@ -31,7 +31,7 @@ description: Load current Linear project context. Run at session start to orient
 
 ### Finding Work
 
-- `linear issue list` — Your unstarted assigned issues
+- `linear issue list -s backlog -s triage -s unstarted -A` — All actionable issues (backlog + triage + unstarted)
 - `linear issue list -s started` — Your in-progress work
 - `linear issue list -A` — All assignees (team view)
 - `linear issue view` — Current branch's issue details

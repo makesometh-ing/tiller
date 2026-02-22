@@ -13,7 +13,7 @@ Linear CLI is configured via `.linear.toml` in the project root. Do not modify t
 ## Quick Reference
 
 ```bash
-linear issue list              # Your unstarted issues
+linear issue list -s backlog -s triage -s unstarted -A  # All actionable issues
 linear issue list -s started   # In-progress work
 linear issue list -A           # All assignees
 linear issue view              # Current branch's issue
