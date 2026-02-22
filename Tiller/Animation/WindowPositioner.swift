@@ -99,6 +99,24 @@ final class WindowPositioner: WindowPositionerProtocol {
             return .success(())
         }
 
+        // Detect silent resize clamping: macOS returns .success but clamps to minimum size.
+        // Read back actual size and compare to requested size.
+        var actualSizeRef: CFTypeRef?
+        let readBack = AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &actualSizeRef)
+        if readBack == .success, let actualSizeValue = actualSizeRef {
+            var actualSize = CGSize.zero
+            if AXValueGetValue(actualSizeValue as! AXValue, .cgSize, &actualSize) {
+                let tolerance: CGFloat = 2
+                if abs(actualSize.width - frame.width) > tolerance || abs(actualSize.height - frame.height) > tolerance {
+                    _resizeRejectedLock.lock()
+                    _resizeRejectedWindowIDs.insert(windowID)
+                    _resizeRejectedLock.unlock()
+                    TillerLogger.debug("animation", "Size-set silently clamped for window \(windowID.rawValue): requested \(frame.width)x\(frame.height), actual \(actualSize.width)x\(actualSize.height) — marked as resize-rejected")
+                    return .success(())
+                }
+            }
+        }
+
         return .success(())
     }
 
