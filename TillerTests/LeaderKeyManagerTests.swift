@@ -13,6 +13,7 @@ final class LeaderKeyManagerTests: XCTestCase {
     private var configManager: ConfigManager!
     private var tempDirectory: URL!
     private var receivedActions: [KeyAction]!
+    private var receivedStates: [LeaderState]!
 
     override func setUp() async throws {
         try await super.setUp()
@@ -31,12 +32,17 @@ final class LeaderKeyManagerTests: XCTestCase {
         sut.onAction = { [weak self] action in
             self?.receivedActions.append(action)
         }
+        receivedStates = []
+        sut.onStateChanged = { [weak self] state in
+            self?.receivedStates.append(state)
+        }
     }
 
     override func tearDown() async throws {
         sut = nil
         configManager = nil
         receivedActions = nil
+        receivedStates = nil
 
         if let tempDirectory {
             try? FileManager.default.removeItem(at: tempDirectory)
@@ -337,6 +343,21 @@ final class LeaderKeyManagerTests: XCTestCase {
 
         manager.exitLeaderMode()
         try? FileManager.default.removeItem(at: tempDir)
+    }
+
+    // MARK: - onStateChanged Callback
+
+    func testOnStateChangedFiresOnEnterAndExit() {
+        activateLeader()
+        XCTAssertEqual(receivedStates, [.leaderActive])
+
+        simulateKeyDown(KeyMapping.escape)
+        XCTAssertEqual(receivedStates, [.leaderActive, .idle])
+    }
+
+    func testOnStateChangedNotCalledWhenAlreadyIdle() {
+        sut.exitLeaderMode()
+        XCTAssertTrue(receivedStates.isEmpty)
     }
 
     // MARK: - KeyMapping Unit Tests

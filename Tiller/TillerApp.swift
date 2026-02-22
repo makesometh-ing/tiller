@@ -59,6 +59,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 break
             }
         }
+        leader.onStateChanged = { state in
+            TillerMenuState.shared.leaderState = state
+        }
         leader.start()
         self.leaderKeyManager = leader
 
@@ -74,8 +77,10 @@ struct TillerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        MenuBarExtra("Tiller", image: "MenuBarIcon") {
+        MenuBarExtra {
             TillerMenuView(menuState: TillerMenuState.shared)
+        } label: {
+            Label(TillerMenuState.shared.statusText, image: "MenuBarIcon")
         }
     }
 }

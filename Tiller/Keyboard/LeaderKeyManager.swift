@@ -62,6 +62,7 @@ final class LeaderKeyManager {
 
     private(set) var state: LeaderState = .idle
     var onAction: ((KeyAction) -> Void)?
+    var onStateChanged: ((LeaderState) -> Void)?
 
     private let configManager: ConfigManager
     private var eventTap: CFMachPort?
@@ -169,6 +170,7 @@ final class LeaderKeyManager {
 
     private func enterLeaderMode() {
         state = .leaderActive
+        onStateChanged?(.leaderActive)
         resetTimeout()
         TillerLogger.debug("keyboard", "[LeaderKey] Leader mode activated")
     }
@@ -176,6 +178,7 @@ final class LeaderKeyManager {
     func exitLeaderMode() {
         guard state == .leaderActive else { return }
         state = .idle
+        onStateChanged?(.idle)
         timeoutTask?.cancel()
         timeoutTask = nil
         TillerLogger.debug("keyboard", "[LeaderKey] Leader mode deactivated")
