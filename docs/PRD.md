@@ -356,6 +356,14 @@ Automatic Tiling and Resizing Behavior
 
   5. Spawned windows (e.g., WeChat chat windows) must always be assigned to the same container as their parent window, following the same size-handling chain above.
 
+  6. Non-resizable windows participate in the container's ring buffer and can be cycled to via keyboard shortcuts (`<`/`>`). When a non-resizable window is focused:
+
+     * It appears centered on top of the accordion (overlay behavior).
+
+     * The accordion underneath freezes — positions stay based on the last focused resizable window.
+
+     * Cycling past the non-resizable window to a resizable window restores normal accordion behavior.
+
 * Windows are never positioned beyond the visible area of the container.
 
 Window Lifecycle Rules
