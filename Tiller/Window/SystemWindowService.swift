@@ -6,6 +6,7 @@
 import AppKit
 import ApplicationServices
 import Foundation
+import os
 
 @_silgen_name("_AXUIElementGetWindow")
 private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
@@ -276,7 +277,7 @@ final class SystemWindowService: WindowServiceProtocol {
                     if AXValueGetValue(minVal as! AXValue, .cgSize, &minSize),
                        AXValueGetValue(maxVal as! AXValue, .cgSize, &maxSize) {
                         let isFixed = (minSize.width == maxSize.width && minSize.height == maxSize.height)
-                        print("[SystemWindowService] Window \(windowID) min/max probe: min=\(minSize), max=\(maxSize), fixed=\(isFixed)")
+                        TillerLogger.windowDiscovery.info("Window \(windowID) min/max probe: min=\(String(describing: minSize)), max=\(String(describing: maxSize)), fixed=\(isFixed)")
                         return (isResizable: !isFixed, isFloating: false)
                     }
                 }
@@ -284,7 +285,7 @@ final class SystemWindowService: WindowServiceProtocol {
                 // Both AXResizable and min/max probes failed — assume non-resizable.
                 // Safe default: centering a resizable window is acceptable;
                 // tiling a non-resizable window to an accordion position is broken.
-                print("[SystemWindowService] Window \(windowID) (\(bundleID ?? "unknown")): AXResizable and min/max probes failed, defaulting to non-resizable")
+                TillerLogger.windowDiscovery.info("Window \(windowID) (\(bundleID ?? "unknown")): AXResizable and min/max probes failed, defaulting to non-resizable")
                 break
             }
         }
