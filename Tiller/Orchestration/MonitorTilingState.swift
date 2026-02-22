@@ -157,6 +157,49 @@ struct MonitorTilingState: Equatable, Sendable {
         }
     }
 
+    // MARK: - Window/Container Operations
+
+    /// Cycles focus within the container holding `windowID`.
+    mutating func cycleWindow(direction: CycleDirection, windowID: WindowID) {
+        guard let idx = containers.firstIndex(where: { $0.windowIDs.contains(windowID) }) else { return }
+        switch direction {
+        case .next: containers[idx].cycleNext()
+        case .previous: containers[idx].cyclePrevious()
+        }
+    }
+
+    /// Moves the focused window from its container to the adjacent container in `direction`.
+    /// Focus follows the moved window. No-op at boundaries or with a single container.
+    mutating func moveWindow(from windowID: WindowID, direction: MoveDirection) {
+        guard let srcIdx = containers.firstIndex(where: { $0.windowIDs.contains(windowID) }) else { return }
+        let dstIdx: Int
+        switch direction {
+        case .left: dstIdx = srcIdx - 1
+        case .right: dstIdx = srcIdx + 1
+        case .up, .down: return
+        }
+        guard containers.indices.contains(dstIdx) else { return }
+        guard let moved = containers[srcIdx].moveFocusedWindow() else { return }
+        containers[dstIdx].addWindow(moved)
+        focusedContainerID = containers[dstIdx].id
+    }
+
+    /// Changes the focused container without moving any window.
+    /// No-op at boundaries or with a single container.
+    mutating func setFocusedContainer(direction: MoveDirection) {
+        guard let currentIdx = focusedContainerID.flatMap({ id in
+            containers.firstIndex(where: { $0.id == id })
+        }) else { return }
+        let targetIdx: Int
+        switch direction {
+        case .left: targetIdx = currentIdx - 1
+        case .right: targetIdx = currentIdx + 1
+        case .up, .down: return
+        }
+        guard containers.indices.contains(targetIdx) else { return }
+        focusedContainerID = containers[targetIdx].id
+    }
+
     // MARK: - Redistribution
 
     /// Redistributes all windows from existing containers into new containers

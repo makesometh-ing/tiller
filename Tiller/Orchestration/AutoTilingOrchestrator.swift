@@ -117,18 +117,37 @@ final class AutoTilingOrchestrator {
         scheduleRetile()
     }
 
-    // MARK: - Window/Container Operations (stubs for TILLER-48)
+    // MARK: - Window/Container Operations
 
     func cycleWindow(direction: CycleDirection) {
-        // Will be wired in TILLER-48
+        guard var (monitorID, state, windowID) = activeMonitorState() else { return }
+        state.cycleWindow(direction: direction, windowID: windowID)
+        monitorStates[monitorID] = state
+        scheduleRetile()
     }
 
     func moveWindowToContainer(direction: MoveDirection) {
-        // Will be wired in TILLER-48
+        guard var (monitorID, state, windowID) = activeMonitorState() else { return }
+        state.moveWindow(from: windowID, direction: direction)
+        monitorStates[monitorID] = state
+        scheduleRetile()
     }
 
     func focusContainer(direction: MoveDirection) {
-        // Will be wired in TILLER-48
+        guard var (monitorID, state, _) = activeMonitorState() else { return }
+        state.setFocusedContainer(direction: direction)
+        monitorStates[monitorID] = state
+        scheduleRetile()
+    }
+
+    private func activeMonitorState() -> (MonitorID, MonitorTilingState, WindowID)? {
+        guard let focusedWindowID = windowDiscoveryManager.focusedWindow?.windowID else { return nil }
+        for (monitorID, state) in monitorStates {
+            if state.containerForWindow(focusedWindowID) != nil {
+                return (monitorID, state, focusedWindowID)
+            }
+        }
+        return nil
     }
 
     // MARK: - Event Handlers
