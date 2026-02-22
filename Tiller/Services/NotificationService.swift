@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import os
 
 protocol NotificationServiceProtocol {
     func showConfigValidationError(_ error: ConfigValidationError)
@@ -14,19 +15,19 @@ protocol NotificationServiceProtocol {
 
 final class SystemNotificationService: NotificationServiceProtocol {
     func showConfigValidationError(_ error: ConfigValidationError) {
-        print("[Tiller Config] Validation error: \(error.description)")
+        TillerLogger.config.error("Validation error: \(error.description)")
     }
 
     func showConfigParseError(_ error: Error) {
-        print("[Tiller Config] Parse error: \(error.localizedDescription)")
+        TillerLogger.config.error("Parse error: \(error.localizedDescription)")
     }
 
     func showAccessibilityPermissionDenied() {
-        print("[Tiller] Accessibility permission denied. Please grant access in System Preferences > Privacy & Security > Accessibility.")
+        TillerLogger.config.error("Accessibility permission denied. Please grant access in System Preferences > Privacy & Security > Accessibility.")
     }
 
     func showAccessibilityPermissionGranted() {
-        print("[Tiller] Accessibility permission granted.")
+        TillerLogger.config.info("Accessibility permission granted.")
     }
 }
 

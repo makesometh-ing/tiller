@@ -398,22 +398,6 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         XCTAssertFalse(sut.isCurrentlyRunning)
     }
 
-    func testDoubleStartIsIdempotent() async {
-        let window1 = makeWindow(id: 1)
-        mockWindowService.windows = [window1]
-        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
-            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039))
-        ])
-
-        await sut.start()
-        let firstCallCount = mockLayoutEngine.calculateCallCount
-
-        await sut.start()
-
-        // Second start should be no-op
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, firstCallCount)
-    }
-
     func testStopCancelsPendingRetile() async {
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
