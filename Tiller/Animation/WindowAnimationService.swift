@@ -6,6 +6,7 @@
 import CoreGraphics
 import CoreVideo
 import Foundation
+import os
 import QuartzCore
 
 protocol WindowAnimationServiceProtocol {
@@ -75,7 +76,7 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
 
         // Fast path for instant positioning (duration = 0)
         if duration <= 0 {
-            print("[WindowAnimationService] Instant positioning (duration=0)")
+            TillerLogger.animation.debug("Instant positioning (duration=0)")
             var successCount = 0
             for animation in animations {
                 let result = positioner.setFrame(
@@ -85,12 +86,11 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
                 )
                 if case .success = result {
                     successCount += 1
-                    print("[WindowAnimationService] Positioned window \(animation.windowID.rawValue) successfully")
                 } else {
-                    print("[WindowAnimationService] Failed to position window \(animation.windowID.rawValue)")
+                    TillerLogger.animation.error("Failed to position window \(animation.windowID.rawValue)")
                 }
             }
-            print("[WindowAnimationService] Instant positioning complete: \(successCount)/\(animations.count) succeeded")
+            TillerLogger.animation.debug("Instant positioning complete: \(successCount)/\(animations.count) succeeded")
             return .completed
         }
 
