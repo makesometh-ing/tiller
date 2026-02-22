@@ -11,6 +11,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var orchestrator: AutoTilingOrchestrator?
+    private var leaderKeyManager: LeaderKeyManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ConfigManager.shared.loadConfiguration()
@@ -40,6 +41,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.orchestrator = orch
 
         TillerMenuState.shared.configure(orchestrator: orch)
+
+        let leader = LeaderKeyManager(configManager: ConfigManager.shared)
+        leader.onAction = { [weak orch] action in
+            guard let orch else { return }
+            switch action {
+            case .switchLayout(let layoutID):
+                guard let activeMonitorID = MonitorManager.shared.activeMonitor?.id else { return }
+                orch.switchLayout(to: layoutID, on: activeMonitorID)
+            case .moveWindow(let direction):
+                orch.moveWindowToContainer(direction: direction)
+            case .focusContainer(let direction):
+                orch.focusContainer(direction: direction)
+            case .cycleWindow(let direction):
+                orch.cycleWindow(direction: direction)
+            case .exitLeader:
+                break
+            }
+        }
+        leader.start()
+        self.leaderKeyManager = leader
 
         Task {
             await orch.start()
