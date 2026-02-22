@@ -29,6 +29,12 @@ protocol WindowAnimationServiceProtocol {
 
     /// Raise windows in z-order (first = back, last = front)
     func raiseWindowsInOrder(_ windows: [(windowID: WindowID, pid: pid_t)])
+
+    /// Window IDs that rejected resize (size-set failed). Check after each tile.
+    var resizeRejectedWindowIDs: Set<WindowID> { get }
+
+    /// Clear the resize-rejected set after reclassification.
+    func clearResizeRejected()
 }
 
 final class WindowAnimationService: WindowAnimationServiceProtocol {
@@ -167,6 +173,14 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
         for window in windows {
             _ = positioner.raiseWindow(window.windowID, pid: window.pid)
         }
+    }
+
+    var resizeRejectedWindowIDs: Set<WindowID> {
+        (positioner as? WindowPositioner)?.resizeRejectedWindowIDs ?? []
+    }
+
+    func clearResizeRejected() {
+        (positioner as? WindowPositioner)?.clearResizeRejected()
     }
 
     // MARK: - Display Link Management

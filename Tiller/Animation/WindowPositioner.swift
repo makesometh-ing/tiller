@@ -23,6 +23,24 @@ final class WindowPositioner: WindowPositionerProtocol {
     private var isTrustedCache: Bool?
     private var lastTrustedCheck: Date?
 
+    /// Windows where size-set was rejected. Thread-safe (written from display link thread).
+    private let _resizeRejectedLock = NSLock()
+    private var _resizeRejectedWindowIDs: Set<WindowID> = []
+
+    /// Returns the set of window IDs that rejected resize since last clear.
+    var resizeRejectedWindowIDs: Set<WindowID> {
+        _resizeRejectedLock.lock()
+        defer { _resizeRejectedLock.unlock() }
+        return _resizeRejectedWindowIDs
+    }
+
+    /// Clears the resize-rejected set (called by orchestrator after reclassification).
+    func clearResizeRejected() {
+        _resizeRejectedLock.lock()
+        _resizeRejectedWindowIDs.removeAll()
+        _resizeRejectedLock.unlock()
+    }
+
     func setFrame(_ frame: CGRect, for windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError> {
         guard let windowElement = getWindowElement(for: windowID, pid: pid) else {
             return .failure(.windowElementNotFound(windowID))
@@ -73,7 +91,11 @@ final class WindowPositioner: WindowPositionerProtocol {
         if sizeResult != .success {
             // Non-resizable windows can be positioned but not resized — this is expected.
             // Position was already set successfully above, so treat this as success.
-            TillerLogger.debug("animation", "Size-set failed for window \(windowID.rawValue) (error \(sizeResult.rawValue)), position was set — tolerating")
+            // Record the rejection so the orchestrator can reclassify this window.
+            _resizeRejectedLock.lock()
+            _resizeRejectedWindowIDs.insert(windowID)
+            _resizeRejectedLock.unlock()
+            TillerLogger.debug("animation", "Size-set failed for window \(windowID.rawValue) (error \(sizeResult.rawValue)), position was set — marked as resize-rejected")
             return .success(())
         }
 

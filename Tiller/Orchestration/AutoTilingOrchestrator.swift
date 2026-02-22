@@ -37,6 +37,10 @@ final class AutoTilingOrchestrator {
     /// Track last focused tileable window for accordion freeze when non-resizable is focused
     private var lastFocusedTileableWindowID: WindowID?
 
+    /// Windows that rejected resize at tile-time (detected via size-set failure).
+    /// These are treated as non-resizable on subsequent tiles.
+    private var resizeRejectedWindowIDs: Set<WindowID> = []
+
     // MARK: - Initialization
 
     init(
@@ -150,14 +154,32 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        let windows = windowDiscoveryManager.visibleWindows
+        let rawWindows = windowDiscoveryManager.visibleWindows
         let focusedWindow = windowDiscoveryManager.focusedWindow
 
-        guard !windows.isEmpty else {
+        guard !rawWindows.isEmpty else {
             stableWindowOrder.removeAll()
             let result = TilingResult.noWindowsToTile
             lastTileResult = result
             return result
+        }
+
+        // Override isResizable for windows that rejected resize at tile-time
+        let windows = rawWindows.map { window -> WindowInfo in
+            if resizeRejectedWindowIDs.contains(window.id) && window.isResizable {
+                TillerLogger.debug("orchestration", "[Orchestrator] Overriding window \(window.id.rawValue) (\(window.appName)) to non-resizable (resize rejected at tile-time)")
+                return WindowInfo(
+                    id: window.id,
+                    title: window.title,
+                    appName: window.appName,
+                    bundleID: window.bundleID,
+                    frame: window.frame,
+                    isResizable: false,
+                    isFloating: window.isFloating,
+                    ownerPID: window.ownerPID
+                )
+            }
+            return window
         }
 
         // Identify tileable windows (for accordion positioning and z-order)
@@ -331,6 +353,20 @@ final class AutoTilingOrchestrator {
         }
 
         let animationResult = await animationService.animateBatch(allAnimations, duration: duration)
+
+        // Check for windows that rejected resize during this tile pass.
+        // These are windows the system reported as resizable but actually aren't
+        // (e.g. iPhone Mirroring) — detected because AXSize set fails at tile-time.
+        let newRejections = animationService.resizeRejectedWindowIDs.subtracting(resizeRejectedWindowIDs)
+        if !newRejections.isEmpty {
+            let rejectedDesc = newRejections.map { String($0.rawValue) }.joined(separator: ", ")
+            TillerLogger.debug("orchestration", "[Orchestrator] Detected \(newRejections.count) new resize-rejected window(s): [\(rejectedDesc)] — will retile with corrected classification")
+            resizeRejectedWindowIDs.formUnion(newRejections)
+            animationService.clearResizeRejected()
+
+            // Retile immediately with corrected classification (non-resizable → centered)
+            return await performTile()
+        }
 
         let result: TilingResult
         switch animationResult {
