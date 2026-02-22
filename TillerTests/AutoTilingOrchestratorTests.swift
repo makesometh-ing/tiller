@@ -924,4 +924,122 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         })
         XCTAssertNotNil(m1Input, "Monitor 1 should still have just its original window")
     }
+
+    // MARK: - Layout Switching Tests
+
+    func testSwitchLayoutTriggersRetile() async {
+        // Given: Orchestrator running with monocle layout
+        let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let window2 = makeWindow(id: 2, frame: CGRect(x: 1100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window1, window2]
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        let initialCallCount = mockLayoutEngine.calculateCallCount
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // Provide fresh placements for the retile after layout switch
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: Switch to split halves
+        let monitorID = MonitorID(rawValue: 1)
+        sut.switchLayout(to: .splitHalves, on: monitorID)
+
+        // Wait for debounced retile
+        await waitForRetile()
+
+        // Then: Layout engine was called with split halves container frames (2 containers)
+        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+
+        // Split halves produces 2 containers, so layout engine should be called twice
+        // (once per container)
+        let inputs = mockLayoutEngine.allInputs
+        XCTAssertEqual(inputs.count, 2, "Split halves should produce 2 container layout inputs")
+    }
+
+    func testSwitchLayoutSameLayoutNoOp() async {
+        // Given: Orchestrator running with monocle layout
+        let window1 = makeWindow(id: 1)
+        mockWindowService.windows = [window1]
+
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039))
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // When: Switch to same layout (monocle)
+        let monitorID = MonitorID(rawValue: 1)
+        sut.switchLayout(to: .monocle, on: monitorID)
+
+        // Wait briefly to ensure nothing happens
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Then: No retile triggered
+        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
+    }
+
+    func testSwitchLayoutDoesNotAffectOtherMonitor() async {
+        // Given: Two monitors, orchestrator running
+        let monitor1 = MockMonitorService.createTestMonitor(
+            id: 1, name: "Monitor 1",
+            frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1920, height: 1055),
+            isMain: true
+        )
+        let monitor2 = MockMonitorService.createTestMonitor(
+            id: 2, name: "Monitor 2",
+            frame: CGRect(x: 1920, y: 0, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: 1920, y: 25, width: 1920, height: 1055),
+            isMain: false
+        )
+        mockMonitorService.monitors = [monitor1, monitor2]
+
+        let win1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let win2 = makeWindow(id: 2, frame: CGRect(x: 2100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [win1, win2]
+
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: win1.id, pid: win1.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039)),
+            WindowPlacement(windowID: win2.id, pid: win2.ownerPID, targetFrame: CGRect(x: 1928, y: 33, width: 1904, height: 1039))
+        ])
+
+        await sut.start()
+        // Initial tile: 2 calls (1 container per monitor, each in monocle)
+        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 2)
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: win1.id, pid: win1.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039)),
+            WindowPlacement(windowID: win2.id, pid: win2.ownerPID, targetFrame: CGRect(x: 1928, y: 33, width: 1904, height: 1039))
+        ])
+
+        // When: Switch monitor 1 to split halves
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+        await waitForRetile(expectedCallCount: 2)
+
+        // Then: Monitor 1 has 2 containers (split), monitor 2 still has 1 (monocle)
+        let inputs = mockLayoutEngine.allInputs
+
+        // Monitor 2 input: should still have 1 window, unchanged monocle container frame
+        let m2Input = inputs.first(where: { $0.windows.contains(where: { $0.id == win2.id }) })
+        XCTAssertNotNil(m2Input, "Monitor 2 should still be tiled")
+
+        // Monitor 1 should now have split containers (2 inputs for the 2 containers,
+        // though only the non-empty ones get to the layout engine)
+        let m1Inputs = inputs.filter { !$0.windows.contains(where: { $0.id == win2.id }) }
+        XCTAssertGreaterThanOrEqual(m1Inputs.count, 1, "Monitor 1 should have been retiled")
+    }
 }
