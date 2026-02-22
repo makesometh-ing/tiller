@@ -27,10 +27,14 @@ struct TillerMenuView: View {
 
             Text("[\(monitorIndex)] \(monitor.name)")
 
-            Button("  1-Monocle") {
-                // No-op — Monocle is the only layout in Phase 1
+            ForEach(Array(LayoutID.allCases.enumerated()), id: \.element) { layoutIndex, layout in
+                let isActive = menuState.activeLayoutPerMonitor[monitor.id] == layout
+                Button {
+                    menuState.switchLayout(to: layout, on: monitor.id)
+                } label: {
+                    Text("\(isActive ? "✓ " : "  ")\(layoutIndex + 1)-\(layout.displayName)")
+                }
             }
-            .disabled(true)
 
             Divider()
         }

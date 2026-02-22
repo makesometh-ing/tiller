@@ -18,6 +18,7 @@ final class TillerMenuState {
     var isTilingEnabled: Bool = false
     var monitors: [MonitorInfo] = []
     var activeMonitorID: MonitorID?
+    var activeLayoutPerMonitor: [MonitorID: LayoutID] = [:]
 
     // MARK: - Dependencies
 
@@ -40,6 +41,14 @@ final class TillerMenuState {
 
         refreshMonitors()
         activeMonitorID = monitorManager.activeMonitor?.id
+
+        for monitor in monitorManager.connectedMonitors {
+            activeLayoutPerMonitor[monitor.id] = orchestrator.activeLayout(for: monitor.id)
+        }
+
+        orchestrator.onLayoutChanged = { [weak self] monitorID, layout in
+            self?.activeLayoutPerMonitor[monitorID] = layout
+        }
 
         monitorManager.onMonitorChange = { [weak self] _ in
             self?.refreshMonitors()
@@ -64,6 +73,10 @@ final class TillerMenuState {
                 isTilingEnabled = true
             }
         }
+    }
+
+    func switchLayout(to layout: LayoutID, on monitorID: MonitorID) {
+        orchestrator?.switchLayout(to: layout, on: monitorID)
     }
 
     func quit() {

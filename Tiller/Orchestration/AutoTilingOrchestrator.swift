@@ -18,6 +18,10 @@ final class AutoTilingOrchestrator {
     private let animationService: WindowAnimationServiceProtocol
     private let config: OrchestratorConfig
 
+    // MARK: - Callbacks
+
+    var onLayoutChanged: ((MonitorID, LayoutID) -> Void)?
+
     // MARK: - State
 
     private var isRunning: Bool = false
@@ -92,7 +96,11 @@ final class AutoTilingOrchestrator {
         windowDiscoveryManager.onFocusedWindowChanged = nil
     }
 
-    // MARK: - Layout Switching
+    // MARK: - Layout
+
+    func activeLayout(for monitorID: MonitorID) -> LayoutID {
+        monitorStates[monitorID]?.activeLayout ?? .monocle
+    }
 
     func switchLayout(to layout: LayoutID, on monitorID: MonitorID) {
         guard var state = monitorStates[monitorID] else { return }
@@ -115,6 +123,7 @@ final class AutoTilingOrchestrator {
         monitorStates[monitorID] = state
 
         scheduleRetile()
+        onLayoutChanged?(monitorID, layout)
     }
 
     // MARK: - Window/Container Operations
@@ -288,6 +297,7 @@ final class AutoTilingOrchestrator {
             let monitorWindows = windowsByMonitor[monitor.id] ?? []
 
             // Get or create MonitorTilingState for this monitor
+            let isNewState = monitorStates[monitor.id] == nil
             var state = monitorStates[monitor.id] ?? MonitorTilingState(monitorID: monitor.id)
 
             // Compute container frames from LayoutDefinitions
@@ -417,6 +427,10 @@ final class AutoTilingOrchestrator {
 
             // Save updated state
             monitorStates[monitor.id] = state
+
+            if isNewState {
+                onLayoutChanged?(monitor.id, state.activeLayout)
+            }
         }
 
         guard !allAnimations.isEmpty else {
