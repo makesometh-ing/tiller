@@ -80,7 +80,10 @@ struct TillerApp: App {
         MenuBarExtra {
             TillerMenuView(menuState: TillerMenuState.shared)
         } label: {
-            Label(TillerMenuState.shared.statusText, image: "MenuBarIcon")
+            HStack(spacing: 4) {
+                Image("MenuBarIcon")
+                Text(TillerMenuState.shared.statusText)
+            }
         }
     }
 }
