@@ -721,8 +721,8 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         // Initial tile: layout engine should get tileableWindow2 as focused
         XCTAssertEqual(mockLayoutEngine.lastInput?.focusedWindowID, tileableWindow2.id)
 
-        // Wait for z-order suppression (200ms) to expire
-        try? await Task.sleep(nanoseconds: 250_000_000)
+        // Wait for z-order suppression (200ms) to expire — use generous margin
+        try? await Task.sleep(nanoseconds: 350_000_000)
         mockLayoutEngine.reset()
         mockAnimationService.reset()
 
@@ -740,11 +740,17 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         )
         mockWindowService.simulateWindowFocusSync(nonResizableWindow.id)
 
-        await Task.yield()
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        // Poll until layout engine is called (debounce + performTile completes)
+        for _ in 0..<20 {
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms per poll
+            if mockLayoutEngine.calculateCallCount > 0 { break }
+        }
 
         // Then: Accordion freezes — layout engine receives tileableWindow2 (last tileable focus),
         // NOT the non-resizable window's ID
+        XCTAssertGreaterThan(mockLayoutEngine.calculateCallCount, 0,
+            "Layout engine should have been called after focus change")
         XCTAssertEqual(mockLayoutEngine.lastInput?.focusedWindowID, tileableWindow2.id,
             "Accordion should freeze at last tileable window when non-resizable is focused")
     }

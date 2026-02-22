@@ -132,6 +132,17 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
         raiseOrderCalls.append(windows)
     }
 
+    // Configurable resize-rejected set for tests
+    var _mockResizeRejectedWindowIDs: Set<WindowID> = []
+
+    var resizeRejectedWindowIDs: Set<WindowID> {
+        return _mockResizeRejectedWindowIDs
+    }
+
+    func clearResizeRejected() {
+        _mockResizeRejectedWindowIDs.removeAll()
+    }
+
     // MARK: - Test Helpers
 
     func reset() {
@@ -145,6 +156,7 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
         resultToReturn = .completed
         shouldCompleteInstantly = true
         animationDelay = 0
+        _mockResizeRejectedWindowIDs.removeAll()
     }
 
     func getCurrentFrame(for windowID: WindowID) -> CGRect? {
