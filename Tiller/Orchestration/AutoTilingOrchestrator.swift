@@ -25,8 +25,8 @@ final class AutoTilingOrchestrator {
     private var isInitialTile: Bool = true
     private var lastTileResult: TilingResult?
 
-    /// Stable window order for ring buffer navigation (not affected by z-order changes)
-    private var stableWindowOrder: [WindowID] = []
+    /// Per-monitor tiling state: layout, containers, and window assignments
+    private var monitorStates: [MonitorID: MonitorTilingState] = [:]
 
     /// Track when we last adjusted z-order to ignore async focus events
     private var lastZOrderAdjustment: Date?
@@ -34,8 +34,8 @@ final class AutoTilingOrchestrator {
     /// Track last focused window to avoid redundant z-order changes
     private var lastFocusedWindowID: WindowID?
 
-    /// Track last focused tileable window for accordion freeze when non-resizable is focused
-    private var lastFocusedTileableWindowID: WindowID?
+    /// Per-container tracking of last focused tileable window for accordion freeze
+    private var lastFocusedTileableWindowPerContainer: [ContainerID: WindowID] = [:]
 
     /// Windows that rejected resize at tile-time (detected via size-set failure).
     /// These are treated as non-resizable on subsequent tiles.
@@ -90,6 +90,26 @@ final class AutoTilingOrchestrator {
         pendingRetileTask = nil
         windowDiscoveryManager.onWindowChange = nil
         windowDiscoveryManager.onFocusedWindowChanged = nil
+    }
+
+    // MARK: - Layout Switching (stubs for TILLER-46)
+
+    func switchLayout(to layout: LayoutID, on monitorID: MonitorID) {
+        // Will be wired in TILLER-46
+    }
+
+    // MARK: - Window/Container Operations (stubs for TILLER-48)
+
+    func cycleWindow(direction: CycleDirection) {
+        // Will be wired in TILLER-48
+    }
+
+    func moveWindowToContainer(direction: MoveDirection) {
+        // Will be wired in TILLER-48
+    }
+
+    func focusContainer(direction: MoveDirection) {
+        // Will be wired in TILLER-48
     }
 
     // MARK: - Event Handlers
@@ -158,7 +178,7 @@ final class AutoTilingOrchestrator {
         let focusedWindow = windowDiscoveryManager.focusedWindow
 
         guard !rawWindows.isEmpty else {
-            stableWindowOrder.removeAll()
+            monitorStates.removeAll()
             let result = TilingResult.noWindowsToTile
             lastTileResult = result
             return result
@@ -182,30 +202,11 @@ final class AutoTilingOrchestrator {
             return window
         }
 
-        // Identify tileable windows (for accordion positioning and z-order)
-        let tileableWindows = windows.filter { !$0.isFloating && $0.isResizable }
-        let tileableIDs = Set(tileableWindows.map { $0.id })
-
-        // Ring buffer includes all non-floating windows (tileable + non-resizable)
-        // so non-resizable windows can be cycled to via keyboard shortcuts
+        // Non-floating windows participate in tiling
         let nonFloatingWindows = windows.filter { !$0.isFloating }
-        let nonFloatingIDs = Set(nonFloatingWindows.map { $0.id })
 
-        stableWindowOrder.removeAll { !nonFloatingIDs.contains($0) }
-        for window in nonFloatingWindows {
-            if !stableWindowOrder.contains(window.id) {
-                stableWindowOrder.append(window.id)
-            }
-        }
-
-        // Create window lookup for sorting
+        // Create window lookup
         let windowByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
-
-        // Order windows by ring buffer position (floating windows excluded)
-        let stableOrderedWindows = stableWindowOrder.compactMap { windowByID[$0] }
-
-        let orderDesc = stableWindowOrder.map { String($0.rawValue) }.joined(separator: ", ")
-        TillerLogger.debug("orchestration","[Orchestrator] Stable window order: [\(orderDesc)]")
 
         let tillerConfig = configManager.getConfig()
         let monitors = monitorManager.connectedMonitors
@@ -216,10 +217,10 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Group windows by monitor using their center point (maintaining stable order)
+        // Group non-floating windows by monitor using their center point
         var windowsByMonitor: [MonitorID: [WindowInfo]] = [:]
 
-        for window in stableOrderedWindows {
+        for window in nonFloatingWindows {
             let centerPoint = CGPoint(
                 x: window.frame.midX,
                 y: window.frame.midY
@@ -228,63 +229,156 @@ final class AutoTilingOrchestrator {
             if let monitor = monitors.first(where: { $0.frame.contains(centerPoint) }) {
                 windowsByMonitor[monitor.id, default: []].append(window)
             } else if let mainMonitor = monitors.first(where: { $0.isMain }) {
-                // Fallback to main monitor if window center isn't in any monitor
                 windowsByMonitor[mainMonitor.id, default: []].append(window)
             } else if let firstMonitor = monitors.first {
-                // Fallback to first monitor
                 windowsByMonitor[firstMonitor.id, default: []].append(window)
             }
         }
 
-        // Track last focused tileable window for accordion freeze
         let focusedID = focusedWindow?.windowID
-        let focusedIsTileable = focusedID.map { tileableIDs.contains($0) } ?? false
 
-        if let fid = focusedID, tileableIDs.contains(fid) {
-            lastFocusedTileableWindowID = fid
-        }
+        // Prune monitor states for monitors that are no longer connected
+        let connectedMonitorIDs = Set(monitors.map { $0.id })
+        monitorStates = monitorStates.filter { connectedMonitorIDs.contains($0.key) }
 
-        // When a non-resizable window is focused, freeze the accordion:
-        // pass the last focused tileable window ID so accordion positioning stays put
-        let accordionFocusID: WindowID? = focusedIsTileable ? focusedID : lastFocusedTileableWindowID
-
-        // Calculate layouts and collect animations for each monitor
+        // Calculate layouts and collect animations per-container
         var allAnimations: [(windowID: WindowID, pid: pid_t, startFrame: CGRect, targetFrame: CGRect)] = []
+        var allZOrderCalls: [(windowID: WindowID, pid: pid_t)] = []
+        var didRaiseNonResizable = false
 
         for monitor in monitors {
-            guard let monitorWindows = windowsByMonitor[monitor.id], !monitorWindows.isEmpty else {
-                continue
-            }
+            let monitorWindows = windowsByMonitor[monitor.id] ?? []
 
-            // Calculate container frame with margins
-            let margin = CGFloat(tillerConfig.margin)
-            let containerFrame = monitor.visibleFrame.insetBy(dx: margin, dy: margin)
+            // Get or create MonitorTilingState for this monitor
+            var state = monitorStates[monitor.id] ?? MonitorTilingState(monitorID: monitor.id)
 
-            let input = LayoutInput(
-                windows: monitorWindows,
-                focusedWindowID: accordionFocusID,
-                containerFrame: containerFrame,
-                accordionOffset: tillerConfig.accordionOffset
+            // Compute container frames from LayoutDefinitions
+            let containerFrames = LayoutDefinitions.containerFrames(
+                for: state.activeLayout,
+                in: monitor.visibleFrame,
+                margin: CGFloat(tillerConfig.margin),
+                padding: CGFloat(tillerConfig.padding)
             )
 
-            let result = layoutEngine.calculate(input: input)
+            // Update container frames, preserving window assignments.
+            // On first tile (empty containers), this falls through to redistributeWindows.
+            // On subsequent tiles with same layout, frames update in place.
+            state.updateContainerFrames(containerFrames)
 
-            // Position ALL windows - don't skip based on current position
-            for placement in result.placements {
-                guard let window = monitorWindows.first(where: { $0.id == placement.windowID }) else {
-                    TillerLogger.debug("orchestration","[Orchestrator] Window \(placement.windowID.rawValue) not found in monitorWindows")
-                    continue
+            // Determine which windows should be in this monitor's containers
+            let currentWindowIDs = Set(monitorWindows.map { $0.id })
+            let stateWindowIDs = Set(state.containers.flatMap { $0.windowIDs })
+
+            // Remove windows that are no longer on this monitor
+            for windowID in stateWindowIDs where !currentWindowIDs.contains(windowID) {
+                state.removeWindow(windowID)
+            }
+
+            // Add new windows (not yet in any container) to the focused container
+            for window in monitorWindows where !stateWindowIDs.contains(window.id) {
+                state.assignWindow(window.id)
+            }
+
+            let orderDesc = state.containers.map { container in
+                let ids = container.windowIDs.map { String($0.rawValue) }.joined(separator: ",")
+                return "C\(container.id.rawValue):[\(ids)]"
+            }.joined(separator: " ")
+            TillerLogger.debug("orchestration","[Orchestrator] Monitor \(monitor.id.rawValue) containers: \(orderDesc)")
+
+            // Tile each container independently
+            for container in state.containers {
+                guard !container.windowIDs.isEmpty else { continue }
+
+                // Build the ordered list of WindowInfo for this container
+                let containerWindows = container.windowIDs.compactMap { windowByID[$0] }
+                guard !containerWindows.isEmpty else { continue }
+
+                // Determine accordion focus for this container
+                let tileableIDs = Set(containerWindows.filter { $0.isResizable }.map { $0.id })
+                let containerFocusedID = focusedID.flatMap { container.windowIDs.contains($0) ? $0 : nil }
+                let focusedIsTileable = containerFocusedID.map { tileableIDs.contains($0) } ?? false
+
+                // Track last focused tileable window per container
+                if let fid = containerFocusedID, tileableIDs.contains(fid) {
+                    lastFocusedTileableWindowPerContainer[container.id] = fid
                 }
 
-                TillerLogger.debug("orchestration","[Orchestrator] Window \(window.appName) (ID: \(window.id.rawValue)) -> \(placement.targetFrame.origin.x)")
+                let accordionFocusID: WindowID?
+                if focusedIsTileable {
+                    accordionFocusID = containerFocusedID
+                } else {
+                    accordionFocusID = lastFocusedTileableWindowPerContainer[container.id]
+                }
 
-                allAnimations.append((
-                    windowID: placement.windowID,
-                    pid: placement.pid,
-                    startFrame: window.frame,
-                    targetFrame: placement.targetFrame
-                ))
+                let input = LayoutInput(
+                    windows: containerWindows,
+                    focusedWindowID: accordionFocusID,
+                    containerFrame: container.frame,
+                    accordionOffset: tillerConfig.accordionOffset
+                )
+
+                let result = layoutEngine.calculate(input: input)
+
+                for placement in result.placements {
+                    guard let window = windowByID[placement.windowID] else {
+                        TillerLogger.debug("orchestration","[Orchestrator] Window \(placement.windowID.rawValue) not found")
+                        continue
+                    }
+
+                    TillerLogger.debug("orchestration","[Orchestrator] Window \(window.appName) (ID: \(window.id.rawValue)) -> \(placement.targetFrame.origin.x)")
+
+                    allAnimations.append((
+                        windowID: placement.windowID,
+                        pid: placement.pid,
+                        startFrame: window.frame,
+                        targetFrame: placement.targetFrame
+                    ))
+                }
+
+                // Per-container z-order management
+                let tileableRingOrder = container.windowIDs.filter { tileableIDs.contains($0) }
+                let tileableCount = tileableRingOrder.count
+                let nonFloatingIDs = Set(container.windowIDs)
+                let focusedIsNonResizable = containerFocusedID.map {
+                    nonFloatingIDs.contains($0) && !tileableIDs.contains($0)
+                } ?? false
+
+                if tileableCount > 1 && focusedIsTileable {
+                    var focusedTileableIdx = 0
+                    if let fid = containerFocusedID, let idx = tileableRingOrder.firstIndex(of: fid) {
+                        focusedTileableIdx = idx
+                    }
+
+                    let prevIndex = (focusedTileableIdx - 1 + tileableCount) % tileableCount
+                    let nextIndex = (focusedTileableIdx + 1) % tileableCount
+
+                    // Add "others" (not prev, focused, or next)
+                    for (idx, windowID) in tileableRingOrder.enumerated() {
+                        if idx != focusedTileableIdx && idx != prevIndex && idx != nextIndex {
+                            if let window = windowByID[windowID] {
+                                allZOrderCalls.append((windowID: windowID, pid: window.ownerPID))
+                            }
+                        }
+                    }
+
+                    // Add prev (if different from focused and next)
+                    if tileableCount > 2, let window = windowByID[tileableRingOrder[prevIndex]] {
+                        allZOrderCalls.append((windowID: tileableRingOrder[prevIndex], pid: window.ownerPID))
+                    }
+
+                    // Add next (if different from focused)
+                    if tileableCount > 1, nextIndex != focusedTileableIdx, let window = windowByID[tileableRingOrder[nextIndex]] {
+                        allZOrderCalls.append((windowID: tileableRingOrder[nextIndex], pid: window.ownerPID))
+                    }
+                } else if focusedIsNonResizable, let fid = containerFocusedID, let focusedWin = windowByID[fid] {
+                    TillerLogger.debug("orchestration","[Orchestrator] Raising non-resizable window \(fid.rawValue) to top (overlay)")
+                    allZOrderCalls.append((windowID: fid, pid: focusedWin.ownerPID))
+                    didRaiseNonResizable = true
+                }
             }
+
+            // Save updated state
+            monitorStates[monitor.id] = state
         }
 
         guard !allAnimations.isEmpty else {
@@ -293,55 +387,16 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Z-order management: accordion z-order uses tileable windows only,
-        // even though stableWindowOrder includes non-resizable windows for cycling.
-        // DON'T raise focused window - it triggers focus events and it's already in front.
-        let tileableRingOrder = stableWindowOrder.filter { tileableIDs.contains($0) }
-        let tileableCount = tileableRingOrder.count
-        let focusedIsNonResizable = focusedID.map { nonFloatingIDs.contains($0) && !tileableIDs.contains($0) } ?? false
-
-        if tileableCount > 1 && focusedIsTileable {
-            // Accordion z-order: position tileable windows as prev/focused/next
-            var focusedTileableIdx = 0
-            if let fid = focusedID, let idx = tileableRingOrder.firstIndex(of: fid) {
-                focusedTileableIdx = idx
-            }
-
-            let prevIndex = (focusedTileableIdx - 1 + tileableCount) % tileableCount
-            let nextIndex = (focusedTileableIdx + 1) % tileableCount
-
-            var zOrder: [(windowID: WindowID, pid: pid_t)] = []
-
-            // Add "others" (not prev, focused, or next)
-            for (idx, windowID) in tileableRingOrder.enumerated() {
-                if idx != focusedTileableIdx && idx != prevIndex && idx != nextIndex {
-                    if let window = windowByID[windowID] {
-                        zOrder.append((windowID: windowID, pid: window.ownerPID))
-                    }
-                }
-            }
-
-            // Add prev (if different from focused and next)
-            if tileableCount > 2, let window = windowByID[tileableRingOrder[prevIndex]] {
-                zOrder.append((windowID: tileableRingOrder[prevIndex], pid: window.ownerPID))
-            }
-
-            // Add next (if different from focused)
-            if tileableCount > 1, nextIndex != focusedTileableIdx, let window = windowByID[tileableRingOrder[nextIndex]] {
-                zOrder.append((windowID: tileableRingOrder[nextIndex], pid: window.ownerPID))
-            }
-
-            if !zOrder.isEmpty {
-                let zOrderDesc = zOrder.map { String($0.windowID.rawValue) }.joined(separator: ", ")
+        // Execute z-order adjustments
+        if !allZOrderCalls.isEmpty {
+            let zOrderDesc = allZOrderCalls.map { String($0.windowID.rawValue) }.joined(separator: ", ")
+            if didRaiseNonResizable {
+                TillerLogger.debug("orchestration","[Orchestrator] Z-order (non-resizable overlay): [\(zOrderDesc)]")
+            } else {
                 TillerLogger.debug("orchestration","[Orchestrator] Z-order (back to front, excluding focused): [\(zOrderDesc)]")
-                lastZOrderAdjustment = Date()
-                animationService.raiseWindowsInOrder(zOrder)
             }
-        } else if focusedIsNonResizable, let fid = focusedID, let focusedWin = windowByID[fid] {
-            // Non-resizable overlay: raise it above the frozen accordion
-            TillerLogger.debug("orchestration","[Orchestrator] Raising non-resizable window \(fid.rawValue) to top (overlay)")
             lastZOrderAdjustment = Date()
-            animationService.raiseWindowsInOrder([(windowID: fid, pid: focusedWin.ownerPID)])
+            animationService.raiseWindowsInOrder(allZOrderCalls)
         }
 
         // Determine animation duration
@@ -355,8 +410,6 @@ final class AutoTilingOrchestrator {
         let animationResult = await animationService.animateBatch(allAnimations, duration: duration)
 
         // Check for windows that rejected resize during this tile pass.
-        // These are windows the system reported as resizable but actually aren't
-        // (e.g. iPhone Mirroring) — detected because AXSize set fails at tile-time.
         let newRejections = animationService.resizeRejectedWindowIDs.subtracting(resizeRejectedWindowIDs)
         if !newRejections.isEmpty {
             let rejectedDesc = newRejections.map { String($0.rawValue) }.joined(separator: ", ")
@@ -395,4 +448,18 @@ final class AutoTilingOrchestrator {
     var hasPendingRetile: Bool {
         return pendingRetileTask != nil && !pendingRetileTask!.isCancelled
     }
+}
+
+// MARK: - Direction Types
+
+enum CycleDirection: Sendable {
+    case next
+    case previous
+}
+
+enum MoveDirection: Sendable {
+    case left
+    case right
+    case up
+    case down
 }

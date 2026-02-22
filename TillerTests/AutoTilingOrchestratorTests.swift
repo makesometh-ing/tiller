@@ -801,4 +801,127 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         XCTAssertLessThanOrEqual(mockLayoutEngine.calculateCallCount, 1,
             "Duplicate focus events for same window should be ignored")
     }
+
+    // MARK: - Per-Container Architecture Tests
+
+    func testTwoMonitorsEachGetIndependentMonocleTiling() async {
+        // Given: Two monitors with separate windows
+        let monitor1 = MockMonitorService.createTestMonitor(
+            id: 1,
+            name: "Monitor 1",
+            frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1920, height: 1055),
+            isMain: true
+        )
+        let monitor2 = MockMonitorService.createTestMonitor(
+            id: 2,
+            name: "Monitor 2",
+            frame: CGRect(x: 1920, y: 0, width: 2560, height: 1440),
+            visibleFrame: CGRect(x: 1920, y: 25, width: 2560, height: 1415),
+            isMain: false
+        )
+        mockMonitorService.monitors = [monitor1, monitor2]
+
+        // Windows on monitor 1
+        let win1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let win2 = makeWindow(id: 2, frame: CGRect(x: 200, y: 200, width: 800, height: 600))
+        // Windows on monitor 2
+        let win3 = makeWindow(id: 3, frame: CGRect(x: 2100, y: 100, width: 800, height: 600))
+
+        mockWindowService.windows = [win1, win2, win3]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: win1.id, appName: win1.appName, bundleID: win1.bundleID
+        )
+
+        let targetFrame1 = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        let targetFrame2 = CGRect(x: 1928, y: 33, width: 2544, height: 1399)
+
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: win1.id, pid: win1.ownerPID, targetFrame: targetFrame1),
+            WindowPlacement(windowID: win2.id, pid: win2.ownerPID, targetFrame: targetFrame1),
+            WindowPlacement(windowID: win3.id, pid: win3.ownerPID, targetFrame: targetFrame2)
+        ])
+
+        // When: Orchestrator starts
+        await sut.start()
+
+        // Then: Layout engine called once per monitor (monocle = 1 container per monitor)
+        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 2)
+
+        let inputs = mockLayoutEngine.allInputs
+        XCTAssertEqual(inputs.count, 2)
+
+        // Monitor 1 input should have 2 windows with monitor 1's container frame
+        let m1Input = inputs.first(where: { $0.windows.count == 2 })
+        XCTAssertNotNil(m1Input, "Monitor 1 should have 2 windows")
+        XCTAssertTrue(m1Input?.windows.contains(where: { $0.id == win1.id }) ?? false)
+        XCTAssertTrue(m1Input?.windows.contains(where: { $0.id == win2.id }) ?? false)
+
+        // Monitor 2 input should have 1 window with monitor 2's container frame
+        let m2Input = inputs.first(where: { $0.windows.count == 1 })
+        XCTAssertNotNil(m2Input, "Monitor 2 should have 1 window")
+        XCTAssertTrue(m2Input?.windows.contains(where: { $0.id == win3.id }) ?? false)
+
+        // Container frames should be different (different monitor sizes)
+        XCTAssertNotEqual(m1Input?.containerFrame, m2Input?.containerFrame,
+            "Each monitor should have its own independent container frame")
+    }
+
+    func testWindowAddedToCorrectMonitorContainer() async {
+        // Given: Two monitors, orchestrator running with one window on each
+        let monitor1 = MockMonitorService.createTestMonitor(
+            id: 1, name: "Monitor 1",
+            frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: 0, y: 25, width: 1920, height: 1055),
+            isMain: true
+        )
+        let monitor2 = MockMonitorService.createTestMonitor(
+            id: 2, name: "Monitor 2",
+            frame: CGRect(x: 1920, y: 0, width: 1920, height: 1080),
+            visibleFrame: CGRect(x: 1920, y: 25, width: 1920, height: 1055),
+            isMain: false
+        )
+        mockMonitorService.monitors = [monitor1, monitor2]
+
+        let win1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let win2 = makeWindow(id: 2, frame: CGRect(x: 2100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [win1, win2]
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: win1.id, pid: win1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: win2.id, pid: win2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // When: New window opens on monitor 2
+        let win3 = makeWindow(id: 3, frame: CGRect(x: 2200, y: 200, width: 800, height: 600))
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: win1.id, pid: win1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: win2.id, pid: win2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: win3.id, pid: win3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        mockWindowService.simulateWindowOpenSync(win3)
+        await waitForRetile()
+
+        // Then: Monitor 2 layout input should now have 2 windows
+        let m2Inputs = mockLayoutEngine.allInputs.filter {
+            $0.windows.contains(where: { $0.id == win2.id })
+        }
+        XCTAssertFalse(m2Inputs.isEmpty, "Monitor 2 should have been tiled")
+
+        let m2Input = m2Inputs.first(where: { $0.windows.contains(where: { $0.id == win3.id }) })
+        XCTAssertNotNil(m2Input, "New window should be in monitor 2's layout input")
+
+        // Monitor 1 should still have just 1 window
+        let m1Input = mockLayoutEngine.allInputs.first(where: {
+            $0.windows.contains(where: { $0.id == win1.id }) &&
+            !$0.windows.contains(where: { $0.id == win3.id })
+        })
+        XCTAssertNotNil(m1Input, "Monitor 1 should still have just its original window")
+    }
 }

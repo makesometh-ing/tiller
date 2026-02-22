@@ -79,6 +79,21 @@ struct MonitorTilingState: Equatable, Sendable {
         containers.first(where: { $0.windowIDs.contains(windowID) })
     }
 
+    // MARK: - Frame Updates
+
+    /// Updates container frames in place, preserving container identity and window assignments.
+    /// If the container count matches, frames are updated positionally.
+    /// If the count differs (layout change), falls through to redistributeWindows.
+    mutating func updateContainerFrames(_ containerFrames: [CGRect]) {
+        guard containers.count == containerFrames.count else {
+            redistributeWindows(into: containerFrames)
+            return
+        }
+        for i in containers.indices {
+            containers[i].updateFrame(containerFrames[i])
+        }
+    }
+
     // MARK: - Redistribution
 
     /// Redistributes all windows from existing containers into new containers
