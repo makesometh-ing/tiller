@@ -30,6 +30,7 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
     private(set) var batchAnimationCalls: [BatchAnimationCall] = []
     private(set) var cancelledWindows: [WindowID] = []
     private(set) var cancelAllCalled = false
+    private(set) var raiseOrderCalls: [[(windowID: WindowID, pid: pid_t)]] = []
 
     private var animatingWindows: Set<WindowID> = []
     private var currentFrames: [WindowID: CGRect] = [:]
@@ -128,7 +129,7 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
     }
 
     func raiseWindowsInOrder(_ windows: [(windowID: WindowID, pid: pid_t)]) {
-        // No-op for mock
+        raiseOrderCalls.append(windows)
     }
 
     // MARK: - Test Helpers
@@ -138,6 +139,7 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
         batchAnimationCalls.removeAll()
         cancelledWindows.removeAll()
         cancelAllCalled = false
+        raiseOrderCalls.removeAll()
         animatingWindows.removeAll()
         currentFrames.removeAll()
         resultToReturn = .completed

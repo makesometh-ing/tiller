@@ -154,20 +154,32 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Update stable window order: keep existing order, add new windows, remove closed ones
-        let currentWindowIDs = Set(windows.map { $0.id })
-        stableWindowOrder.removeAll { !currentWindowIDs.contains($0) }
-        for window in windows {
+        // Separate tileable windows (accordion ring buffer) from non-resizable (centered only)
+        // Non-resizable windows get placements from the layout engine but don't participate
+        // in the ring buffer or z-order management
+        let tileableWindows = windows.filter { !$0.isFloating && $0.isResizable }
+        let tileableIDs = Set(tileableWindows.map { $0.id })
+
+        // Update stable window order with tileable windows only
+        stableWindowOrder.removeAll { !tileableIDs.contains($0) }
+        for window in tileableWindows {
             if !stableWindowOrder.contains(window.id) {
                 stableWindowOrder.append(window.id)
             }
         }
 
-        // Create window lookup for sorting
+        // Create window lookup for sorting (all windows, not just tileable)
         let windowByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
 
-        // Sort windows by stable order
-        let stableOrderedWindows = stableWindowOrder.compactMap { windowByID[$0] }
+        // Sort all windows by stable order (tileable first in ring order, then others)
+        let stableOrderedWindows: [WindowInfo] = {
+            var ordered = stableWindowOrder.compactMap { windowByID[$0] }
+            // Append non-tileable, non-floating windows (they'll be passed to the layout engine)
+            for window in windows where !window.isFloating && !window.isResizable {
+                ordered.append(window)
+            }
+            return ordered
+        }()
 
         print("[Orchestrator] Stable window order: \(stableWindowOrder.map { $0.rawValue })")
 
@@ -245,17 +257,22 @@ final class AutoTilingOrchestrator {
             return result
         }
 
-        // Set z-order for non-focused windows only (focused is already front)
+        // Set z-order for tileable (accordion) windows only.
+        // Non-resizable windows are centered and not part of the ring buffer — don't manage their z-order.
         // Order: others (back) -> prev -> next
         // DON'T raise focused window - it triggers focus events and it's already in front
         let focusedID = focusedWindow?.windowID
+
+        // Only adjust z-order if the focused window is tileable (in the ring buffer).
+        // When a non-resizable window is focused, leave z-order unchanged.
+        let focusedIsTileable = focusedID.map { tileableIDs.contains($0) } ?? false
         var focusedIndex = 0
-        if let fid = focusedID, let idx = stableWindowOrder.firstIndex(of: fid) {
+        if focusedIsTileable, let fid = focusedID, let idx = stableWindowOrder.firstIndex(of: fid) {
             focusedIndex = idx
         }
 
         let windowCount = stableWindowOrder.count
-        if windowCount > 1 {
+        if windowCount > 1 && focusedIsTileable {
             let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
             let nextIndex = (focusedIndex + 1) % windowCount
 

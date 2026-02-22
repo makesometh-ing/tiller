@@ -296,8 +296,15 @@ final class SystemWindowService: WindowServiceProtocol {
             forName: NSWorkspace.didActivateApplicationNotification,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
             guard let self = self else { return }
+
+            // Ignore activations from menu bar-only (accessory) or background (prohibited) apps
+            // These apps (e.g. Stats) should not trigger a retile when their popover opens
+            if let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+               app.activationPolicy != .regular {
+                return
+            }
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 if let focusedWindow = self.getFocusedWindow() {

@@ -237,14 +237,13 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         // When: Orchestrator starts
         await sut.start()
 
-        // Then: Layout engine received both windows (engine filters floating)
+        // Then: Floating windows are excluded at orchestrator level — only non-floating windows reach the engine
         XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
-        XCTAssertEqual(mockLayoutEngine.lastInput?.windows.count, 2)
+        XCTAssertEqual(mockLayoutEngine.lastInput?.windows.count, 1)
 
-        // The layout engine filters floating windows internally, so we verify the input was passed correctly
         let inputWindows = mockLayoutEngine.lastInput?.windows ?? []
         XCTAssertTrue(inputWindows.contains(where: { $0.id == normalWindow.id }))
-        XCTAssertTrue(inputWindows.contains(where: { $0.id == floatingWindow.id }))
+        XCTAssertFalse(inputWindows.contains(where: { $0.id == floatingWindow.id }))
     }
 
     // MARK: - Multi-Monitor Tests
@@ -647,6 +646,68 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         let inputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
         XCTAssertEqual(inputOrder.count, 1)
         XCTAssertEqual(inputOrder.first, window2.id)
+    }
+
+    // MARK: - Non-Resizable Window Ring Buffer Tests
+
+    func testNonResizableWindowExcludedFromRingBuffer() async {
+        // Given: Mix of resizable and non-resizable windows
+        let tileableWindow1 = makeWindow(id: 1, isResizable: true)
+        let tileableWindow2 = makeWindow(id: 2, isResizable: true)
+        let nonResizableWindow = makeWindow(id: 3, frame: CGRect(x: 100, y: 100, width: 400, height: 300), isResizable: false)
+        mockWindowService.windows = [tileableWindow1, tileableWindow2, nonResizableWindow]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: tileableWindow1.id,
+            appName: tileableWindow1.appName,
+            bundleID: tileableWindow1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        let centeredFrame = CGRect(x: 760, y: 390, width: 400, height: 300)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: tileableWindow1.id, pid: tileableWindow1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: tileableWindow2.id, pid: tileableWindow2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: nonResizableWindow.id, pid: nonResizableWindow.ownerPID, targetFrame: centeredFrame)
+        ])
+
+        // When: Orchestrator starts
+        await sut.start()
+
+        // Then: All 3 windows are passed to the layout engine (it handles centering non-resizable)
+        XCTAssertEqual(mockLayoutEngine.lastInput?.windows.count, 3)
+
+        // And: Z-order management only raises tileable windows (non-resizable excluded)
+        let raisedWindowIDs = Set(mockAnimationService.raiseOrderCalls.flatMap { $0.map { $0.windowID } })
+        XCTAssertFalse(raisedWindowIDs.contains(nonResizableWindow.id),
+            "Non-resizable window should not be raised as part of z-order management")
+    }
+
+    func testNonResizableFocusedSkipsZOrderAdjustment() async {
+        // Given: Mix of windows with non-resizable one focused
+        let tileableWindow1 = makeWindow(id: 1, isResizable: true)
+        let tileableWindow2 = makeWindow(id: 2, isResizable: true)
+        let nonResizableWindow = makeWindow(id: 3, frame: CGRect(x: 100, y: 100, width: 400, height: 300), isResizable: false)
+        mockWindowService.windows = [tileableWindow1, tileableWindow2, nonResizableWindow]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: nonResizableWindow.id,
+            appName: nonResizableWindow.appName,
+            bundleID: nonResizableWindow.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        let centeredFrame = CGRect(x: 760, y: 390, width: 400, height: 300)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: tileableWindow1.id, pid: tileableWindow1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: tileableWindow2.id, pid: tileableWindow2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: nonResizableWindow.id, pid: nonResizableWindow.ownerPID, targetFrame: centeredFrame)
+        ])
+
+        // When: Orchestrator starts (with non-resizable window focused)
+        await sut.start()
+
+        // Then: No z-order adjustment occurs (non-resizable focused → skip z-order entirely)
+        XCTAssertTrue(mockAnimationService.raiseOrderCalls.isEmpty,
+            "Z-order should not be adjusted when a non-resizable window is focused")
     }
 
     // MARK: - Focus Event Suppression Tests
