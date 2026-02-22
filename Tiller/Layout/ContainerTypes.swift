@@ -12,6 +12,13 @@ struct ContainerID: Hashable, Equatable, Sendable {
 enum LayoutID: String, Sendable, Codable, Equatable, Hashable, CaseIterable {
     case monocle
     case splitHalves
+
+    var displayName: String {
+        switch self {
+        case .monocle: return "Monocle"
+        case .splitHalves: return "Split Halves"
+        }
+    }
 }
 
 typealias LayoutDefinition = @Sendable (_ monitorFrame: CGRect, _ margin: Int, _ padding: Int) -> [CGRect]

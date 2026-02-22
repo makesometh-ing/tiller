@@ -138,6 +138,54 @@ final class TillerMenuStateTests: XCTestCase {
 
     // MARK: - Monitor updates
 
+    // MARK: - Layout State
+
+    func testConfigureInitializesLayoutState() {
+        sut.configure(orchestrator: orchestrator)
+
+        // Default layout is monocle for the connected monitor
+        XCTAssertEqual(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)], .monocle)
+    }
+
+    func testSwitchLayoutUpdatesState() async {
+        // Need windows for the orchestrator to create monitor state
+        let window = MockWindowService.createTestWindow(id: 1, title: "W1", frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window]
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window.id, pid: window.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039))
+        ])
+
+        sut.configure(orchestrator: orchestrator)
+        await orchestrator.start()
+
+        // Now switch layout
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+
+        XCTAssertEqual(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)], .splitHalves)
+    }
+
+    func testLayoutChangeCallbackUpdatesState() async {
+        let window = MockWindowService.createTestWindow(id: 1, title: "W1", frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window]
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window.id, pid: window.ownerPID, targetFrame: CGRect(x: 8, y: 33, width: 1904, height: 1039))
+        ])
+
+        sut.configure(orchestrator: orchestrator)
+        await orchestrator.start()
+
+        // Simulate layout change via orchestrator (as if triggered by keyboard)
+        orchestrator.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+
+        XCTAssertEqual(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)], .splitHalves)
+    }
+
+    func testSwitchLayoutDoesNothingWithoutConfigure() {
+        // Should not crash
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+        XCTAssertTrue(sut.activeLayoutPerMonitor.isEmpty)
+    }
+
     func testMonitorListUpdatesOnChange() {
         sut.configure(orchestrator: orchestrator)
         XCTAssertEqual(sut.monitors.count, 1)
