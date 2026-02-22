@@ -186,6 +186,42 @@ final class TillerMenuStateTests: XCTestCase {
         XCTAssertTrue(sut.activeLayoutPerMonitor.isEmpty)
     }
 
+    // MARK: - Status Text
+
+    func testStatusTextDefaultsToMonitor1Idle() {
+        XCTAssertEqual(sut.statusText, "[1] -")
+    }
+
+    func testStatusTextReflectsLeaderActive() {
+        sut.leaderState = .leaderActive
+        XCTAssertEqual(sut.statusText, "[1] L")
+    }
+
+    func testStatusTextCombinesMonitorAndLeader() {
+        let secondMonitor = MockMonitorService.createTestMonitor(
+            id: 2,
+            name: "External Monitor",
+            frame: CGRect(x: 1920, y: 0, width: 2560, height: 1440),
+            isMain: false
+        )
+        mockMonitorService.simulateMonitorConnect(secondMonitor)
+        sut.configure(orchestrator: orchestrator)
+        monitorManager.startMonitoring()
+
+        sut.activeMonitorID = MonitorID(rawValue: 2)
+        sut.leaderState = .leaderActive
+
+        XCTAssertEqual(sut.statusText, "[2] L")
+    }
+
+    func testStatusTextDefaultsToMonitor1WhenNoActiveMonitor() {
+        sut.activeMonitorID = nil
+        sut.leaderState = .leaderActive
+        XCTAssertEqual(sut.statusText, "[1] L")
+    }
+
+    // MARK: - Monitor Updates
+
     func testMonitorListUpdatesOnChange() {
         sut.configure(orchestrator: orchestrator)
         XCTAssertEqual(sut.monitors.count, 1)

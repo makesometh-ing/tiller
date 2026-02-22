@@ -19,6 +19,20 @@ final class TillerMenuState {
     var monitors: [MonitorInfo] = []
     var activeMonitorID: MonitorID?
     var activeLayoutPerMonitor: [MonitorID: LayoutID] = [:]
+    var leaderState: LeaderState = .idle
+
+    // MARK: - Status Text
+
+    var statusText: String {
+        let layer = leaderState == .leaderActive ? "L" : "-"
+        return "[\(activeMonitorNumber)] \(layer)"
+    }
+
+    private var activeMonitorNumber: Int {
+        guard let activeID = activeMonitorID,
+              let index = monitors.firstIndex(where: { $0.id == activeID }) else { return 1 }
+        return index + 1
+    }
 
     // MARK: - Dependencies
 
