@@ -18,7 +18,7 @@ typealias LayoutDefinition = @Sendable (_ monitorFrame: CGRect, _ margin: Int, _
 
 struct Container: Equatable, Sendable {
     let id: ContainerID
-    let frame: CGRect
+    private(set) var frame: CGRect
     private(set) var windowIDs: [WindowID]
     private(set) var focusedWindowID: WindowID?
 
@@ -27,6 +27,13 @@ struct Container: Equatable, Sendable {
         self.frame = frame
         self.windowIDs = windowIDs
         self.focusedWindowID = focusedWindowID
+    }
+
+    // MARK: - Frame Updates
+
+    /// Updates the container's frame (e.g. when monitor size changes).
+    mutating func updateFrame(_ newFrame: CGRect) {
+        frame = newFrame
     }
 
     // MARK: - Ring Buffer Operations
