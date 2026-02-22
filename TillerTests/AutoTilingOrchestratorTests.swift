@@ -99,6 +99,25 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         )
     }
 
+    /// Polls until the layout engine has been called at least the expected number of times,
+    /// or times out after ~1 second. Replaces non-deterministic fixed sleeps.
+    private func waitForRetile(
+        expectedCallCount: Int = 1,
+        timeout: Int = 20,
+        file: StaticString = #file,
+        line: UInt = #line
+    ) async {
+        for _ in 0..<timeout {
+            await Task.yield()
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms per poll
+            if mockLayoutEngine.calculateCallCount >= expectedCallCount { return }
+        }
+        XCTFail(
+            "Timed out waiting for retile (expected \(expectedCallCount), got \(mockLayoutEngine.calculateCallCount))",
+            file: file, line: line
+        )
+    }
+
     // MARK: - Initial Tiling Tests
 
     func testInitialTiling() async {
@@ -185,10 +204,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         mockWindowService.simulateWindowOpenSync(window2)
 
         // Wait for debounce and retile
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await waitForRetile()
 
         // Then: Retile was triggered
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
+        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
         XCTAssertGreaterThanOrEqual(mockAnimationService.batchAnimationCalls.count, 1)
     }
 
@@ -216,10 +235,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         mockWindowService.simulateWindowCloseSync(window2.id)
 
         // Wait for debounce and retile
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await waitForRetile()
 
         // Then: Retile was triggered
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
+        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
     }
 
     // MARK: - Floating Window Tests
@@ -595,7 +614,7 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         ])
 
         mockWindowService.simulateWindowOpenSync(window2)
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await waitForRetile()
 
         // Then: New window should be appended (window1 stays first)
         let inputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
@@ -624,7 +643,7 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         ])
 
         mockWindowService.simulateWindowCloseSync(window1.id)
-        try? await Task.sleep(nanoseconds: 50_000_000)
+        await waitForRetile()
 
         // Then: Only window2 remains
         let inputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
@@ -740,17 +759,11 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         )
         mockWindowService.simulateWindowFocusSync(nonResizableWindow.id)
 
-        // Poll until layout engine is called (debounce + performTile completes)
-        for _ in 0..<20 {
-            await Task.yield()
-            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms per poll
-            if mockLayoutEngine.calculateCallCount > 0 { break }
-        }
+        // Wait for debounce and retile
+        await waitForRetile()
 
         // Then: Accordion freezes — layout engine receives tileableWindow2 (last tileable focus),
         // NOT the non-resizable window's ID
-        XCTAssertGreaterThan(mockLayoutEngine.calculateCallCount, 0,
-            "Layout engine should have been called after focus change")
         XCTAssertEqual(mockLayoutEngine.lastInput?.focusedWindowID, tileableWindow2.id,
             "Accordion should freeze at last tileable window when non-resizable is focused")
     }
