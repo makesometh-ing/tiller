@@ -990,6 +990,154 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
     }
 
+    // MARK: - Window/Container Operation Tests
+
+    func testCycleWindowTriggersRetile() async {
+        // Given: Orchestrator running with 3 windows in monocle
+        let window1 = makeWindow(id: 1)
+        let window2 = makeWindow(id: 2)
+        let window3 = makeWindow(id: 3)
+        mockWindowService.windows = [window1, window2, window3]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id, appName: window1.appName, bundleID: window1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: Cycle to next window
+        sut.cycleWindow(direction: .next)
+        await waitForRetile()
+
+        // Then: Layout engine was called (retile triggered)
+        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+    }
+
+    func testMoveWindowToContainerTriggersRetile() async {
+        // Given: Orchestrator running with split-halves layout
+        let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let window2 = makeWindow(id: 2, frame: CGRect(x: 1100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id, appName: window1.appName, bundleID: window1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+
+        // Switch to split halves to get 2 containers
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+        await waitForRetile(expectedCallCount: 2)
+
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: Move focused window (window1) to right container
+        sut.moveWindowToContainer(direction: .right)
+        await waitForRetile()
+
+        // Then: Retile triggered
+        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+    }
+
+    func testFocusContainerTriggersRetile() async {
+        // Given: Orchestrator running with split-halves layout
+        let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let window2 = makeWindow(id: 2, frame: CGRect(x: 1100, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id, appName: window1.appName, bundleID: window1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+
+        // Switch to split halves
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+        await waitForRetile(expectedCallCount: 2)
+
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: Focus right container
+        sut.focusContainer(direction: .right)
+        await waitForRetile()
+
+        // Then: Retile triggered
+        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+    }
+
+    func testOperationsNoOpWithNoFocusedWindow() async {
+        // Given: Orchestrator running but no focused window
+        let window1 = makeWindow(id: 1)
+        mockWindowService.windows = [window1]
+        mockWindowService.focusedWindow = nil
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // When: All three operations called with no focused window
+        sut.cycleWindow(direction: .next)
+        sut.moveWindowToContainer(direction: .right)
+        sut.focusContainer(direction: .right)
+
+        // Wait briefly
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Then: No retile triggered (all no-ops)
+        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
+    }
+
     func testSwitchLayoutDoesNotAffectOtherMonitor() async {
         // Given: Two monitors, orchestrator running
         let monitor1 = MockMonitorService.createTestMonitor(

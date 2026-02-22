@@ -401,6 +401,209 @@ final class MonitorTilingStateTests: XCTestCase {
         XCTAssertEqual(state.containers[1].windowIDs, [wid(1)])
     }
 
+    // MARK: - cycleWindow Tests
+
+    func testCycleWindowNext() {
+        let container = makeContainer(id: 0, windowIDs: [1, 2, 3], focusedWindowID: 1)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .monocle,
+            containers: [container], focusedContainerID: container.id
+        )
+
+        state.cycleWindow(direction: .next, windowID: wid(1))
+
+        XCTAssertEqual(state.containers[0].focusedWindowID, wid(2))
+    }
+
+    func testCycleWindowPrevious() {
+        let container = makeContainer(id: 0, windowIDs: [1, 2, 3], focusedWindowID: 1)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .monocle,
+            containers: [container], focusedContainerID: container.id
+        )
+
+        state.cycleWindow(direction: .previous, windowID: wid(1))
+
+        // Wraps to last: 3
+        XCTAssertEqual(state.containers[0].focusedWindowID, wid(3))
+    }
+
+    func testCycleWindowSingleWindow() {
+        let container = makeContainer(id: 0, windowIDs: [1], focusedWindowID: 1)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .monocle,
+            containers: [container], focusedContainerID: container.id
+        )
+
+        state.cycleWindow(direction: .next, windowID: wid(1))
+
+        // No-op with 1 window
+        XCTAssertEqual(state.containers[0].focusedWindowID, wid(1))
+    }
+
+    // MARK: - moveWindow Tests
+
+    func testMoveWindowRight() {
+        let leftFrame = CGRect(x: 0, y: 0, width: 960, height: 1080)
+        let rightFrame = CGRect(x: 960, y: 0, width: 960, height: 1080)
+        let left = Container(
+            id: ContainerID(rawValue: 0), frame: leftFrame,
+            windowIDs: [wid(1), wid(2)], focusedWindowID: wid(1)
+        )
+        let right = Container(
+            id: ContainerID(rawValue: 1), frame: rightFrame,
+            windowIDs: [wid(3)], focusedWindowID: wid(3)
+        )
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: left.id
+        )
+
+        state.moveWindow(from: wid(1), direction: .right)
+
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(2)])
+        XCTAssertEqual(state.containers[1].windowIDs, [wid(3), wid(1)])
+        XCTAssertEqual(state.focusedContainerID, right.id)
+    }
+
+    func testMoveWindowLeft() {
+        let leftFrame = CGRect(x: 0, y: 0, width: 960, height: 1080)
+        let rightFrame = CGRect(x: 960, y: 0, width: 960, height: 1080)
+        let left = Container(
+            id: ContainerID(rawValue: 0), frame: leftFrame,
+            windowIDs: [wid(1)], focusedWindowID: wid(1)
+        )
+        let right = Container(
+            id: ContainerID(rawValue: 1), frame: rightFrame,
+            windowIDs: [wid(2), wid(3)], focusedWindowID: wid(2)
+        )
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: right.id
+        )
+
+        state.moveWindow(from: wid(2), direction: .left)
+
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(2)])
+        XCTAssertEqual(state.containers[1].windowIDs, [wid(3)])
+        XCTAssertEqual(state.focusedContainerID, left.id)
+    }
+
+    func testMoveWindowAtBoundary() {
+        let leftFrame = CGRect(x: 0, y: 0, width: 960, height: 1080)
+        let rightFrame = CGRect(x: 960, y: 0, width: 960, height: 1080)
+        let left = Container(
+            id: ContainerID(rawValue: 0), frame: leftFrame,
+            windowIDs: [wid(1)], focusedWindowID: wid(1)
+        )
+        let right = Container(
+            id: ContainerID(rawValue: 1), frame: rightFrame,
+            windowIDs: [wid(2)], focusedWindowID: wid(2)
+        )
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: left.id
+        )
+
+        // Move left from leftmost container — no-op
+        state.moveWindow(from: wid(1), direction: .left)
+
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(1)])
+        XCTAssertEqual(state.containers[1].windowIDs, [wid(2)])
+    }
+
+    func testMoveWindowMonocle() {
+        let container = makeContainer(id: 0, windowIDs: [1, 2], focusedWindowID: 1)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .monocle,
+            containers: [container], focusedContainerID: container.id
+        )
+
+        // Single container — no destination
+        state.moveWindow(from: wid(1), direction: .right)
+
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(2)])
+    }
+
+    func testMoveWindowLastFromContainer() {
+        let leftFrame = CGRect(x: 0, y: 0, width: 960, height: 1080)
+        let rightFrame = CGRect(x: 960, y: 0, width: 960, height: 1080)
+        let left = Container(
+            id: ContainerID(rawValue: 0), frame: leftFrame,
+            windowIDs: [wid(1)], focusedWindowID: wid(1)
+        )
+        let right = Container(
+            id: ContainerID(rawValue: 1), frame: rightFrame,
+            windowIDs: [wid(2)], focusedWindowID: wid(2)
+        )
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: left.id
+        )
+
+        state.moveWindow(from: wid(1), direction: .right)
+
+        // Left container becomes empty
+        XCTAssertTrue(state.containers[0].windowIDs.isEmpty)
+        XCTAssertEqual(state.containers[1].windowIDs, [wid(2), wid(1)])
+        XCTAssertEqual(state.focusedContainerID, right.id)
+    }
+
+    // MARK: - setFocusedContainer Tests
+
+    func testSetFocusedContainerRight() {
+        let left = makeContainer(id: 0, windowIDs: [1], focusedWindowID: 1)
+        let right = makeContainer(id: 1, windowIDs: [2], focusedWindowID: 2)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: left.id
+        )
+
+        state.setFocusedContainer(direction: .right)
+
+        XCTAssertEqual(state.focusedContainerID, right.id)
+    }
+
+    func testSetFocusedContainerLeft() {
+        let left = makeContainer(id: 0, windowIDs: [1], focusedWindowID: 1)
+        let right = makeContainer(id: 1, windowIDs: [2], focusedWindowID: 2)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: right.id
+        )
+
+        state.setFocusedContainer(direction: .left)
+
+        XCTAssertEqual(state.focusedContainerID, left.id)
+    }
+
+    func testSetFocusedContainerAtBoundary() {
+        let left = makeContainer(id: 0, windowIDs: [1], focusedWindowID: 1)
+        let right = makeContainer(id: 1, windowIDs: [2], focusedWindowID: 2)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: left.id
+        )
+
+        // Move left from leftmost — no-op
+        state.setFocusedContainer(direction: .left)
+
+        XCTAssertEqual(state.focusedContainerID, left.id)
+    }
+
+    func testSetFocusedContainerMonocle() {
+        let container = makeContainer(id: 0, windowIDs: [1], focusedWindowID: 1)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .monocle,
+            containers: [container], focusedContainerID: container.id
+        )
+
+        // Single container — no-op
+        state.setFocusedContainer(direction: .right)
+
+        XCTAssertEqual(state.focusedContainerID, container.id)
+    }
+
     func testSwitchLayout_focusedContainerFollowsFocusedWindow() {
         // Given: monocle with focused window 2
         let container = makeContainer(id: 0, windowIDs: [1, 2], focusedWindowID: 2)
