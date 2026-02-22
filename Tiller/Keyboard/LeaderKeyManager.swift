@@ -11,6 +11,7 @@ import Foundation
 enum LeaderState: Equatable, Sendable {
     case idle
     case leaderActive
+    case subLayerActive(key: String)
 }
 
 // MARK: - Key Mapping
@@ -127,7 +128,7 @@ final class LeaderKeyManager {
         case .idle:
             return handleIdleKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType, isOptionDown: isOptionDown)
 
-        case .leaderActive:
+        case .leaderActive, .subLayerActive:
             return handleLeaderKeyEvent(keyCode: keyCode, eventType: eventType, isOptionDown: isOptionDown, isShift: isShift)
         }
     }
@@ -176,7 +177,7 @@ final class LeaderKeyManager {
     }
 
     func exitLeaderMode() {
-        guard state == .leaderActive else { return }
+        guard state != .idle else { return }
         state = .idle
         onStateChanged?(.idle)
         timeoutTask?.cancel()

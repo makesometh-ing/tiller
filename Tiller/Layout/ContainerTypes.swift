@@ -19,6 +19,10 @@ enum LayoutID: String, Sendable, Codable, Equatable, Hashable, CaseIterable {
         case .splitHalves: return "Split Halves"
         }
     }
+
+    var displayNumber: Int {
+        (LayoutID.allCases.firstIndex(of: self) ?? 0) + 1
+    }
 }
 
 typealias LayoutDefinition = @Sendable (_ monitorFrame: CGRect, _ margin: Int, _ padding: Int) -> [CGRect]
