@@ -64,6 +64,12 @@ final class AutoTilingOrchestrator {
         isRunning = true
         isInitialTile = true
 
+        // Perform initial tile BEFORE registering callbacks.
+        // This prevents window events from triggering retiles while isInitialTile is true,
+        // which would cause them to use duration=0 (instant) instead of animating.
+        await performTile()
+        isInitialTile = false
+
         windowDiscoveryManager.onWindowChange = { [weak self] event in
             self?.handleWindowChange(event)
         }
@@ -71,9 +77,6 @@ final class AutoTilingOrchestrator {
         windowDiscoveryManager.onFocusedWindowChanged = { [weak self] focusedWindow in
             self?.handleFocusChange(focusedWindow)
         }
-
-        await performTile()
-        isInitialTile = false
     }
 
     func stop() {
