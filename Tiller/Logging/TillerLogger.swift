@@ -20,4 +20,5 @@ enum TillerLogger {
     static let layout = Logger(subsystem: subsystem, category: "layout")
     static let animation = Logger(subsystem: subsystem, category: "animation")
     static let monitor = Logger(subsystem: subsystem, category: "monitor")
+    static let config = Logger(subsystem: subsystem, category: "config")
 }
