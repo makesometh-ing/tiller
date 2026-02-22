@@ -36,7 +36,33 @@
 
   * A settings action for opening the setting menu
 
-  * A ‘Quit’ action is always presented as the final entry at the bottom of the menu.
+  * A 'Quit' action is always presented as the final entry at the bottom of the menu.
+
+### Menu Bar Status Text
+
+* A dynamic status string is always displayed to the right of the Tiller menu bar icon.
+
+* **Format:** `[<active monitor number>] <layer indicator>`
+
+* **Layer indicator values:**
+
+  * `-` — leader mode is not active (idle state)
+
+  * `L` — leader mode is active, at the root layer
+
+  * `<KEY>*` — leader mode is active and the user has entered a sub-layer, where `<KEY>` is the uppercased sub-layer key and `*` denotes it is a layer (e.g. `M*` for the monitor sub-layer)
+
+* **Examples:**
+
+  * `[1] -` — monitor 1 focused, leader not active
+
+  * `[1] L` — monitor 1 focused, leader active (root)
+
+  * `[1] M*` — monitor 1 focused, leader active, in monitor sub-layer
+
+  * `[2] F*` — monitor 2 focused, leader active, in a sub-layer mapped to `f`
+
+* The status text updates in real-time as the active monitor or leader state changes.
 
 * **Monitor Navigation Row:**
 
@@ -433,6 +459,32 @@ Tiller automatically marks windows as 'floating' if they match any of the follow
 * Floating windows are visually above tiled containers and excluded from tiling actions.
 
 * Auto-floated windows are distinct from auto-ignored windows: floated windows are still tracked by Tiller (they appear above containers and respond to focus), while ignored windows are invisible to Tiller entirely.
+
+Floating Window Indicator Overlay
+
+* Every floating window tracked by Tiller displays a small translucent pill badge in its bottom-right corner showing `F`.
+
+* **Visual design:**
+
+  * Pill shape with rounded corners
+
+  * Maximum 10pt font size
+
+  * 50% opacity
+
+  * Respects system appearance: uses appropriate colors for dark mode and light mode
+
+  * Comfortable padding around the text
+
+* **Behavior:**
+
+  * The pill is anchored to the floating window — it moves with the window.
+
+  * The pill is **not interactable** — it does not accept mouse clicks, drags, or any input events. All interactions pass through to the window beneath it.
+
+  * The pill does not block or interfere with the window's content or controls.
+
+* **Scope:** The pill appears on all floating windows Tiller tracks (both auto-floated and user-floated). Auto-ignored windows (which Tiller does not track at all) do not receive a pill.
 
 User Control of Floating Windows
 
