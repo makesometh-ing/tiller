@@ -206,7 +206,8 @@ final class SystemWindowService: WindowServiceProtocol {
 
         guard result == .success,
               let windows = windowsRef as? [AXUIElement] else {
-            return (isResizable: true, isFloating: false)
+            // Can't query AX windows — assume non-resizable (safe: centering is better than broken tiling)
+            return (isResizable: false, isFloating: false)
         }
 
         for window in windows {
@@ -256,14 +257,40 @@ final class SystemWindowService: WindowServiceProtocol {
 
                 if resizableResult == .success,
                    let resizable = resizableRef as? Bool {
-                    // Non-resizable windows flow to the layout engine for centering
                     return (isResizable: resizable, isFloating: false)
                 }
+
+                // AXResizable failed — probe min/max size as secondary check.
+                // If minSize == maxSize, window is definitively non-resizable.
+                var minSizeRef: CFTypeRef?
+                var maxSizeRef: CFTypeRef?
+                let minResult = AXUIElementCopyAttributeValue(window, "AXMinimumSize" as CFString, &minSizeRef)
+                let maxResult = AXUIElementCopyAttributeValue(window, "AXMaximumSize" as CFString, &maxSizeRef)
+
+                if minResult == .success, maxResult == .success,
+                   let minVal = minSizeRef, let maxVal = maxSizeRef,
+                   CFGetTypeID(minVal) == AXValueGetTypeID(),
+                   CFGetTypeID(maxVal) == AXValueGetTypeID() {
+                    var minSize = CGSize.zero
+                    var maxSize = CGSize(width: 1, height: 1)
+                    if AXValueGetValue(minVal as! AXValue, .cgSize, &minSize),
+                       AXValueGetValue(maxVal as! AXValue, .cgSize, &maxSize) {
+                        let isFixed = (minSize.width == maxSize.width && minSize.height == maxSize.height)
+                        print("[SystemWindowService] Window \(windowID) min/max probe: min=\(minSize), max=\(maxSize), fixed=\(isFixed)")
+                        return (isResizable: !isFixed, isFloating: false)
+                    }
+                }
+
+                // Both AXResizable and min/max probes failed — assume non-resizable.
+                // Safe default: centering a resizable window is acceptable;
+                // tiling a non-resizable window to an accordion position is broken.
+                print("[SystemWindowService] Window \(windowID) (\(bundleID ?? "unknown")): AXResizable and min/max probes failed, defaulting to non-resizable")
                 break
             }
         }
 
-        return (isResizable: true, isFloating: false)
+        // Window not found in AX window list — assume non-resizable (safe default)
+        return (isResizable: false, isFloating: false)
     }
 
     private func setupWorkspaceObservers() {
