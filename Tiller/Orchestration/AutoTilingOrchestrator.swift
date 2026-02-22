@@ -5,7 +5,6 @@
 
 import CoreGraphics
 import Foundation
-import os
 
 @MainActor
 final class AutoTilingOrchestrator {
@@ -108,13 +107,13 @@ final class AutoTilingOrchestrator {
         // Ignore focus changes caused by our own z-order adjustments (within 200ms)
         if let lastAdjust = lastZOrderAdjustment,
            Date().timeIntervalSince(lastAdjust) < 0.2 {
-            TillerLogger.orchestration.debug("[Orchestrator] Ignoring focus change within 200ms of z-order adjustment")
+            TillerLogger.debug("orchestration","[Orchestrator] Ignoring focus change within 200ms of z-order adjustment")
             return
         }
 
         // Ignore if focus hasn't actually changed
         if focusedWindow?.windowID == lastFocusedWindowID {
-            TillerLogger.orchestration.debug("[Orchestrator] Ignoring duplicate focus event for same window")
+            TillerLogger.debug("orchestration","[Orchestrator] Ignoring duplicate focus event for same window")
             return
         }
 
@@ -184,7 +183,7 @@ final class AutoTilingOrchestrator {
         let stableOrderedWindows = stableWindowOrder.compactMap { windowByID[$0] }
 
         let orderDesc = stableWindowOrder.map { String($0.rawValue) }.joined(separator: ", ")
-        TillerLogger.orchestration.debug("[Orchestrator] Stable window order: [\(orderDesc)]")
+        TillerLogger.debug("orchestration","[Orchestrator] Stable window order: [\(orderDesc)]")
 
         let tillerConfig = configManager.getConfig()
         let monitors = monitorManager.connectedMonitors
@@ -251,11 +250,11 @@ final class AutoTilingOrchestrator {
             // Position ALL windows - don't skip based on current position
             for placement in result.placements {
                 guard let window = monitorWindows.first(where: { $0.id == placement.windowID }) else {
-                    TillerLogger.orchestration.debug("[Orchestrator] Window \(placement.windowID.rawValue) not found in monitorWindows")
+                    TillerLogger.debug("orchestration","[Orchestrator] Window \(placement.windowID.rawValue) not found in monitorWindows")
                     continue
                 }
 
-                TillerLogger.orchestration.debug("[Orchestrator] Window \(window.appName) (ID: \(window.id.rawValue)) -> \(placement.targetFrame.origin.x)")
+                TillerLogger.debug("orchestration","[Orchestrator] Window \(window.appName) (ID: \(window.id.rawValue)) -> \(placement.targetFrame.origin.x)")
 
                 allAnimations.append((
                     windowID: placement.windowID,
@@ -312,13 +311,13 @@ final class AutoTilingOrchestrator {
 
             if !zOrder.isEmpty {
                 let zOrderDesc = zOrder.map { String($0.windowID.rawValue) }.joined(separator: ", ")
-                TillerLogger.orchestration.debug("[Orchestrator] Z-order (back to front, excluding focused): [\(zOrderDesc)]")
+                TillerLogger.debug("orchestration","[Orchestrator] Z-order (back to front, excluding focused): [\(zOrderDesc)]")
                 lastZOrderAdjustment = Date()
                 animationService.raiseWindowsInOrder(zOrder)
             }
         } else if focusedIsNonResizable, let fid = focusedID, let focusedWin = windowByID[fid] {
             // Non-resizable overlay: raise it above the frozen accordion
-            TillerLogger.orchestration.debug("[Orchestrator] Raising non-resizable window \(fid.rawValue) to top (overlay)")
+            TillerLogger.debug("orchestration","[Orchestrator] Raising non-resizable window \(fid.rawValue) to top (overlay)")
             lastZOrderAdjustment = Date()
             animationService.raiseWindowsInOrder([(windowID: fid, pid: focusedWin.ownerPID)])
         }

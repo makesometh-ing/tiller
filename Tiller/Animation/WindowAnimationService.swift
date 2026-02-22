@@ -76,7 +76,7 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
 
         // Fast path for instant positioning (duration = 0)
         if duration <= 0 {
-            TillerLogger.animation.debug("Instant positioning (duration=0)")
+            TillerLogger.debug("animation","Instant positioning (duration=0)")
             var successCount = 0
             for animation in animations {
                 let result = positioner.setFrame(
@@ -90,7 +90,7 @@ final class WindowAnimationService: WindowAnimationServiceProtocol {
                     TillerLogger.animation.error("Failed to position window \(animation.windowID.rawValue)")
                 }
             }
-            TillerLogger.animation.debug("Instant positioning complete: \(successCount)/\(animations.count) succeeded")
+            TillerLogger.debug("animation","Instant positioning complete: \(successCount)/\(animations.count) succeeded")
             return .completed
         }
 

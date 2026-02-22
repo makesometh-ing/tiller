@@ -4,7 +4,6 @@
 //
 
 import Foundation
-import os
 
 @MainActor
 final class WindowDiscoveryManager {
@@ -41,16 +40,16 @@ final class WindowDiscoveryManager {
             return
         }
 
-        TillerLogger.windowDiscovery.info("Starting window discovery")
+        TillerLogger.debug("window-discovery","Starting window discovery")
 
         let windows = windowService.getVisibleWindows()
-        TillerLogger.windowDiscovery.info("Found \(windows.count) visible window(s)")
+        TillerLogger.debug("window-discovery","Found \(windows.count) visible window(s)")
         for window in windows {
-            TillerLogger.windowDiscovery.debug("  - \"\(window.title)\" (\(window.appName), ID: \(window.id.rawValue))")
+            TillerLogger.debug("window-discovery","  - \"\(window.title)\" (\(window.appName), ID: \(window.id.rawValue))")
         }
 
         if let focused = windowService.getFocusedWindow() {
-            TillerLogger.windowDiscovery.info("Focused window: \(focused.appName) (ID: \(focused.windowID.rawValue))")
+            TillerLogger.debug("window-discovery","Focused window: \(focused.appName) (ID: \(focused.windowID.rawValue))")
         }
 
         windowService.startObserving { [weak self] event in
@@ -67,7 +66,7 @@ final class WindowDiscoveryManager {
 
         windowService.stopObserving()
         _isMonitoring = false
-        TillerLogger.windowDiscovery.info("Stopped window discovery")
+        TillerLogger.debug("window-discovery","Stopped window discovery")
     }
 
     func getWindow(byID id: WindowID) -> WindowInfo? {
@@ -81,18 +80,18 @@ final class WindowDiscoveryManager {
     private func handleWindowEvent(_ event: WindowChangeEvent) {
         switch event {
         case .windowOpened(let windowInfo):
-            TillerLogger.windowDiscovery.info("Window opened: \"\(windowInfo.title)\" (\(windowInfo.appName))")
+            TillerLogger.debug("window-discovery","Window opened: \"\(windowInfo.title)\" (\(windowInfo.appName))")
         case .windowClosed(let windowID):
-            TillerLogger.windowDiscovery.info("Window closed: ID \(windowID.rawValue)")
+            TillerLogger.debug("window-discovery","Window closed: ID \(windowID.rawValue)")
         case .windowFocused(let windowID):
-            TillerLogger.windowDiscovery.info("Window focused: ID \(windowID.rawValue)")
+            TillerLogger.debug("window-discovery","Window focused: ID \(windowID.rawValue)")
             if let focused = windowService.getFocusedWindow() {
                 onFocusedWindowChanged?(focused)
             }
         case .windowMoved(let windowID, let newFrame):
-            TillerLogger.windowDiscovery.debug("Window moved: ID \(windowID.rawValue) to \(String(describing: newFrame))")
+            TillerLogger.debug("window-discovery","Window moved: ID \(windowID.rawValue) to \(String(describing: newFrame))")
         case .windowResized(let windowID, let newFrame):
-            TillerLogger.windowDiscovery.debug("Window resized: ID \(windowID.rawValue) to \(String(describing: newFrame))")
+            TillerLogger.debug("window-discovery","Window resized: ID \(windowID.rawValue) to \(String(describing: newFrame))")
         }
 
         onWindowChange?(event)
