@@ -58,10 +58,16 @@ Work is **NOT done** until the PR is merged into `main`.
    gh pr merge --squash --auto    # Auto-merge when checks pass
    ```
 
-4. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
-5. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
-6. **Verify** — PR is merged into `main`, Linear reflects actual state
-7. **Hand off** — Provide context for next session: what was done, what's next, any blockers
+4. **Return to main** — After the PR merges, switch back to `main` and pull:
+
+   ```bash
+   git checkout main && git pull
+   ```
+
+5. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
+6. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
+7. **Verify** — PR is merged into `main`, local `main` is up to date, Linear reflects actual state
+8. **Hand off** — Provide context for next session: what was done, what's next, any blockers
 
 **CRITICAL RULES:**
 
