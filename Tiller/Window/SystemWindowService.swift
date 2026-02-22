@@ -258,11 +258,13 @@ final class SystemWindowService: WindowServiceProtocol {
 
                 if resizableResult == .success,
                    let resizable = resizableRef as? Bool {
+                    TillerLogger.windowDiscovery.debug("Window \(windowID) (\(bundleID ?? "unknown")): AXResizable = \(resizable)")
                     return (isResizable: resizable, isFloating: false)
                 }
 
-                // AXResizable failed — probe min/max size as secondary check.
-                // If minSize == maxSize, window is definitively non-resizable.
+                TillerLogger.windowDiscovery.debug("Window \(windowID) (\(bundleID ?? "unknown")): AXResizable query failed (error \(resizableResult.rawValue))")
+
+                // AXResizable failed — try min/max size probe as fallback.
                 var minSizeRef: CFTypeRef?
                 var maxSizeRef: CFTypeRef?
                 let minResult = AXUIElementCopyAttributeValue(window, "AXMinimumSize" as CFString, &minSizeRef)
@@ -282,11 +284,12 @@ final class SystemWindowService: WindowServiceProtocol {
                     }
                 }
 
-                // Both AXResizable and min/max probes failed — assume non-resizable.
-                // Safe default: centering a resizable window is acceptable;
-                // tiling a non-resizable window to an accordion position is broken.
-                TillerLogger.windowDiscovery.info("Window \(windowID) (\(bundleID ?? "unknown")): AXResizable and min/max probes failed, defaulting to non-resizable")
-                break
+                // All probes failed, but we DID find the window in the AX tree
+                // and the app has .regular activation policy.
+                // Default to resizable: these are normal app windows where attribute
+                // queries failed (can happen in debug builds or certain app frameworks).
+                TillerLogger.windowDiscovery.info("Window \(windowID) (\(bundleID ?? "unknown")): all probes failed, defaulting to resizable (window found in AX tree)")
+                return (isResizable: true, isFloating: false)
             }
         }
 
