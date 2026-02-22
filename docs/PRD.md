@@ -344,6 +344,16 @@ Automatic Tiling and Resizing Behavior
 
 * When an app is opened, it is assigned to the same container as the currently focused window on that monitor.
 
+* **Non-Resizable Window Detection:**
+
+  Tiller classifies a window as non-resizable using the following detection chain:
+
+  1. Query the `AXResizable` Accessibility attribute. If the app exposes it, use the returned boolean directly.
+
+  2. If `AXResizable` is not available (some apps don't expose it), probe `AXMinimumSize` and `AXMaximumSize`. If both succeed and the values are equal, the window is definitively non-resizable.
+
+  3. If both probes fail, **default to non-resizable**. This is a safe default: centering a resizable window is visually acceptable, but tiling a non-resizable window to an accordion position produces broken layout.
+
 * **Non-Resizable Window Handling (strict precedence chain):**
 
   1. When a non-resizable window is opened or spawned, assign it to the same container as its parent window (if identifiable), or the same container as the currently focused window.
@@ -352,7 +362,7 @@ Automatic Tiling and Resizing Behavior
 
   3. If the window is too large for its assigned container: immediately move it to the next largest container in the current layout and center it there.
 
-  4. If the window is too large for all containers on the monitor: auto-float the window. When focused, center it on screen. No notification is shown for auto-float.
+  4. If the window is too large for all containers on the monitor: skip placement (no auto-float). The window retains its original position.
 
   5. Spawned windows (e.g., WeChat chat windows) must always be assigned to the same container as their parent window, following the same size-handling chain above.
 
@@ -403,16 +413,22 @@ The following window types are completely invisible to Tiller — never tiled, n
 * Menu bar popovers (e.g., 1Password dropdown, Bartender, system menu extras)
 * System UI elements (Spotlight, Notification Center, Control Center)
 * Transient/ephemeral windows (tooltips, autocomplete dropdowns, hover popups)
+* Windows on non-zero CGWindowLayer (only layer 0 is processed)
+* Desktop elements (excluded by CGWindowListOption)
 
-Detection uses macOS Accessibility APIs (window role, subrole, and level attributes). These windows are excluded unconditionally and cannot be opted into tiling.
+Detection uses macOS Accessibility APIs (window role, subrole, and level attributes) combined with CGWindowList layer filtering. These windows are excluded unconditionally and cannot be opted into tiling.
 
 Auto-Floated Windows
 
-* Tiller automatically marks windows as 'floating' if they are:
+Tiller automatically marks windows as 'floating' if they match any of the following criteria (evaluated in order):
 
-  * Dialogs
-  * Modals
-  * Palettes/tool windows
+1. **Always-floating app list** (hardcoded system utilities): BetterDisplay, Control Center, Notification Center, Stats. These are system overlays that cannot be meaningfully positioned.
+
+2. **User-configured floating apps**: Apps added to the `floatingApps` list in config (by bundle identifier).
+
+3. **Activation policy filter**: Apps with `.accessory` (menu bar-only) or `.prohibited` (background) activation policy. These apps' windows are treated as floating because they are typically popovers or transient UI that should not be tiled. Their focus events also do not trigger retiles.
+
+4. **AX role/subrole detection**: Windows with `AXDialog` or `AXSheet` role, or `AXFloatingWindow`/`AXSystemFloatingWindow`/`AXDialog` subrole.
 
 * Floating windows are visually above tiled containers and excluded from tiling actions.
 
@@ -421,6 +437,8 @@ Auto-Floated Windows
 User Control of Floating Windows
 
 * Users may add applications to a global float list via menu bar GUI or a leader-key shortcut.
+
+* Floating is always a user choice (via the config `floatingApps` list or a shortcut key action). Non-resizable windows are never automatically floated — they are centered within the container instead.
 
 * The list is always visible and editable in the configuration UI.
 
@@ -694,6 +712,16 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 * Leverages menu bar API for config editor and app access.
 
 * No networking; configuration strictly local.
+
+### Structured Logging
+
+* Tiller uses macOS unified logging (OSLog) with subsystem `ing.makesometh.Tiller` and the following categories: `orchestration`, `window-discovery`, `layout`, `animation`, `monitor`, `config`.
+
+* Logs can be queried via:
+  * `log stream --predicate 'subsystem == "ing.makesometh.Tiller"' --level debug` (live)
+  * `log show --predicate 'subsystem == "ing.makesometh.Tiller"' --last 1h > tiller-logs.txt` (export)
+
+* Log levels: `.debug` for frame coordinates and per-window iteration, `.info` for window classification decisions and state changes, `.error` for failures.
 
 ---
 
