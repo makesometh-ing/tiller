@@ -70,7 +70,10 @@ final class WindowPositioner: WindowPositionerProtocol {
         )
 
         if sizeResult != .success {
-            return .failure(.accessibilityError(sizeResult.rawValue))
+            // Non-resizable windows can be positioned but not resized — this is expected.
+            // Position was already set successfully above, so treat this as success.
+            print("[WindowPositioner] Size-set failed for window \(windowID.rawValue) (error \(sizeResult.rawValue)), position was set — tolerating")
+            return .success(())
         }
 
         return .success(())

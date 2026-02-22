@@ -16,87 +16,126 @@ final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
             !window.isFloating && window.isResizable
         }
 
-        print("[LayoutEngine] Tileable: \(tileableWindows.count), mode=\(tileableWindows.count == 1 ? "1" : tileableWindows.count == 2 ? "2" : "3+")")
-
-        guard !tileableWindows.isEmpty else {
-            return LayoutResult(placements: [])
+        let nonResizableWindows = input.windows.filter { window in
+            !window.isFloating && !window.isResizable
         }
 
-        var focusedIndex = 0
-        if let focusedID = input.focusedWindowID,
-           let idx = tileableWindows.firstIndex(where: { $0.id == focusedID }) {
-            focusedIndex = idx
+        print("[LayoutEngine] Tileable: \(tileableWindows.count), non-resizable: \(nonResizableWindows.count), mode=\(tileableWindows.count == 1 ? "1" : tileableWindows.count == 2 ? "2" : "3+")")
+
+        guard !tileableWindows.isEmpty || !nonResizableWindows.isEmpty else {
+            return LayoutResult(placements: [])
         }
 
         var placements: [WindowPlacement] = []
         let container = input.containerFrame
-        let offset = CGFloat(input.accordionOffset)
-        let windowCount = tileableWindows.count
 
-        // Window dimensions depend on count
-        // 1 window: fills container
-        // 2 windows: width = container - offset
-        // 3+ windows: width = container - 2*offset
-        let windowWidth: CGFloat
-        let windowHeight = container.height
+        // --- Accordion placements for resizable (tileable) windows ---
 
-        switch windowCount {
-        case 1:
-            windowWidth = container.width
-        case 2:
-            windowWidth = container.width - offset
-        default:
-            windowWidth = container.width - (2 * offset)
-        }
+        if !tileableWindows.isEmpty {
+            var focusedIndex = 0
+            if let focusedID = input.focusedWindowID,
+               let idx = tileableWindows.firstIndex(where: { $0.id == focusedID }) {
+                focusedIndex = idx
+            }
 
-        // Ring buffer indices for prev/next
-        let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
-        let nextIndex = (focusedIndex + 1) % windowCount
+            let offset = CGFloat(input.accordionOffset)
+            let windowCount = tileableWindows.count
 
-        print("[LayoutEngine] Ring: prev=\(prevIndex) focused=\(focusedIndex) next=\(nextIndex)")
-        print("[LayoutEngine] Container: \(container), offset=\(offset), windowWidth=\(windowWidth)")
-
-        for (index, window) in tileableWindows.enumerated() {
-            let targetX: CGFloat
+            // Window dimensions depend on count
+            // 1 window: fills container
+            // 2 windows: width = container - offset
+            // 3+ windows: width = container - 2*offset
+            let windowWidth: CGFloat
+            let windowHeight = container.height
 
             switch windowCount {
             case 1:
-                // Single window fills container
-                targetX = container.minX
+                windowWidth = container.width
             case 2:
-                // Two windows: focused left-aligned, other offset right
-                if index == focusedIndex {
-                    targetX = container.minX
-                } else {
-                    targetX = container.minX + offset
-                }
+                windowWidth = container.width - offset
             default:
-                // 3+ windows: prev at minX, focused at minX+offset, next at minX+2*offset
-                // Others hidden behind focused at minX+offset
-                if index == prevIndex {
-                    targetX = container.minX
-                } else if index == focusedIndex {
-                    targetX = container.minX + offset
-                } else if index == nextIndex {
-                    targetX = container.minX + (2 * offset)
-                } else {
-                    // Others: same position as focused (hidden behind)
-                    targetX = container.minX + offset
-                }
+                windowWidth = container.width - (2 * offset)
             }
 
-            let targetFrame = CGRect(
-                x: targetX,
-                y: container.minY,
-                width: windowWidth,
-                height: windowHeight
-            )
+            // Ring buffer indices for prev/next
+            let prevIndex = (focusedIndex - 1 + windowCount) % windowCount
+            let nextIndex = (focusedIndex + 1) % windowCount
 
-            placements.append(WindowPlacement(
-                windowID: window.id,
-                pid: window.ownerPID,
-                targetFrame: targetFrame
-            ))
+            print("[LayoutEngine] Ring: prev=\(prevIndex) focused=\(focusedIndex) next=\(nextIndex)")
+            print("[LayoutEngine] Container: \(container), offset=\(offset), windowWidth=\(windowWidth)")
+
+            for (index, window) in tileableWindows.enumerated() {
+                let targetX: CGFloat
+
+                switch windowCount {
+                case 1:
+                    // Single window fills container
+                    targetX = container.minX
+                case 2:
+                    // Two windows: focused left-aligned, other offset right
+                    if index == focusedIndex {
+                        targetX = container.minX
+                    } else {
+                        targetX = container.minX + offset
+                    }
+                default:
+                    // 3+ windows: prev at minX, focused at minX+offset, next at minX+2*offset
+                    // Others hidden behind focused at minX+offset
+                    if index == prevIndex {
+                        targetX = container.minX
+                    } else if index == focusedIndex {
+                        targetX = container.minX + offset
+                    } else if index == nextIndex {
+                        targetX = container.minX + (2 * offset)
+                    } else {
+                        // Others: same position as focused (hidden behind)
+                        targetX = container.minX + offset
+                    }
+                }
+
+                let targetFrame = CGRect(
+                    x: targetX,
+                    y: container.minY,
+                    width: windowWidth,
+                    height: windowHeight
+                )
+
+                placements.append(WindowPlacement(
+                    windowID: window.id,
+                    pid: window.ownerPID,
+                    targetFrame: targetFrame
+                ))
+            }
+        }
+
+        // --- Centered placements for non-resizable windows ---
+
+        for window in nonResizableWindows {
+            let windowSize = window.frame.size
+
+            // If window fits within the container, center it (preserve original size)
+            // If too large, skip — no placement means auto-float per PRD
+            if windowSize.width <= container.width && windowSize.height <= container.height {
+                let centeredX = container.minX + (container.width - windowSize.width) / 2
+                let centeredY = container.minY + (container.height - windowSize.height) / 2
+
+                let centeredFrame = CGRect(
+                    x: centeredX,
+                    y: centeredY,
+                    width: windowSize.width,
+                    height: windowSize.height
+                )
+
+                print("[LayoutEngine] Centering non-resizable window \(window.id.rawValue) (\(window.appName)) at \(centeredFrame)")
+
+                placements.append(WindowPlacement(
+                    windowID: window.id,
+                    pid: window.ownerPID,
+                    targetFrame: centeredFrame
+                ))
+            } else {
+                print("[LayoutEngine] Non-resizable window \(window.id.rawValue) (\(window.appName)) too large for container, auto-floating")
+            }
         }
 
         return LayoutResult(placements: placements)

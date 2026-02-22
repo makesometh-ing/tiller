@@ -20,7 +20,8 @@ final class SystemWindowService: WindowServiceProtocol {
     private static let alwaysFloatingApps: Set<String> = [
         "pro.betterdisplay.BetterDisplay",
         "com.apple.controlcenter",
-        "com.apple.notificationcenterui"
+        "com.apple.notificationcenterui",
+        "eu.exelban.Stats"
     ]
 
     func getVisibleWindows() -> [WindowInfo] {
@@ -187,6 +188,13 @@ final class SystemWindowService: WindowServiceProtocol {
             }
         }
 
+        // Filter windows from menu bar-only (accessory) or background (prohibited) apps
+        if let app = NSRunningApplication(processIdentifier: pid) {
+            if app.activationPolicy == .accessory || app.activationPolicy == .prohibited {
+                return (isResizable: true, isFloating: true)
+            }
+        }
+
         let appElement = AXUIElementCreateApplication(pid)
         var windowsRef: CFTypeRef?
 
@@ -248,8 +256,8 @@ final class SystemWindowService: WindowServiceProtocol {
 
                 if resizableResult == .success,
                    let resizable = resizableRef as? Bool {
-                    // Non-resizable windows are considered floating
-                    return (isResizable: resizable, isFloating: !resizable)
+                    // Non-resizable windows flow to the layout engine for centering
+                    return (isResizable: resizable, isFloating: false)
                 }
                 break
             }
