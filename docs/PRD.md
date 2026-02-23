@@ -34,9 +34,47 @@
 
 * **Additional Items:**
 
-  * A settings action for opening the setting menu
+  * A settings action for opening the settings menu (disabled in current phase).
+
+  * A "Reload Config" action that reads, validates, and applies the config file from disk. Shows an error indicator in the status text if the file is invalid (see Config File Management).
+
+  * A "Reset to Defaults" action that restores all configuration to built-in defaults. This is a destructive action and must present a confirmation dialog before executing (see Reset to Defaults).
 
   * A 'Quit' action is always presented as the final entry at the bottom of the menu.
+
+* **Menu item ordering (top to bottom):**
+
+  1. Enable/disable tiling toggle
+  2. Divider
+  3. Per-monitor layout selection groups (with dividers between monitors)
+  4. Divider
+  5. Settings... (disabled)
+  6. Reload Config
+  7. Reset to Defaults
+  8. Divider
+  9. Quit Tiller
+
+### Reset to Defaults
+
+* Triggered via the "Reset to Defaults" menu item.
+
+* **Confirmation dialog:** Before executing, Tiller presents a native macOS alert dialog:
+
+  * Title: "Reset Configuration?"
+
+  * Message: "This will reset all settings (keybindings, floating apps, ignored apps, and general settings) to their defaults. This cannot be undone."
+
+  * Buttons: "Reset" (destructive) and "Cancel" (default)
+
+* **On confirmation:**
+
+  * Overwrites `~/.config/tiller/config.json` with the complete built-in default configuration.
+
+  * Applies the default configuration immediately (equivalent to loading defaults into the active config).
+
+  * Clears any config error indicator from the status text.
+
+* **On cancel:** No action is taken.
 
 ### Menu Bar Status Text
 
@@ -116,11 +154,9 @@ When switching between built-in layouts, windows must be distributed across the 
 
 1. **Per-layout memory (primary):** Tiller maintains a per-monitor, per-layout memory of which windows were assigned to which containers. When switching to a layout that has been previously used on that monitor, windows are restored to their remembered container positions. Windows that no longer exist are silently ignored; their remembered slots are left empty.
 
-2. **Center-coordinate fallback (secondary):** If no per-layout memory exists for the target layout (first time switching to it), each window is assigned to whichever container in the new layout geometrically contains the window's current center coordinates.
+2. **Round-robin distribution (secondary):** If no per-layout memory exists for the target layout (first time switching to it), windows are distributed across the new layout's containers in round-robin order. The window list is taken from the current container order (all containers, left to right, preserving each container's internal ring buffer order). Each window is assigned to `containers[index % containerCount]`.
 
-3. **Unmatched windows:** If a window's center coordinates do not fall within any container in the new layout (edge case), assign it to the container nearest to its center coordinates.
-
-4. **Empty containers are acceptable.** If a layout switch results in one or more containers with no windows, they remain empty.
+3. **Empty containers are acceptable.** If a layout switch results in one or more containers with no windows (fewer windows than containers), they remain empty.
 
 ## Functional Requirements
 
@@ -136,13 +172,23 @@ SIP and Native Permissions
 
 Animated Transitions
 
-* All window movements and layout changes animate with:
+* **Intra-layout operations** (window cycling, container moves, container focus changes, container resizing, peek mode) animate with:
 
   * Native macOS-style animation
 
   * 200ms duration per transition
 
   * Hardware acceleration and 60fps target; no dropped frames
+
+* **Layout switches and initial tiling** are applied instantly (duration = 0, no animation):
+
+  * Switching between built-in layouts (via leader key or menu)
+
+  * Initial tile on app launch or tiling enable
+
+  * Monitor connect/reconnect restore
+
+  * This ensures layout changes feel immediate and responsive; animation is reserved for fine-grained window operations within a layout.
 
 Per-Monitor State
 
@@ -592,11 +638,9 @@ User Control of Floating Windows
 
 ### Live Configuration Editing
 
-* All configuration changes are saved instantly and trigger a live reload—no app restart.
+* **GUI editor (future):** All configuration changes made via the GUI settings editor are saved instantly, applied live (no app restart), and written back to `~/.config/tiller/config.json`. The config file is always the single source of truth — GUI saves overwrite any prior manual edits to the file. Upon successful save, users receive immediate visual confirmation (checkmark/banner). Validation errors are shown inline; invalid changes are discarded and do not alter live state.
 
-* Upon successful save, users receive immediate visual confirmation (checkmark/banner).
-
-* Validation errors are shown inline; invalid changes are discarded and do not alter live state.
+* **Manual file editing (current):** Edits to `~/.config/tiller/config.json` are not detected automatically. Users must click "Reload Config" in the menu bar to apply changes from disk. Invalid configs are rejected entirely and Tiller falls back to defaults with a visible error indicator (see Config File Management).
 
 ### General Tab Contents
 
@@ -633,31 +677,51 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
 ### Config File Management
 
-* **Location:** `~/.config/tiller`
+* **Location:** `~/.config/tiller/config.json`
 
-* **Format:** User-selectable, JSON or YAML
+* **Format:** JSON only.
+
+* **Keybinding format:** Keybindings are represented as JSON arrays of modifier and key strings, e.g. `["cmd", "shift", "x"]`. Valid modifiers: `"cmd"`, `"ctrl"`, `"option"`, `"shift"`. The final element is the key character or name.
+
+* **Default config creation:** On first launch, if no config file exists, Tiller writes a complete `config.json` with all default values. This serves as a documented reference for manual editing.
 
 * **Supported Settings:** See General and Key Bindings tabs for the full settings list. All settings enumerated in those tabs are serialized to the config file.
+
+* **No file watching:** Tiller does not watch the config file for changes. Manual edits to `config.json` require using the "Reload Config" menu item to take effect (see Menubar UI Structure).
+
+* **Reload Config behavior:**
+
+  * Reads and parses `config.json` from disk.
+
+  * Validates all values against the config schema.
+
+  * If valid: applies the new configuration immediately. All active settings (margins, padding, keybindings, floating apps, etc.) update without restart.
+
+  * If invalid: the config is rejected entirely. Tiller falls back to the built-in defaults. An error indicator is shown in the menu bar status text (see error indicator below).
+
+  * **Error indicator:** When config reload fails validation or parsing, the status text in the menu bar is prefixed with `!` (e.g. `! 1 | 1 | -`). The error indicator clears on the next successful reload, reset to defaults, or app restart.
 
 ## Configuration Schema and Validation
 
 ### Strict Schema Enforcement
 
-* All config files (JSON/YAML) are schema-validated on load and save.
+* All config files (JSON) are schema-validated on load and on reload.
 
-* Public schema specification is provided for validation.
+* If config is invalid/malformed on reload: the entire config is rejected and Tiller falls back to built-in defaults. A `!` error indicator is shown in the menu bar status text. The application remains fully functional using default settings.
 
-* If config is invalid/malformed, only affected features are disabled and a banner/popup notifies the user of fallbacks. Application remains stable for unaffected features.
+* If config is invalid/malformed on initial load (app launch): Tiller writes the default config file and starts with defaults. A log entry records the parse failure.
 
 ## Animations, Visual Feedback, and Responsiveness
 
 ### Animated Behavior
 
-* All window moves, resizes, layout changes are animated with an ease-in-out curve and use a 200ms default duration (user-configurable from 150–300ms).
+* **Intra-layout operations** (window moves, resizes, cycling, peek) are animated with an ease-out-cubic curve and use a 200ms default duration (user-configurable from 150–300ms).
 
-* All related containers and windows animate together for each change.
+* All related containers and windows within the same layout animate together for each change.
 
 * Target containers are briefly outlined in a subtle sea blue when animating window moves.
+
+* **Layout switches and initial tiling are not animated** — windows snap to their target positions instantly (duration = 0). This includes layout switching via keyboard or menu, initial tile on app launch, and monitor reconnect restores.
 
 ### Visual Communication
 
