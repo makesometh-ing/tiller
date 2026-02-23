@@ -97,7 +97,7 @@ Work is **NOT done** until the PR is merged into `main`.
 
 When bugs or new requirements are discovered during a session (e.g. from user testing, code review, or while working on another issue):
 
-1. **Create a Linear issue first** — Before writing any code, file the bug/task in Linear with a clear description, reproduction steps, and acceptance criteria
+1. **Create a Linear issue first** — Before writing any code, file the bug/task in Linear with a clear description, reproduction steps, and acceptance criteria and verfication/validation criteria
 2. **Start the issue** — Use `linear issue start <ID>` to create a branch and move it to In Progress
 3. **Then implement** — Follow the normal git workflow (branch → commit → PR → merge)
 
