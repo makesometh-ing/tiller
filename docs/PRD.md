@@ -701,6 +701,28 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
   * **Error indicator:** When config reload fails validation or parsing, the status text in the menu bar is prefixed with `!` (e.g. `! 1 | 1 | -`). The error indicator clears on the next successful reload, reset to defaults, or app restart.
 
+### Config Version Migration
+
+* The config file includes a top-level `"version"` field (integer, starting at `1`).
+
+* **On config load** (startup and reload), the version is checked and migrations are applied if needed:
+
+  * If `version` matches the current schema version: proceed with normal decode and validation.
+
+  * If `version` is older: run migrations sequentially (v1→v2, v2→v3, etc.). New keys are added with their default values. Existing user values are preserved. Deprecated keys are removed (logged). The migrated config is written back to disk with the updated version number.
+
+  * If `version` is missing (pre-versioning config files): treat as version 0 and run all migrations from v0→current.
+
+  * If `version` is newer than the current app version: log a warning, attempt best-effort load using `decodeIfPresent` for unknown keys, do not downgrade the version number.
+
+* **Migration guarantees:**
+
+  * User customisations are never lost during migration — only new keys are added (with defaults) and deprecated keys are removed.
+
+  * Changed validation ranges: values outside the new range are clamped to the nearest valid value, not reset to default.
+
+  * Each migration step is independently unit-testable.
+
 ## Configuration Schema and Validation
 
 ### Strict Schema Enforcement
