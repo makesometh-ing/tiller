@@ -681,7 +681,47 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
 * **Format:** JSON only.
 
-* **Keybinding format:** Keybindings are represented as JSON arrays of modifier and key strings, e.g. `["cmd", "shift", "x"]`. Valid modifiers: `"cmd"`, `"ctrl"`, `"option"`, `"shift"`. The final element is the key character or name.
+* **Keybinding schema:** Each action binding is an object with four properties that mirror the Key Bindings tab columns:
+
+  ```json
+  {
+    "keybindings": {
+      "leaderTrigger": ["option", "space"],
+      "actions": {
+        "<actionId>": {
+          "keys": ["<modifier>", ..., "<key>"],
+          "leaderLayer": true,
+          "subLayer": null,
+          "staysInLeader": false
+        }
+      }
+    }
+  }
+  ```
+
+  * **`keys`** — JSON array of modifier and key strings. Valid modifiers: `"cmd"`, `"ctrl"`, `"option"`, `"shift"`. The final element is the key character or name (e.g. `"h"`, `"1"`, `"space"`, `"escape"`, `","`, `"."`). Example: `["shift", "h"]`.
+
+  * **`leaderLayer`** — boolean. When `true`, the action requires the leader key to be pressed first. When `false`, the key binding acts as a global direct hotkey. An action cannot be both simultaneously.
+
+  * **`subLayer`** — optional string (single character) or `null`. An intermediate key pressed after the leader key but before the action key (e.g. `"m"` for monitor actions). Sub-layers are one level deep only. Only applicable when `leaderLayer` is `true`; must be `null` when `leaderLayer` is `false`.
+
+  * **`staysInLeader`** — boolean. When `true`, leader mode remains active after the action executes. When `false`, leader mode exits after execution.
+
+  * **`leaderTrigger`** — the key combo that activates leader mode. Same array format as `keys`. Default: `["option", "space"]`.
+
+  **Default action bindings:**
+
+  | Action ID | keys | leaderLayer | subLayer | staysInLeader |
+  |---|---|---|---|---|
+  | `switchLayout.monocle` | `["1"]` | true | null | false |
+  | `switchLayout.splitHalves` | `["2"]` | true | null | false |
+  | `moveWindow.left` | `["h"]` | true | null | true |
+  | `moveWindow.right` | `["l"]` | true | null | true |
+  | `focusContainer.left` | `["shift", "h"]` | true | null | true |
+  | `focusContainer.right` | `["shift", "l"]` | true | null | true |
+  | `cycleWindow.previous` | `["shift", ","]` | true | null | true |
+  | `cycleWindow.next` | `["shift", "."]` | true | null | true |
+  | `exitLeader` | `["escape"]` | true | null | false |
 
 * **Default config creation:** On first launch, if no config file exists, Tiller writes a complete `config.json` with all default values. This serves as a documented reference for manual editing.
 
