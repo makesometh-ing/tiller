@@ -234,11 +234,62 @@ final class TillerMenuStateTests: XCTestCase {
         ])
 
         sut.configure(orchestrator: orchestrator)
+        sut.activeMonitorID = MonitorID(rawValue: 1)
         await orchestrator.start()
 
         sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
 
         XCTAssertEqual(sut.statusText, "1 | 2 | -")
+    }
+
+    // MARK: - Config Error Indicator
+
+    func testStatusTextAppendsErrorSuffix() {
+        sut.hasConfigError = true
+        XCTAssertEqual(sut.statusText, "1 | 1 | - !")
+    }
+
+    func testStatusTextNormalWhenNoError() {
+        sut.hasConfigError = false
+        XCTAssertEqual(sut.statusText, "1 | 1 | -")
+    }
+
+    func testStatusTextErrorWithLeaderActive() {
+        sut.hasConfigError = true
+        sut.leaderState = .leaderActive
+        XCTAssertEqual(sut.statusText, "1 | 1 | * !")
+    }
+
+    func testConfigErrorTooltipWhenError() {
+        sut.hasConfigError = true
+        sut.configErrorMessage = "Margin value 999 is out of range (0-20)"
+        XCTAssertEqual(sut.configErrorTooltip, "Margin value 999 is out of range (0-20)")
+    }
+
+    func testConfigErrorTooltipNilWhenNoError() {
+        sut.hasConfigError = false
+        sut.configErrorMessage = nil
+        XCTAssertNil(sut.configErrorTooltip)
+    }
+
+    func testConfigureConfigSyncsErrorState() {
+        let errorManager = ConfigManager(
+            fileManager: .default,
+            basePath: tempDirectory.path,
+            notificationService: MockNotificationService()
+        )
+        let configDir = (tempDirectory.path as NSString).appendingPathComponent(".config/tiller")
+        try? FileManager.default.createDirectory(atPath: configDir, withIntermediateDirectories: true)
+        let invalidJSON = """
+        { "margin": 999, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        try? Data(invalidJSON.utf8).write(to: URL(fileURLWithPath: (configDir as NSString).appendingPathComponent("config.json")))
+        errorManager.loadConfiguration()
+
+        sut.configureConfig(manager: errorManager)
+
+        XCTAssertTrue(sut.hasConfigError)
+        XCTAssertNotNil(sut.configErrorMessage)
     }
 
     // MARK: - Monitor Updates

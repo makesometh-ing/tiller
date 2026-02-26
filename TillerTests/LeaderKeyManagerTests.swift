@@ -393,4 +393,43 @@ final class LeaderKeyManagerTests: XCTestCase {
         XCTAssertTrue(KeyAction.cycleWindow(.previous).staysInLeader)
         XCTAssertFalse(KeyAction.exitLeader.staysInLeader)
     }
+
+    // MARK: - Config-Driven Bindings
+
+    func testRemappedKeysDispatchCorrectly() {
+        // Create config with h/l swapped
+        var kb = KeybindingsConfig.default
+        kb.actions["moveWindow.left"] = ActionBinding(keys: ["l"], leaderLayer: true, subLayer: nil, staysInLeader: true)
+        kb.actions["moveWindow.right"] = ActionBinding(keys: ["h"], leaderLayer: true, subLayer: nil, staysInLeader: true)
+
+        sut.updateBindings(from: kb)
+
+        activateLeader()
+
+        // h should now be moveWindow.right
+        simulateKeyDown(KeyMapping.keyH)
+        XCTAssertEqual(receivedActions.last, .moveWindow(.right))
+
+        // l should now be moveWindow.left
+        simulateKeyDown(KeyMapping.keyL)
+        XCTAssertEqual(receivedActions.last, .moveWindow(.left))
+    }
+
+    func testUpdateBindingsMidSession() {
+        activateLeader()
+
+        // Default: h = moveWindow.left
+        simulateKeyDown(KeyMapping.keyH)
+        XCTAssertEqual(receivedActions.last, .moveWindow(.left))
+
+        // Update bindings: swap h/l
+        var kb = KeybindingsConfig.default
+        kb.actions["moveWindow.left"] = ActionBinding(keys: ["l"], leaderLayer: true, subLayer: nil, staysInLeader: true)
+        kb.actions["moveWindow.right"] = ActionBinding(keys: ["h"], leaderLayer: true, subLayer: nil, staysInLeader: true)
+        sut.updateBindings(from: kb)
+
+        // h should now be moveWindow.right (after mid-session update)
+        simulateKeyDown(KeyMapping.keyH)
+        XCTAssertEqual(receivedActions.last, .moveWindow(.right))
+    }
 }

@@ -44,6 +44,20 @@ struct TillerMenuView: View {
         }
         .disabled(true)
 
+        Button {
+            menuState.reloadConfig()
+        } label: {
+            if menuState.hasConfigError, let message = menuState.configErrorMessage {
+                Text("Reload Config — \(message)")
+            } else {
+                Text("Reload Config")
+            }
+        }
+
+        Button("Reset to Defaults") {
+            menuState.resetToDefaults()
+        }
+
         Divider()
 
         Button("Quit Tiller") {

@@ -10,6 +10,10 @@ enum ConfigValidationError: Error, Equatable, Sendable {
     case paddingOutOfRange(Int)
     case accordionOffsetOutOfRange(Int)
     case leaderTimeoutOutOfRange(Double)
+    case duplicateKeybinding(actionID: String, conflictsWith: String)
+    case invalidKeyName(actionID: String, key: String)
+    case missingRequiredAction(String)
+    case subLayerOnNonLeader(actionID: String)
 
     var description: String {
         switch self {
@@ -21,34 +25,101 @@ enum ConfigValidationError: Error, Equatable, Sendable {
             return "Accordion offset value \(value) is out of range (4-24)"
         case .leaderTimeoutOutOfRange(let value):
             return "Leader timeout value \(value) is out of range (0-30)"
+        case .duplicateKeybinding(let actionID, let conflictsWith):
+            return "Duplicate keybinding: \(actionID) conflicts with \(conflictsWith)"
+        case .invalidKeyName(let actionID, let key):
+            return "Invalid key '\(key)' in binding for \(actionID)"
+        case .missingRequiredAction(let actionID):
+            return "Required action '\(actionID)' is missing from keybindings"
+        case .subLayerOnNonLeader(let actionID):
+            return "Action '\(actionID)' has subLayer set but leaderLayer is false"
         }
     }
 }
 
 struct ConfigValidator {
+
+    static let validModifiers: Set<String> = ["cmd", "ctrl", "option", "shift"]
+
+    static let validKeyNames: Set<String> = {
+        var keys: Set<String> = []
+        for c in "abcdefghijklmnopqrstuvwxyz" { keys.insert(String(c)) }
+        for c in "0123456789" { keys.insert(String(c)) }
+        keys.formUnion(["space", "escape", "tab", "return", "delete", "backspace",
+                        ",", ".", "-", "=", "/", "\\", "[", "]", ";", "'", "`"])
+        for i in 1...12 { keys.insert("f\(i)") }
+        return keys
+    }()
+
+    static let requiredActions: Set<String> = ["exitLeader"]
+
     static func validate(_ config: TillerConfig) -> [ConfigValidationError] {
         var errors: [ConfigValidationError] = []
 
         if !TillerConfig.ValidationRange.margin.contains(config.margin) {
             errors.append(.marginOutOfRange(config.margin))
         }
-
         if !TillerConfig.ValidationRange.padding.contains(config.padding) {
             errors.append(.paddingOutOfRange(config.padding))
         }
-
         if !TillerConfig.ValidationRange.accordionOffset.contains(config.accordionOffset) {
             errors.append(.accordionOffsetOutOfRange(config.accordionOffset))
         }
-
         if !TillerConfig.ValidationRange.leaderTimeout.contains(config.leaderTimeout) {
             errors.append(.leaderTimeoutOutOfRange(config.leaderTimeout))
         }
 
+        errors.append(contentsOf: validateKeybindings(config.keybindings))
         return errors
     }
 
     static func isValid(_ config: TillerConfig) -> Bool {
         return validate(config).isEmpty
+    }
+
+    // MARK: - Keybinding Validation
+
+    static func validateKeybindings(_ keybindings: KeybindingsConfig) -> [ConfigValidationError] {
+        var errors: [ConfigValidationError] = []
+
+        validateKeys(keybindings.leaderTrigger, actionID: "leaderTrigger", errors: &errors)
+
+        for required in requiredActions {
+            if keybindings.actions[required] == nil {
+                errors.append(.missingRequiredAction(required))
+            }
+        }
+
+        var seen: [String: String] = [:] // "layer:keys" → actionID
+
+        for (actionID, binding) in keybindings.actions {
+            validateKeys(binding.keys, actionID: actionID, errors: &errors)
+
+            if !binding.leaderLayer && binding.subLayer != nil {
+                errors.append(.subLayerOnNonLeader(actionID: actionID))
+            }
+
+            let layer = binding.leaderLayer ? (binding.subLayer ?? "root") : "global"
+            let signature = "\(layer):\(binding.keys.joined(separator: "+"))"
+            if let existing = seen[signature] {
+                errors.append(.duplicateKeybinding(actionID: actionID, conflictsWith: existing))
+            } else {
+                seen[signature] = actionID
+            }
+        }
+
+        return errors
+    }
+
+    private static func validateKeys(_ keys: [String], actionID: String, errors: inout [ConfigValidationError]) {
+        guard let keyName = keys.last else { return }
+        let modifiers = keys.dropLast()
+
+        if !validKeyNames.contains(keyName) {
+            errors.append(.invalidKeyName(actionID: actionID, key: keyName))
+        }
+        for modifier in modifiers where !validModifiers.contains(modifier) {
+            errors.append(.invalidKeyName(actionID: actionID, key: modifier))
+        }
     }
 }
