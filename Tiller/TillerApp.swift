@@ -14,7 +14,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var leaderKeyManager: LeaderKeyManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        ConfigManager.shared.loadConfiguration()
+        let result = ConfigManager.shared.loadConfiguration()
+        if case .fallbackToDefault = result {
+            TillerMenuState.shared.hasConfigError = ConfigManager.shared.hasConfigError
+            TillerMenuState.shared.configErrorMessage = ConfigManager.shared.configErrorMessage
+        }
 
         AccessibilityManager.shared.onPermissionStatusChanged = { [weak self] status in
             if status == .granted {
@@ -41,6 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.orchestrator = orch
 
         TillerMenuState.shared.configure(orchestrator: orch)
+        TillerMenuState.shared.configureConfig(manager: ConfigManager.shared)
 
         let leader = LeaderKeyManager(configManager: ConfigManager.shared)
         leader.onAction = { [weak orch] action in
@@ -65,6 +70,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         leader.start()
         self.leaderKeyManager = leader
 
+        ConfigManager.shared.onConfigReloaded = { [weak self] config in
+            self?.leaderKeyManager?.updateBindings(from: config.keybindings)
+        }
+
         Task {
             await orch.start()
             TillerMenuState.shared.isTilingEnabled = true
@@ -83,7 +92,9 @@ struct TillerApp: App {
             HStack(spacing: 4) {
                 Image("MenuBarIcon")
                 Text(TillerMenuState.shared.statusText)
+                    .font(.system(.body, design: .monospaced))
             }
+            .help(TillerMenuState.shared.configErrorTooltip ?? "")
         }
     }
 }

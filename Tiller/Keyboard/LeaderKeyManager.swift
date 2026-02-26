@@ -14,10 +14,9 @@ enum LeaderState: Equatable, Sendable {
     case subLayerActive(key: String)
 }
 
-// MARK: - Key Mapping
+// MARK: - Key Mapping (static key codes for tests)
 
 enum KeyMapping {
-    // macOS virtual key codes
     static let space: UInt16 = 49
     static let escape: UInt16 = 53
     static let key1: UInt16 = 18
@@ -27,31 +26,21 @@ enum KeyMapping {
     static let comma: UInt16 = 43
     static let period: UInt16 = 47
 
-    // Option modifier flag
-    static let optionFlag: UInt64 = 0x80000  // NSEvent.ModifierFlags.option.rawValue in CGEventFlags
+    static let optionFlag: UInt64 = 0x80000
 
+    /// Legacy hardcoded lookup — kept for test compatibility. Production code uses KeybindingResolver.
     static func action(forKeyCode keyCode: UInt16, shift: Bool) -> KeyAction? {
         switch (keyCode, shift) {
-        case (key1, false):
-            return .switchLayout(.monocle)
-        case (key2, false):
-            return .switchLayout(.splitHalves)
-        case (keyH, false):
-            return .moveWindow(.left)
-        case (keyL, false):
-            return .moveWindow(.right)
-        case (keyH, true):
-            return .focusContainer(.left)
-        case (keyL, true):
-            return .focusContainer(.right)
-        case (comma, true):
-            return .cycleWindow(.previous)
-        case (period, true):
-            return .cycleWindow(.next)
-        case (escape, _):
-            return .exitLeader
-        default:
-            return nil
+        case (key1, false): return .switchLayout(.monocle)
+        case (key2, false): return .switchLayout(.splitHalves)
+        case (keyH, false): return .moveWindow(.left)
+        case (keyL, false): return .moveWindow(.right)
+        case (keyH, true): return .focusContainer(.left)
+        case (keyL, true): return .focusContainer(.right)
+        case (comma, true): return .cycleWindow(.previous)
+        case (period, true): return .cycleWindow(.next)
+        case (escape, _): return .exitLeader
+        default: return nil
         }
     }
 }
@@ -66,12 +55,14 @@ final class LeaderKeyManager {
     var onStateChanged: ((LeaderState) -> Void)?
 
     private let configManager: ConfigManager
+    private var resolver: KeybindingResolver
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var timeoutTask: Task<Void, Never>?
 
     init(configManager: ConfigManager) {
         self.configManager = configManager
+        self.resolver = KeybindingResolver(config: configManager.getConfig().keybindings)
     }
 
     deinit {
@@ -86,8 +77,6 @@ final class LeaderKeyManager {
         guard eventTap == nil else { return }
 
         let eventMask: CGEventMask = (1 << CGEventType.keyDown.rawValue) | (1 << CGEventType.flagsChanged.rawValue)
-
-        // Store self pointer for the C callback
         let selfPtr = Unmanaged.passUnretained(self).toOpaque()
 
         guard let tap = CGEvent.tapCreate(
@@ -118,47 +107,48 @@ final class LeaderKeyManager {
         exitLeaderMode()
     }
 
+    func updateBindings(from config: KeybindingsConfig) {
+        resolver = KeybindingResolver(config: config)
+    }
+
     // MARK: - State Machine
 
     func handleKeyEvent(keyCode: UInt16, flags: CGEventFlags, eventType: CGEventType) -> Bool {
-        let isOptionDown = flags.rawValue & KeyMapping.optionFlag != 0
         let isShift = flags.rawValue & UInt64(CGEventFlags.maskShift.rawValue) != 0
 
         switch state {
         case .idle:
-            return handleIdleKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType, isOptionDown: isOptionDown)
+            return handleIdleKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType)
 
         case .leaderActive, .subLayerActive:
-            return handleLeaderKeyEvent(keyCode: keyCode, eventType: eventType, isOptionDown: isOptionDown, isShift: isShift)
+            return handleLeaderKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType, isShift: isShift)
         }
     }
 
     // MARK: - Idle State
 
-    private func handleIdleKeyEvent(keyCode: UInt16, flags: CGEventFlags, eventType: CGEventType, isOptionDown: Bool) -> Bool {
-        // Only activate on Option+Space keyDown
-        if eventType == .keyDown && keyCode == KeyMapping.space && isOptionDown {
+    private func handleIdleKeyEvent(keyCode: UInt16, flags: CGEventFlags, eventType: CGEventType) -> Bool {
+        if eventType == .keyDown && resolver.isLeaderTrigger(keyCode: keyCode, flags: flags.rawValue) {
             enterLeaderMode()
-            return true  // consume the event
+            return true
         }
-        return false  // pass through
+        return false
     }
 
     // MARK: - Leader Active State
 
-    private func handleLeaderKeyEvent(keyCode: UInt16, eventType: CGEventType, isOptionDown: Bool, isShift: Bool) -> Bool {
-        // Ignore flagsChanged events while in leader mode
+    private func handleLeaderKeyEvent(keyCode: UInt16, flags: CGEventFlags, eventType: CGEventType, isShift: Bool) -> Bool {
         guard eventType == .keyDown else { return true }
 
-        // Option+Space again exits leader
-        if keyCode == KeyMapping.space && isOptionDown {
+        // Leader trigger again exits leader
+        if resolver.isLeaderTrigger(keyCode: keyCode, flags: flags.rawValue) {
             exitLeaderMode()
             return true
         }
 
-        // Map key to action
-        if let action = KeyMapping.action(forKeyCode: keyCode, shift: isShift) {
-            dispatchAction(action)
+        // Config-driven dispatch
+        if let resolved = resolver.resolve(keyCode: keyCode, shift: isShift) {
+            dispatchAction(resolved.action, staysInLeader: resolved.staysInLeader)
             return true
         }
 
@@ -187,11 +177,11 @@ final class LeaderKeyManager {
 
     // MARK: - Action Dispatch
 
-    private func dispatchAction(_ action: KeyAction) {
+    private func dispatchAction(_ action: KeyAction, staysInLeader: Bool) {
         TillerLogger.debug("keyboard", "[LeaderKey] Dispatching action: \(action)")
         onAction?(action)
 
-        if action.staysInLeader {
+        if staysInLeader {
             resetTimeout()
         } else {
             exitLeaderMode()
@@ -204,7 +194,7 @@ final class LeaderKeyManager {
         timeoutTask?.cancel()
 
         let timeout = configManager.getConfig().leaderTimeout
-        guard timeout > 0 else { return }  // 0 = infinite, no timeout
+        guard timeout > 0 else { return }
 
         timeoutTask = Task { [weak self] in
             do {
@@ -232,12 +222,10 @@ final class LeaderKeyManager {
         }
     }
 
-    // C-compatible callback for CGEventTap. Called on the run loop thread.
     private static let eventTapCallback: CGEventTapCallBack = { _, eventType, event, userInfo in
         guard let userInfo else { return Unmanaged.passUnretained(event) }
         let manager = Unmanaged<LeaderKeyManager>.fromOpaque(userInfo).takeUnretainedValue()
 
-        // Re-enable tap if it gets disabled by the system
         if eventType == .tapDisabledByUserInput || eventType == .tapDisabledByTimeout {
             if let tap = manager.eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
@@ -251,8 +239,8 @@ final class LeaderKeyManager {
         let consumed = manager.handleKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType)
 
         if consumed {
-            return nil  // suppress the event
+            return nil
         }
-        return Unmanaged.passUnretained(event)  // pass through
+        return Unmanaged.passUnretained(event)
     }
 }

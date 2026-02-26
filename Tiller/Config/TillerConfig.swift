@@ -5,6 +5,37 @@
 
 import Foundation
 
+// MARK: - Keybinding Types
+
+struct ActionBinding: Codable, Equatable, Sendable {
+    var keys: [String]
+    var leaderLayer: Bool
+    var subLayer: String?
+    var staysInLeader: Bool
+}
+
+struct KeybindingsConfig: Codable, Equatable, Sendable {
+    var leaderTrigger: [String]
+    var actions: [String: ActionBinding]
+
+    static let `default` = KeybindingsConfig(
+        leaderTrigger: ["option", "space"],
+        actions: [
+            "switchLayout.monocle": ActionBinding(keys: ["1"], leaderLayer: true, subLayer: nil, staysInLeader: false),
+            "switchLayout.splitHalves": ActionBinding(keys: ["2"], leaderLayer: true, subLayer: nil, staysInLeader: false),
+            "moveWindow.left": ActionBinding(keys: ["h"], leaderLayer: true, subLayer: nil, staysInLeader: true),
+            "moveWindow.right": ActionBinding(keys: ["l"], leaderLayer: true, subLayer: nil, staysInLeader: true),
+            "focusContainer.left": ActionBinding(keys: ["shift", "h"], leaderLayer: true, subLayer: nil, staysInLeader: true),
+            "focusContainer.right": ActionBinding(keys: ["shift", "l"], leaderLayer: true, subLayer: nil, staysInLeader: true),
+            "cycleWindow.previous": ActionBinding(keys: ["shift", ","], leaderLayer: true, subLayer: nil, staysInLeader: true),
+            "cycleWindow.next": ActionBinding(keys: ["shift", "."], leaderLayer: true, subLayer: nil, staysInLeader: true),
+            "exitLeader": ActionBinding(keys: ["escape"], leaderLayer: true, subLayer: nil, staysInLeader: false),
+        ]
+    )
+}
+
+// MARK: - Config
+
 struct TillerConfig: Codable, Equatable, Sendable {
     var margin: Int
     var padding: Int
@@ -12,6 +43,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
     var leaderTimeout: Double = 5.0
     var floatingApps: [String]
     var logLocation: String?
+    var keybindings: KeybindingsConfig
 
     init(
         margin: Int,
@@ -19,7 +51,8 @@ struct TillerConfig: Codable, Equatable, Sendable {
         accordionOffset: Int,
         leaderTimeout: Double = 5.0,
         floatingApps: [String],
-        logLocation: String? = nil
+        logLocation: String? = nil,
+        keybindings: KeybindingsConfig = .default
     ) {
         self.margin = margin
         self.padding = padding
@@ -27,6 +60,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         self.leaderTimeout = leaderTimeout
         self.floatingApps = floatingApps
         self.logLocation = logLocation
+        self.keybindings = keybindings
     }
 
     init(from decoder: Decoder) throws {
@@ -37,6 +71,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         leaderTimeout = try container.decodeIfPresent(Double.self, forKey: .leaderTimeout) ?? 5.0
         floatingApps = try container.decode([String].self, forKey: .floatingApps)
         logLocation = try container.decodeIfPresent(String.self, forKey: .logLocation)
+        keybindings = try container.decodeIfPresent(KeybindingsConfig.self, forKey: .keybindings) ?? .default
     }
 
     static let defaultLogPath: String = {
@@ -52,7 +87,8 @@ struct TillerConfig: Codable, Equatable, Sendable {
         floatingApps: [
             "pro.betterdisplay.BetterDisplay"  // Overlay/utility windows that can't be positioned
         ],
-        logLocation: nil  // nil = use default: ~/.tiller/logs/tiller-debug.log
+        logLocation: nil,  // nil = use default: ~/.tiller/logs/tiller-debug.log
+        keybindings: .default
     )
 
     enum ValidationRange {

@@ -218,4 +218,199 @@ final class ConfigTests: XCTestCase {
 
         XCTAssertEqual(config1, config2)
     }
+
+    // MARK: - Keybinding Decoding
+
+    func testDecodeConfigWithKeybindings() throws {
+        let json = """
+        {
+            "margin": 8, "padding": 8, "accordionOffset": 16,
+            "floatingApps": [],
+            "keybindings": {
+                "leaderTrigger": ["option", "space"],
+                "actions": {
+                    "exitLeader": { "keys": ["escape"], "leaderLayer": true, "subLayer": null, "staysInLeader": false },
+                    "moveWindow.left": { "keys": ["j"], "leaderLayer": true, "subLayer": null, "staysInLeader": true }
+                }
+            }
+        }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+
+        XCTAssertEqual(config.keybindings.leaderTrigger, ["option", "space"])
+        XCTAssertEqual(config.keybindings.actions.count, 2)
+        XCTAssertEqual(config.keybindings.actions["moveWindow.left"]?.keys, ["j"])
+    }
+
+    func testDecodeConfigWithoutKeybindingsGetsDefaults() throws {
+        let json = """
+        { "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+
+        XCTAssertEqual(config.keybindings, KeybindingsConfig.default)
+    }
+
+    func testDefaultConfigIncludesKeybindings() {
+        XCTAssertEqual(TillerConfig.default.keybindings, KeybindingsConfig.default)
+        XCTAssertEqual(TillerConfig.default.keybindings.actions.count, 9)
+        XCTAssertNotNil(TillerConfig.default.keybindings.actions["exitLeader"])
+    }
+
+    // MARK: - Keybinding Validation
+
+    func testValidationDuplicateKeybinding() {
+        var config = TillerConfig.default
+        var kb = KeybindingsConfig.default
+        // Make two actions share the same keys in the same layer
+        kb.actions["moveWindow.left"] = ActionBinding(keys: ["h"], leaderLayer: true, subLayer: nil, staysInLeader: true)
+        kb.actions["focusContainer.left"] = ActionBinding(keys: ["h"], leaderLayer: true, subLayer: nil, staysInLeader: true)
+        config.keybindings = kb
+
+        let errors = ConfigValidator.validate(config)
+        let dupes = errors.filter {
+            if case .duplicateKeybinding = $0 { return true }
+            return false
+        }
+        XCTAssertFalse(dupes.isEmpty, "Should detect duplicate keybinding")
+    }
+
+    func testValidationInvalidKeyName() {
+        var config = TillerConfig.default
+        var kb = KeybindingsConfig.default
+        kb.actions["moveWindow.left"] = ActionBinding(keys: ["INVALID_KEY"], leaderLayer: true, subLayer: nil, staysInLeader: true)
+        config.keybindings = kb
+
+        let errors = ConfigValidator.validate(config)
+        let invalidKeys = errors.filter {
+            if case .invalidKeyName = $0 { return true }
+            return false
+        }
+        XCTAssertFalse(invalidKeys.isEmpty, "Should detect invalid key name")
+    }
+
+    func testValidationMissingExitLeader() {
+        var config = TillerConfig.default
+        var kb = KeybindingsConfig.default
+        kb.actions.removeValue(forKey: "exitLeader")
+        config.keybindings = kb
+
+        let errors = ConfigValidator.validate(config)
+        let missing = errors.filter {
+            if case .missingRequiredAction = $0 { return true }
+            return false
+        }
+        XCTAssertFalse(missing.isEmpty, "Should require exitLeader action")
+    }
+
+    func testValidationSubLayerOnNonLeader() {
+        var config = TillerConfig.default
+        var kb = KeybindingsConfig.default
+        kb.actions["moveWindow.left"] = ActionBinding(keys: ["h"], leaderLayer: false, subLayer: "m", staysInLeader: false)
+        config.keybindings = kb
+
+        let errors = ConfigValidator.validate(config)
+        let subLayerErrors = errors.filter {
+            if case .subLayerOnNonLeader = $0 { return true }
+            return false
+        }
+        XCTAssertFalse(subLayerErrors.isEmpty, "Should reject subLayer when leaderLayer is false")
+    }
+
+    func testValidationDefaultConfigIsValid() {
+        XCTAssertTrue(ConfigValidator.isValid(.default))
+    }
+
+    // MARK: - Reload
+
+    func testReloadValidConfig() async throws {
+        let manager = createConfigManager()
+        manager.loadConfiguration()
+
+        // Write a modified valid config
+        let customConfig = TillerConfig(margin: 10, padding: 10, accordionOffset: 16, floatingApps: [])
+        let data = try JSONEncoder().encode(customConfig)
+        try data.write(to: URL(fileURLWithPath: manager.configFilePath))
+
+        let result = manager.reloadConfiguration()
+
+        if case .loaded(let config) = result {
+            XCTAssertEqual(config.margin, 10)
+            XCTAssertFalse(manager.hasConfigError)
+            XCTAssertNil(manager.configErrorMessage)
+        } else {
+            XCTFail("Expected loaded result, got \(result)")
+        }
+    }
+
+    func testReloadInvalidConfigFallsBack() async throws {
+        let manager = createConfigManager()
+        manager.loadConfiguration()
+
+        // Write an invalid config
+        let invalidConfig = TillerConfig(margin: 999, padding: 8, accordionOffset: 16, floatingApps: [])
+        let data = try JSONEncoder().encode(invalidConfig)
+        try data.write(to: URL(fileURLWithPath: manager.configFilePath))
+
+        let result = manager.reloadConfiguration()
+
+        if case .fallbackToDefault = result {
+            XCTAssertTrue(manager.hasConfigError)
+            XCTAssertNotNil(manager.configErrorMessage)
+            XCTAssertEqual(manager.getConfig(), TillerConfig.default)
+        } else {
+            XCTFail("Expected fallbackToDefault result, got \(result)")
+        }
+    }
+
+    func testReloadCallsOnConfigReloaded() async throws {
+        let manager = createConfigManager()
+        manager.loadConfiguration()
+
+        var reloadedConfig: TillerConfig?
+        manager.onConfigReloaded = { config in
+            reloadedConfig = config
+        }
+
+        let customConfig = TillerConfig(margin: 5, padding: 5, accordionOffset: 8, floatingApps: [])
+        let data = try JSONEncoder().encode(customConfig)
+        try data.write(to: URL(fileURLWithPath: manager.configFilePath))
+
+        manager.reloadConfiguration()
+
+        XCTAssertNotNil(reloadedConfig)
+        XCTAssertEqual(reloadedConfig?.margin, 5)
+    }
+
+    // MARK: - Reset to Defaults
+
+    func testResetToDefaultsClearsError() async throws {
+        let manager = createConfigManager()
+        manager.loadConfiguration()
+
+        // Write invalid config and reload to set error
+        let invalidConfig = TillerConfig(margin: 999, padding: 8, accordionOffset: 16, floatingApps: [])
+        let data = try JSONEncoder().encode(invalidConfig)
+        try data.write(to: URL(fileURLWithPath: manager.configFilePath))
+        manager.reloadConfiguration()
+        XCTAssertTrue(manager.hasConfigError)
+
+        // Reset
+        manager.resetToDefaults()
+
+        XCTAssertFalse(manager.hasConfigError)
+        XCTAssertNil(manager.configErrorMessage)
+        XCTAssertEqual(manager.getConfig(), TillerConfig.default)
+    }
+
+    // MARK: - Error Message Formatting
+
+    func testLineNumberCalculation() {
+        let json = "{\n  \"margin\": 8,\n  \"bad\": !\n}"
+        let data = Data(json.utf8)
+
+        // Offset of '!' is at line 3
+        let offset = json.distance(from: json.startIndex, to: json.range(of: "!")!.lowerBound)
+        XCTAssertEqual(ConfigManager.lineNumber(in: data, at: offset), 3)
+    }
 }

@@ -20,6 +20,8 @@ final class TillerMenuState {
     var activeMonitorID: MonitorID?
     var activeLayoutPerMonitor: [MonitorID: LayoutID] = [:]
     var leaderState: LeaderState = .idle
+    var hasConfigError: Bool = false
+    var configErrorMessage: String?
 
     // MARK: - Status Text
 
@@ -30,7 +32,12 @@ final class TillerMenuState {
         case .leaderActive: layerSegment = "*"
         case .subLayerActive(let key): layerSegment = key
         }
-        return "\(activeMonitorNumber) | \(activeLayoutDisplayNumber) | \(layerSegment)"
+        let base = "\(activeMonitorNumber) | \(activeLayoutDisplayNumber) | \(layerSegment)"
+        return hasConfigError ? "\(base) !" : base
+    }
+
+    var configErrorTooltip: String? {
+        hasConfigError ? configErrorMessage : nil
     }
 
     private var activeMonitorNumber: Int {
@@ -50,6 +57,7 @@ final class TillerMenuState {
     // MARK: - Dependencies
 
     private var orchestrator: AutoTilingOrchestrator?
+    private var configManager: ConfigManager?
     private let monitorManager: MonitorManager
 
     var canToggleTiling: Bool {
@@ -86,6 +94,12 @@ final class TillerMenuState {
         }
     }
 
+    func configureConfig(manager: ConfigManager) {
+        self.configManager = manager
+        self.hasConfigError = manager.hasConfigError
+        self.configErrorMessage = manager.configErrorMessage
+    }
+
     // MARK: - Actions
 
     func toggleTiling() {
@@ -104,6 +118,29 @@ final class TillerMenuState {
 
     func switchLayout(to layout: LayoutID, on monitorID: MonitorID) {
         orchestrator?.switchLayout(to: layout, on: monitorID)
+    }
+
+    func reloadConfig() {
+        guard let configManager else { return }
+        configManager.reloadConfiguration()
+        hasConfigError = configManager.hasConfigError
+        configErrorMessage = configManager.configErrorMessage
+    }
+
+    func resetToDefaults() {
+        let alert = NSAlert()
+        alert.messageText = "Reset Configuration?"
+        alert.informativeText = "This will reset all settings (keybindings, floating apps, ignored apps, and general settings) to their defaults. This cannot be undone."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Reset").hasDestructiveAction = true
+        alert.addButton(withTitle: "Cancel")
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        guard let configManager else { return }
+        configManager.resetToDefaults()
+        hasConfigError = false
+        configErrorMessage = nil
     }
 
     func quit() {
