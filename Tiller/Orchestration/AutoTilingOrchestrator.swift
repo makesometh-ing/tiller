@@ -361,6 +361,7 @@ final class AutoTilingOrchestrator {
                 let input = LayoutInput(
                     windows: containerWindows,
                     focusedWindowID: accordionFocusID,
+                    actualFocusedWindowID: containerFocusedID,
                     containerFrame: container.frame,
                     accordionOffset: tillerConfig.accordionOffset
                 )
