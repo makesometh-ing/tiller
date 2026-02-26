@@ -8,6 +8,9 @@ import CoreGraphics
 struct LayoutInput: Equatable, Sendable {
     let windows: [WindowInfo]
     let focusedWindowID: WindowID?
+    /// The actually focused window (may differ from focusedWindowID when a non-resizable window
+    /// is focused and the accordion freezes on the last focused tileable window).
+    let actualFocusedWindowID: WindowID?
     let containerFrame: CGRect
     let accordionOffset: Int
 }

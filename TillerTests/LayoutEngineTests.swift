@@ -50,6 +50,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [],
             focusedWindowID: nil,
+            actualFocusedWindowID: nil,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -66,6 +67,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window],
             focusedWindowID: window.id,
+            actualFocusedWindowID: window.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -82,6 +84,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window],
             focusedWindowID: nil,
+            actualFocusedWindowID: nil,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -100,6 +103,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window1, window2],
             focusedWindowID: window2.id,
+            actualFocusedWindowID: window2.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -133,6 +137,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window1, window2],
             focusedWindowID: window1.id,
+            actualFocusedWindowID: window1.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -162,6 +167,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window1, window2, window3],
             focusedWindowID: window2.id,
+            actualFocusedWindowID: window2.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -209,6 +215,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window1, window2, window3, window4, window5],
             focusedWindowID: window3.id,
+            actualFocusedWindowID: window3.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -263,6 +270,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [normalWindow, floatingWindow],
             focusedWindowID: normalWindow.id,
+            actualFocusedWindowID: normalWindow.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -280,6 +288,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [floating1, floating2],
             focusedWindowID: floating1.id,
+            actualFocusedWindowID: floating1.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -291,7 +300,7 @@ final class LayoutEngineTests: XCTestCase {
 
     // MARK: - Non-Resizable Window Tests
 
-    func testNonResizableWindowCenteredInContainer() {
+    func testNonResizableWindowCenteredWhenFocused() {
         let nonResizableWindow = makeWindow(
             id: 1,
             isResizable: false,
@@ -300,6 +309,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [nonResizableWindow],
             focusedWindowID: nonResizableWindow.id,
+            actualFocusedWindowID: nonResizableWindow.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -325,6 +335,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [nonResizableWindow],
             focusedWindowID: nonResizableWindow.id,
+            actualFocusedWindowID: nonResizableWindow.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -346,6 +357,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [oversizedWindow],
             focusedWindowID: oversizedWindow.id,
+            actualFocusedWindowID: oversizedWindow.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -368,29 +380,191 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [resizableWindow, nonResizableWindow, floatingWindow],
             focusedWindowID: resizableWindow.id,
+            actualFocusedWindowID: resizableWindow.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
 
         let result = sut.calculate(input: input)
 
-        // 2 placements: resizable (tiled) + non-resizable (centered). Floating excluded.
+        // 2 placements: resizable (tiled) + non-resizable (at ring position). Floating excluded.
         XCTAssertEqual(result.placements.count, 2)
 
         let tiledPlacement = result.placements.first(where: { $0.windowID == resizableWindow.id })!
-        let centeredPlacement = result.placements.first(where: { $0.windowID == nonResizableWindow.id })!
+        let nonResPlacement = result.placements.first(where: { $0.windowID == nonResizableWindow.id })!
 
-        // Resizable fills container (single tileable window)
-        XCTAssertEqual(tiledPlacement.targetFrame, containerFrame)
+        let offset = CGFloat(defaultAccordionOffset)
+        let expectedWidth = containerFrame.width - offset
 
-        // Non-resizable centered with original size
-        XCTAssertEqual(centeredPlacement.targetFrame.width, 400)
-        XCTAssertEqual(centeredPlacement.targetFrame.height, 300)
-        XCTAssertEqual(centeredPlacement.targetFrame.origin.x, (1920 - 400) / 2)
-        XCTAssertEqual(centeredPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+        // Resizable at focused position (left-aligned for 2-window accordion)
+        XCTAssertEqual(tiledPlacement.targetFrame.origin.x, containerFrame.minX)
+        XCTAssertEqual(tiledPlacement.targetFrame.width, expectedWidth)
+
+        // Non-resizable at "next" ring position with natural size, centered vertically
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX + offset)
+        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
+        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
 
         // Floating window has no placement
         XCTAssertNil(result.placements.first(where: { $0.windowID == floatingWindow.id }))
+    }
+
+    // MARK: - Non-Resizable Ring Buffer Tests
+
+    func testNonResizableAtPrevPosition() {
+        // Ring: [nonRes(prev), resizable(focused), resizable2(next)]
+        let nonRes = makeWindow(id: 1, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        let resizable = makeWindow(id: 2)
+        let resizable2 = makeWindow(id: 3)
+
+        let input = LayoutInput(
+            windows: [nonRes, resizable, resizable2],
+            focusedWindowID: resizable.id,
+            actualFocusedWindowID: resizable.id,
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+        XCTAssertEqual(result.placements.count, 3)
+
+        let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
+        let offset = CGFloat(defaultAccordionOffset)
+
+        // Non-resizable at prev position (minX), natural size, centered vertically
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX)
+        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
+        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+
+        // Resizable windows at their accordion positions with full accordion dimensions
+        let focusedPlacement = result.placements.first(where: { $0.windowID == resizable.id })!
+        let nextPlacement = result.placements.first(where: { $0.windowID == resizable2.id })!
+        XCTAssertEqual(focusedPlacement.targetFrame.origin.x, containerFrame.minX + offset)
+        XCTAssertEqual(nextPlacement.targetFrame.origin.x, containerFrame.minX + 2 * offset)
+        XCTAssertEqual(focusedPlacement.targetFrame.width, containerFrame.width - 2 * offset)
+    }
+
+    func testNonResizableAtNextPosition() {
+        // Ring: [resizable2(prev), resizable(focused), nonRes(next)]
+        let resizable2 = makeWindow(id: 1)
+        let resizable = makeWindow(id: 2)
+        let nonRes = makeWindow(id: 3, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+
+        let input = LayoutInput(
+            windows: [resizable2, resizable, nonRes],
+            focusedWindowID: resizable.id,
+            actualFocusedWindowID: resizable.id,
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+        XCTAssertEqual(result.placements.count, 3)
+
+        let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
+        let offset = CGFloat(defaultAccordionOffset)
+
+        // Non-resizable at next position (minX + 2*offset), natural size, centered vertically
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX + 2 * offset)
+        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
+        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+    }
+
+    func testFocusedNonResizableCenteredWithFrozenAccordion() {
+        // Non-resizable is actual focus, accordion frozen on resizable
+        let resizable = makeWindow(id: 1)
+        let nonRes = makeWindow(id: 2, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+
+        let input = LayoutInput(
+            windows: [resizable, nonRes],
+            focusedWindowID: resizable.id,        // accordion frozen on resizable
+            actualFocusedWindowID: nonRes.id,      // user is actually focused on nonRes
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+        XCTAssertEqual(result.placements.count, 2)
+
+        let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
+        let resPlacement = result.placements.first(where: { $0.windowID == resizable.id })!
+
+        // Non-resizable: centered in container (overlay behavior)
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, (1920 - 400) / 2)
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
+        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
+
+        // Resizable: at focused accordion position (left-aligned for 2-window)
+        XCTAssertEqual(resPlacement.targetFrame.origin.x, containerFrame.minX)
+    }
+
+    func testMultipleNonResizableWindowsInRing() {
+        // Ring: [nonRes1(prev), resizable(focused), nonRes2(next)]
+        let nonRes1 = makeWindow(id: 1, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+        let resizable = makeWindow(id: 2)
+        let nonRes2 = makeWindow(id: 3, isResizable: false, frame: CGRect(x: 0, y: 0, width: 500, height: 350))
+
+        let input = LayoutInput(
+            windows: [nonRes1, resizable, nonRes2],
+            focusedWindowID: resizable.id,
+            actualFocusedWindowID: resizable.id,
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+        XCTAssertEqual(result.placements.count, 3)
+
+        let offset = CGFloat(defaultAccordionOffset)
+        let p1 = result.placements.first(where: { $0.windowID == nonRes1.id })!
+        let p2 = result.placements.first(where: { $0.windowID == resizable.id })!
+        let p3 = result.placements.first(where: { $0.windowID == nonRes2.id })!
+
+        // nonRes1 at prev (minX), natural size
+        XCTAssertEqual(p1.targetFrame.origin.x, containerFrame.minX)
+        XCTAssertEqual(p1.targetFrame.width, 400)
+        XCTAssertEqual(p1.targetFrame.height, 300)
+
+        // resizable at focused (minX + offset), accordion dimensions
+        XCTAssertEqual(p2.targetFrame.origin.x, containerFrame.minX + offset)
+        XCTAssertEqual(p2.targetFrame.width, containerFrame.width - 2 * offset)
+
+        // nonRes2 at next (minX + 2*offset), natural size
+        XCTAssertEqual(p3.targetFrame.origin.x, containerFrame.minX + 2 * offset)
+        XCTAssertEqual(p3.targetFrame.width, 500)
+        XCTAssertEqual(p3.targetFrame.height, 350)
+    }
+
+    func testNonResizableAtOtherPositionHiddenBehindFocused() {
+        // 4 windows: nonRes at "other" position (not prev/focused/next)
+        let resizable1 = makeWindow(id: 1)
+        let resizable2 = makeWindow(id: 2)
+        let resizable3 = makeWindow(id: 3)
+        let nonRes = makeWindow(id: 4, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
+
+        // Ring: [res1(prev), res2(focused), res3(next), nonRes(other)]
+        let input = LayoutInput(
+            windows: [resizable1, resizable2, resizable3, nonRes],
+            focusedWindowID: resizable2.id,
+            actualFocusedWindowID: resizable2.id,
+            containerFrame: containerFrame,
+            accordionOffset: defaultAccordionOffset
+        )
+
+        let result = sut.calculate(input: input)
+        XCTAssertEqual(result.placements.count, 4)
+
+        let offset = CGFloat(defaultAccordionOffset)
+        let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
+
+        // "Other" position: same X as focused (hidden behind)
+        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX + offset)
+        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
+        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
     }
 
     // MARK: - Accordion Offset Tests
@@ -404,6 +578,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window1, window2, window3],
             focusedWindowID: window2.id,
+            actualFocusedWindowID: window2.id,
             containerFrame: containerFrame,
             accordionOffset: customOffset
         )
@@ -438,6 +613,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window1, window2],
             focusedWindowID: window2.id,
+            actualFocusedWindowID: window2.id,
             containerFrame: containerFrame,
             accordionOffset: 0
         )
@@ -462,6 +638,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window],
             focusedWindowID: window.id,
+            actualFocusedWindowID: window.id,
             containerFrame: customContainer,
             accordionOffset: defaultAccordionOffset
         )
@@ -481,6 +658,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window],
             focusedWindowID: window.id,
+            actualFocusedWindowID: window.id,
             containerFrame: containerWithMargins,
             accordionOffset: defaultAccordionOffset
         )
@@ -503,6 +681,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window],
             focusedWindowID: window.id,
+            actualFocusedWindowID: window.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -521,6 +700,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [window1, window2],
             focusedWindowID: nonExistentFocusID,
+            actualFocusedWindowID: nonExistentFocusID,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
@@ -541,6 +721,7 @@ final class LayoutEngineTests: XCTestCase {
         let input = LayoutInput(
             windows: [floatingWindow, normalWindow],
             focusedWindowID: floatingWindow.id,
+            actualFocusedWindowID: floatingWindow.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
