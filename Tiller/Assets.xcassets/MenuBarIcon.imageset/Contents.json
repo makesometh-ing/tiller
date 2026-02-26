@@ -1,12 +1,12 @@
 {
   "images" : [
     {
-      "filename" : "MenuBarIcon@1x.png",
+      "filename" : "TillerIcon.png",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
-      "filename" : "MenuBarIcon@2x.png",
+      "filename" : "TillerIcon-2.png",
       "idiom" : "universal",
       "scale" : "2x"
     },

@@ -82,7 +82,8 @@ Work is **NOT done** until the PR is merged into `main`.
 5. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
 6. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
 7. **Verify** — PR is merged into `main`, local `main` is up to date, Linear reflects actual state
-8. **Hand off** — Provide context for next session: what was done, what's next, any blockers
+8. **Reconcile** - PRD is updated to reconcile with any requirements changes and decisions that were made during the development session
+9. **Hand off** — Provide context for next session: what was done, what's next, any blockers
 
 **CRITICAL RULES:**
 
