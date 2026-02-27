@@ -28,7 +28,7 @@ struct LeaderOverlayView: View {
             hintGroup("Focus", keys: "H L")
             hintGroup("Exit", keys: "esc")
         }
-        .font(.system(size: 11, design: .monospaced))
+        .font(.system(size: 11))
     }
 
     private func hintGroup(_ label: String, keys: String) -> some View {
@@ -48,7 +48,7 @@ struct LeaderOverlayView: View {
                 let isActive = layout == activeLayout
                 HStack(spacing: 4) {
                     Text("\(layout.displayNumber)")
-                        .font(.system(size: 12, weight: isActive ? .bold : .regular, design: .monospaced))
+                        .font(.system(size: 12, weight: isActive ? .bold : .regular))
                     Text(layout.displayName)
                         .font(.system(size: 11, weight: isActive ? .medium : .regular))
                 }
