@@ -126,10 +126,7 @@ final class AutoTilingOrchestrator {
             padding: CGFloat(tillerConfig.padding)
         )
 
-        let windows = windowDiscoveryManager.visibleWindows
-        let windowFrames = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0.frame) })
-
-        state.switchLayout(to: layout, containerFrames: containerFrames, windowFrames: windowFrames)
+        state.switchLayout(to: layout, containerFrames: containerFrames)
         monitorStates[monitorID] = state
 
         TillerLogger.debug("orchestration", "[Action] switchLayout to \(layout.rawValue) on monitor \(monitorID.rawValue)")

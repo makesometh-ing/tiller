@@ -255,10 +255,9 @@ final class MonitorTilingStateTests: XCTestCase {
 
     // MARK: - switchLayout Tests
 
-    func testSwitchLayoutMonocleToSplit_centerCoordinate() {
-        // Given: monocle layout with windows on left and right halves of screen
-        let monocleFrame = CGRect(x: 8, y: 8, width: 1904, height: 1064)
-        let container = makeContainer(id: 0, frame: monocleFrame, windowIDs: [1, 2, 3], focusedWindowID: 1)
+    func testSwitchLayoutMonocleToSplit_roundRobin() {
+        // Given: monocle layout with 3 windows
+        let container = makeContainer(id: 0, windowIDs: [1, 2, 3], focusedWindowID: 1)
         var state = MonitorTilingState(
             monitorID: monitorID,
             activeLayout: .monocle,
@@ -269,23 +268,35 @@ final class MonitorTilingStateTests: XCTestCase {
         let leftFrame = CGRect(x: 8, y: 8, width: 948, height: 1064)
         let rightFrame = CGRect(x: 964, y: 8, width: 948, height: 1064)
 
-        // Window 1 center at (400, 540) → left container
-        // Window 2 center at (1200, 540) → right container
-        // Window 3 center at (300, 540) → left container
-        let windowFrames: [WindowID: CGRect] = [
-            wid(1): CGRect(x: 100, y: 240, width: 600, height: 600),
-            wid(2): CGRect(x: 900, y: 240, width: 600, height: 600),
-            wid(3): CGRect(x: 0, y: 240, width: 600, height: 600),
-        ]
-
         // When
-        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame], windowFrames: windowFrames)
+        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame])
 
-        // Then
+        // Then: round-robin distribution: W1→C0, W2→C1, W3→C0
         XCTAssertEqual(state.activeLayout, .splitHalves)
         XCTAssertEqual(state.containers.count, 2)
-        XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(3)]) // left
-        XCTAssertEqual(state.containers[1].windowIDs, [wid(2)])          // right
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(3)])
+        XCTAssertEqual(state.containers[1].windowIDs, [wid(2)])
+    }
+
+    func testSwitchLayoutFourWindows_roundRobin() {
+        // Given: monocle with 4 windows
+        let container = makeContainer(id: 0, windowIDs: [1, 2, 3, 4], focusedWindowID: 1)
+        var state = MonitorTilingState(
+            monitorID: monitorID,
+            activeLayout: .monocle,
+            containers: [container],
+            focusedContainerID: container.id
+        )
+
+        let leftFrame = CGRect(x: 8, y: 8, width: 948, height: 1064)
+        let rightFrame = CGRect(x: 964, y: 8, width: 948, height: 1064)
+
+        // When
+        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame])
+
+        // Then: W1→C0, W2→C1, W3→C0, W4→C1
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(3)])
+        XCTAssertEqual(state.containers[1].windowIDs, [wid(2), wid(4)])
     }
 
     func testSwitchLayoutSplitToMonocle_mergeOrder() {
@@ -308,16 +319,9 @@ final class MonitorTilingStateTests: XCTestCase {
         )
 
         let monocleFrame = CGRect(x: 8, y: 8, width: 1904, height: 1064)
-        // All windows have frames within the monocle container
-        let windowFrames: [WindowID: CGRect] = [
-            wid(1): CGRect(x: 100, y: 100, width: 600, height: 600),
-            wid(2): CGRect(x: 200, y: 200, width: 600, height: 600),
-            wid(3): CGRect(x: 1000, y: 100, width: 600, height: 600),
-            wid(4): CGRect(x: 1100, y: 200, width: 600, height: 600),
-        ]
 
         // When
-        state.switchLayout(to: .monocle, containerFrames: [monocleFrame], windowFrames: windowFrames)
+        state.switchLayout(to: .monocle, containerFrames: [monocleFrame])
 
         // Then: all windows merged, left container order first then right
         XCTAssertEqual(state.activeLayout, .monocle)
@@ -336,47 +340,15 @@ final class MonitorTilingStateTests: XCTestCase {
 
         let originalContainerIDs = state.containers.map(\.id)
 
-        state.switchLayout(
-            to: .monocle,
-            containerFrames: [defaultFrame],
-            windowFrames: [wid(1): defaultFrame, wid(2): defaultFrame]
-        )
+        state.switchLayout(to: .monocle, containerFrames: [defaultFrame])
 
         // Containers should be unchanged (same objects)
         XCTAssertEqual(state.containers.map(\.id), originalContainerIDs)
         XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(2)])
     }
 
-    func testSwitchLayout_emptyContainersAcceptable() {
-        // Given: monocle with windows all on the left side
-        let container = makeContainer(id: 0, windowIDs: [1, 2], focusedWindowID: 1)
-        var state = MonitorTilingState(
-            monitorID: monitorID,
-            activeLayout: .monocle,
-            containers: [container],
-            focusedContainerID: container.id
-        )
-
-        let leftFrame = CGRect(x: 8, y: 8, width: 948, height: 1064)
-        let rightFrame = CGRect(x: 964, y: 8, width: 948, height: 1064)
-
-        // Both windows are on the left side
-        let windowFrames: [WindowID: CGRect] = [
-            wid(1): CGRect(x: 100, y: 100, width: 600, height: 600),
-            wid(2): CGRect(x: 200, y: 200, width: 600, height: 600),
-        ]
-
-        // When
-        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame], windowFrames: windowFrames)
-
-        // Then: right container is empty, which is acceptable per PRD
-        XCTAssertEqual(state.containers.count, 2)
-        XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(2)])
-        XCTAssertTrue(state.containers[1].windowIDs.isEmpty)
-    }
-
-    func testSwitchLayout_unmatchedWindowFallsToNearest() {
-        // Given: monocle with a window whose center is outside all new containers
+    func testSwitchLayout_singleWindowToMultipleContainers() {
+        // Given: monocle with 1 window
         let container = makeContainer(id: 0, windowIDs: [1], focusedWindowID: 1)
         var state = MonitorTilingState(
             monitorID: monitorID,
@@ -388,17 +360,35 @@ final class MonitorTilingStateTests: XCTestCase {
         let leftFrame = CGRect(x: 8, y: 8, width: 948, height: 1064)
         let rightFrame = CGRect(x: 964, y: 8, width: 948, height: 1064)
 
-        // Window center at (5000, 540) — outside both containers, but closer to right
-        let windowFrames: [WindowID: CGRect] = [
-            wid(1): CGRect(x: 4700, y: 240, width: 600, height: 600),
-        ]
+        // When
+        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame])
+
+        // Then: W1→C0, C1 empty (acceptable per PRD)
+        XCTAssertEqual(state.containers.count, 2)
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(1)])
+        XCTAssertTrue(state.containers[1].windowIDs.isEmpty)
+    }
+
+    func testSwitchLayout_zeroWindows() {
+        // Given: monocle with no windows
+        let container = makeContainer(id: 0)
+        var state = MonitorTilingState(
+            monitorID: monitorID,
+            activeLayout: .monocle,
+            containers: [container],
+            focusedContainerID: container.id
+        )
+
+        let leftFrame = CGRect(x: 8, y: 8, width: 948, height: 1064)
+        let rightFrame = CGRect(x: 964, y: 8, width: 948, height: 1064)
 
         // When
-        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame], windowFrames: windowFrames)
+        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame])
 
-        // Then: window assigned to nearest container (right, center ~1438 vs left center ~482)
+        // Then: both containers empty, no crash
+        XCTAssertEqual(state.containers.count, 2)
         XCTAssertTrue(state.containers[0].windowIDs.isEmpty)
-        XCTAssertEqual(state.containers[1].windowIDs, [wid(1)])
+        XCTAssertTrue(state.containers[1].windowIDs.isEmpty)
     }
 
     // MARK: - cycleWindow Tests
@@ -617,16 +607,10 @@ final class MonitorTilingStateTests: XCTestCase {
         let leftFrame = CGRect(x: 8, y: 8, width: 948, height: 1064)
         let rightFrame = CGRect(x: 964, y: 8, width: 948, height: 1064)
 
-        // Window 1 → left, window 2 (focused) → right
-        let windowFrames: [WindowID: CGRect] = [
-            wid(1): CGRect(x: 100, y: 100, width: 600, height: 600),
-            wid(2): CGRect(x: 1000, y: 100, width: 600, height: 600),
-        ]
+        // When: round-robin puts W1→C0, W2→C1
+        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame])
 
-        // When
-        state.switchLayout(to: .splitHalves, containerFrames: [leftFrame, rightFrame], windowFrames: windowFrames)
-
-        // Then: focused container is the right container (holding window 2)
+        // Then: focused container is C1 (holding focused window 2)
         XCTAssertEqual(state.focusedContainerID, state.containers[1].id)
     }
 }
