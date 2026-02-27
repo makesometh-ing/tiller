@@ -120,14 +120,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 struct TillerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
+    private var monospaceStatusText: AttributedString {
+        var s = AttributedString(TillerMenuState.shared.statusText)
+        s.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        return s
+    }
+
     var body: some Scene {
         MenuBarExtra {
             TillerMenuView(menuState: TillerMenuState.shared)
         } label: {
             HStack(spacing: 4) {
                 Image("MenuBarIcon")
-                Text(TillerMenuState.shared.statusText)
-                    .font(.system(size: 12, design: .monospaced))
+                Text(monospaceStatusText)
             }
             .help(TillerMenuState.shared.configErrorTooltip ?? "")
         }
