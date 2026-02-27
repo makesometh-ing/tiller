@@ -96,18 +96,12 @@ struct MonitorTilingState: Equatable, Sendable {
 
     // MARK: - Layout Switching
 
-    /// Switches to a new layout, redistributing windows using center-coordinate fallback.
-    /// Each window is assigned to the container whose frame contains the window's center point.
-    /// Windows with no matching container fall back to the nearest container by center distance.
-    mutating func switchLayout(
-        to layout: LayoutID,
-        containerFrames: [CGRect],
-        windowFrames: [WindowID: CGRect]
-    ) {
+    /// Switches to a new layout, redistributing windows round-robin across the new containers.
+    /// Windows are collected from existing containers left-to-right, each container's ring buffer order.
+    mutating func switchLayout(to layout: LayoutID, containerFrames: [CGRect]) {
         guard activeLayout != layout else { return }
 
-        let previousFocusedContainerID = focusedContainerID
-        let previousFocusedWindowID = previousFocusedContainerID.flatMap { cid in
+        let previousFocusedWindowID = focusedContainerID.flatMap { cid in
             containers.first(where: { $0.id == cid })?.focusedWindowID
         }
 
@@ -118,35 +112,12 @@ struct MonitorTilingState: Equatable, Sendable {
             Container(id: generateContainerID(), frame: frame)
         }
 
-        for windowID in allWindows {
-            guard let frame = windowFrames[windowID] else {
-                // No frame info — assign to first container
-                if !containers.isEmpty {
-                    containers[0].addWindow(windowID)
-                }
-                continue
-            }
-
-            let center = CGPoint(x: frame.midX, y: frame.midY)
-
-            if let index = containers.firstIndex(where: { $0.frame.contains(center) }) {
-                containers[index].addWindow(windowID)
-            } else {
-                // Fallback: nearest container by center-to-center distance
-                let nearest = containers.indices.min(by: { a, b in
-                    let ca = CGPoint(x: containers[a].frame.midX, y: containers[a].frame.midY)
-                    let cb = CGPoint(x: containers[b].frame.midX, y: containers[b].frame.midY)
-                    let da = hypot(center.x - ca.x, center.y - ca.y)
-                    let db = hypot(center.x - cb.x, center.y - cb.y)
-                    return da < db
-                })
-                if let nearest {
-                    containers[nearest].addWindow(windowID)
-                }
-            }
+        for (offset, windowID) in allWindows.enumerated() {
+            guard !containers.isEmpty else { break }
+            containers[offset % containers.count].addWindow(windowID)
         }
 
-        // Set focused container to whichever holds the previously focused window
+        // Focused container follows the previously focused window
         if let prevFocused = previousFocusedWindowID,
            let container = containers.first(where: { $0.windowIDs.contains(prevFocused) }) {
             focusedContainerID = container.id
