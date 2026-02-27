@@ -11,6 +11,7 @@ final class LeaderOverlayPanel {
 
     private var panel: NSPanel?
     private let menuState: TillerMenuState
+    private let slideOffset: CGFloat = 12
 
     init(menuState: TillerMenuState) {
         self.menuState = menuState
@@ -22,6 +23,7 @@ final class LeaderOverlayPanel {
         let contentView = LeaderOverlayView(menuState: menuState)
         let hostingView = NSHostingView(rootView: contentView)
         hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 60)
+        hostingView.autoresizingMask = [.width, .height]
 
         let panel = makePanel()
         panel.contentView = hostingView
@@ -34,26 +36,33 @@ final class LeaderOverlayPanel {
 
         let screenFrame = screenFrame(for: monitor)
         let x = screenFrame.midX - panelSize.width / 2
-        let y = screenFrame.minY + 8 // 8px above dock (bottom of visible frame in AppKit coords)
-        panel.setFrame(NSRect(x: x, y: y, width: panelSize.width, height: panelSize.height), display: true)
+        let finalY = screenFrame.minY + 8
+        let startY = finalY - slideOffset
 
+        panel.setFrame(NSRect(x: x, y: startY, width: panelSize.width, height: panelSize.height), display: true)
         panel.alphaValue = 0
         panel.orderFrontRegardless()
 
+        let finalFrame = NSRect(x: x, y: finalY, width: panelSize.width, height: panelSize.height)
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.15
             ctx.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1
+            panel.animator().setFrame(finalFrame, display: true)
         }
     }
 
     func hide() {
         guard let panel else { return }
 
+        var targetFrame = panel.frame
+        targetFrame.origin.y -= slideOffset
+
         NSAnimationContext.runAnimationGroup({ ctx in
             ctx.duration = 0.1
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0
+            panel.animator().setFrame(targetFrame, display: true)
         }, completionHandler: { [weak self] in
             self?.panel?.orderOut(nil)
             self?.panel = nil
