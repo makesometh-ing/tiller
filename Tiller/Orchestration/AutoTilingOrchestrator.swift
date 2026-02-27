@@ -3,6 +3,7 @@
 //  Tiller
 //
 
+import AppKit
 import CoreGraphics
 import Foundation
 
@@ -103,11 +104,20 @@ final class AutoTilingOrchestrator {
     }
 
     func switchLayout(to layout: LayoutID, on monitorID: MonitorID) {
-        guard var state = monitorStates[monitorID] else { return }
-        guard state.activeLayout != layout else { return }
+        guard var state = monitorStates[monitorID] else {
+            TillerLogger.debug("orchestration", "[Action] switchLayout failed: no state for monitor \(monitorID.rawValue). Known monitors: \(monitorStates.keys.map { $0.rawValue })")
+            return
+        }
+        guard state.activeLayout != layout else {
+            TillerLogger.debug("orchestration", "[Action] switchLayout no-op: already on \(layout.rawValue)")
+            return
+        }
 
         let tillerConfig = configManager.getConfig()
-        guard let monitor = monitorManager.connectedMonitors.first(where: { $0.id == monitorID }) else { return }
+        guard let monitor = monitorManager.connectedMonitors.first(where: { $0.id == monitorID }) else {
+            TillerLogger.debug("orchestration", "[Action] switchLayout failed: monitor \(monitorID.rawValue) not in connectedMonitors")
+            return
+        }
 
         let containerFrames = LayoutDefinitions.containerFrames(
             for: layout,
@@ -122,6 +132,7 @@ final class AutoTilingOrchestrator {
         state.switchLayout(to: layout, containerFrames: containerFrames, windowFrames: windowFrames)
         monitorStates[monitorID] = state
 
+        TillerLogger.debug("orchestration", "[Action] switchLayout to \(layout.rawValue) on monitor \(monitorID.rawValue)")
         scheduleRetile()
         onLayoutChanged?(monitorID, layout)
     }
@@ -129,34 +140,97 @@ final class AutoTilingOrchestrator {
     // MARK: - Window/Container Operations
 
     func cycleWindow(direction: CycleDirection) {
-        guard var (monitorID, state, windowID) = activeMonitorState() else { return }
+        guard var (monitorID, state, windowID) = activeMonitorState() else {
+            TillerLogger.debug("orchestration", "[Action] cycleWindow failed: activeMonitorState() returned nil")
+            return
+        }
         state.cycleWindow(direction: direction, windowID: windowID)
         monitorStates[monitorID] = state
+
+        if let newFocusID = state.containerForWindow(windowID)?.focusedWindowID {
+            raiseAndActivateWindow(newFocusID)
+        }
+
+        TillerLogger.debug("orchestration", "[Action] cycleWindow \(direction) on monitor \(monitorID.rawValue)")
         scheduleRetile()
     }
 
     func moveWindowToContainer(direction: MoveDirection) {
-        guard var (monitorID, state, windowID) = activeMonitorState() else { return }
+        guard var (monitorID, state, windowID) = activeMonitorState() else {
+            TillerLogger.debug("orchestration", "[Action] moveWindow failed: activeMonitorState() returned nil")
+            return
+        }
         state.moveWindow(from: windowID, direction: direction)
         monitorStates[monitorID] = state
+
+        raiseAndActivateWindow(windowID)
+
+        TillerLogger.debug("orchestration", "[Action] moveWindow \(direction) on monitor \(monitorID.rawValue)")
         scheduleRetile()
     }
 
     func focusContainer(direction: MoveDirection) {
-        guard var (monitorID, state, _) = activeMonitorState() else { return }
+        guard var (monitorID, state, _) = activeMonitorState() else {
+            TillerLogger.debug("orchestration", "[Action] focusContainer failed: activeMonitorState() returned nil")
+            return
+        }
         state.setFocusedContainer(direction: direction)
         monitorStates[monitorID] = state
+
+        if let focusedCID = state.focusedContainerID,
+           let container = state.containers.first(where: { $0.id == focusedCID }),
+           let targetWindowID = container.focusedWindowID {
+            raiseAndActivateWindow(targetWindowID)
+        }
+
+        TillerLogger.debug("orchestration", "[Action] focusContainer \(direction) on monitor \(monitorID.rawValue)")
         scheduleRetile()
     }
 
+    /// Returns the monitor ID of the focused window, if found in any monitor state.
+    func activeMonitorID() -> MonitorID? {
+        let focusedWindowID = windowDiscoveryManager.focusedWindow?.windowID ?? lastFocusedWindowID
+        guard let focusedWindowID else {
+            return monitorStates.first?.key
+        }
+        for (monitorID, state) in monitorStates {
+            if state.containerForWindow(focusedWindowID) != nil {
+                return monitorID
+            }
+        }
+        return monitorStates.first?.key
+    }
+
     private func activeMonitorState() -> (MonitorID, MonitorTilingState, WindowID)? {
-        guard let focusedWindowID = windowDiscoveryManager.focusedWindow?.windowID else { return nil }
+        let focusedWindowID = windowDiscoveryManager.focusedWindow?.windowID ?? lastFocusedWindowID
+        guard let focusedWindowID else {
+            TillerLogger.debug("orchestration", "[Action] activeMonitorState: no focused window (live query nil, no lastFocusedWindowID)")
+            return nil
+        }
         for (monitorID, state) in monitorStates {
             if state.containerForWindow(focusedWindowID) != nil {
                 return (monitorID, state, focusedWindowID)
             }
         }
+        TillerLogger.debug("orchestration", "[Action] activeMonitorState: focused window \(focusedWindowID.rawValue) not found in any container. Monitor states: \(monitorStates.map { "\($0.key.rawValue): \($0.value.containers.flatMap { $0.windowIDs }.map { $0.rawValue })" })")
         return nil
+    }
+
+    // MARK: - Window Focus
+
+    private func raiseAndActivateWindow(_ windowID: WindowID) {
+        guard let window = windowDiscoveryManager.getWindow(byID: windowID) else {
+            TillerLogger.debug("orchestration", "[Action] raiseAndActivateWindow: window \(windowID.rawValue) not found")
+            return
+        }
+        NSRunningApplication(processIdentifier: window.ownerPID)?.activate()
+        animationService.raiseWindowsInOrder([(windowID: windowID, pid: window.ownerPID)])
+
+        // Update tracking immediately — the AX observer may not fire a focus event
+        // for the raised window (e.g., debugger process, timing issues).
+        lastFocusedWindowID = windowID
+
+        TillerLogger.debug("orchestration", "[Action] raiseAndActivateWindow: raised window \(windowID.rawValue) (\(window.appName))")
     }
 
     // MARK: - Event Handlers
@@ -189,6 +263,13 @@ final class AutoTilingOrchestrator {
         }
 
         lastFocusedWindowID = focusedWindow?.windowID
+
+        // Update active monitor based on focused window position
+        if let windowID = focusedWindow?.windowID,
+           let window = windowDiscoveryManager.getWindow(byID: windowID) {
+            monitorManager.updateActiveMonitor(forWindowAtPoint: CGPoint(x: window.frame.midX, y: window.frame.midY))
+        }
+
         // Focus changes trigger retile to update accordion positioning
         scheduleRetile()
     }
@@ -282,7 +363,7 @@ final class AutoTilingOrchestrator {
             }
         }
 
-        let focusedID = focusedWindow?.windowID
+        let focusedID = focusedWindow?.windowID ?? lastFocusedWindowID
 
         // Prune monitor states for monitors that are no longer connected
         let connectedMonitorIDs = Set(monitors.map { $0.id })

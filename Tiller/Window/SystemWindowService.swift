@@ -62,6 +62,7 @@ final class SystemWindowService: WindowServiceProtocol {
 
     func getFocusedWindow() -> FocusedWindowInfo? {
         guard let frontApp = NSWorkspace.shared.frontmostApplication else {
+            TillerLogger.debug("window-discovery", "[getFocusedWindow] frontmostApplication is nil")
             return nil
         }
 
@@ -76,6 +77,7 @@ final class SystemWindowService: WindowServiceProtocol {
 
         guard result == .success,
               let focusedWindow = focusedWindowRef else {
+            TillerLogger.debug("window-discovery", "[getFocusedWindow] AXFocusedWindow query failed for \(frontApp.localizedName ?? "?") (pid \(frontApp.processIdentifier)): error \(result.rawValue)")
             return nil
         }
 
@@ -84,6 +86,7 @@ final class SystemWindowService: WindowServiceProtocol {
 
         let windowIDResult = _AXUIElementGetWindow(windowElement, &windowID)
         guard windowIDResult == .success else {
+            TillerLogger.debug("window-discovery", "[getFocusedWindow] _AXUIElementGetWindow failed for \(frontApp.localizedName ?? "?"): error \(windowIDResult.rawValue)")
             return nil
         }
 

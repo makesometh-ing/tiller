@@ -85,8 +85,18 @@ final class WindowDiscoveryManager {
             TillerLogger.debug("window-discovery","Window closed: ID \(windowID.rawValue)")
         case .windowFocused(let windowID):
             TillerLogger.debug("window-discovery","Window focused: ID \(windowID.rawValue)")
-            if let focused = windowService.getFocusedWindow() {
+            // Use the windowID from the AX observer event directly instead of re-querying
+            // via getFocusedWindow(), which is fragile (fails when Tiller menu bar is frontmost
+            // or AX element becomes stale between the observer callback and the re-query).
+            if let windowInfo = windowService.getWindow(byID: windowID) {
+                let focused = FocusedWindowInfo(
+                    windowID: windowID,
+                    appName: windowInfo.appName,
+                    bundleID: windowInfo.bundleID
+                )
                 onFocusedWindowChanged?(focused)
+            } else {
+                TillerLogger.debug("window-discovery", "Window focused but not found in visible windows: ID \(windowID.rawValue)")
             }
         case .windowMoved(let windowID, let newFrame):
             TillerLogger.debug("window-discovery","Window moved: ID \(windowID.rawValue) to \(String(describing: newFrame))")

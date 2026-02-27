@@ -49,11 +49,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let leader = LeaderKeyManager(configManager: ConfigManager.shared)
         leader.onAction = { [weak orch] action in
-            guard let orch else { return }
+            guard let orch else {
+                TillerLogger.debug("keyboard", "[Action] Orchestrator deallocated, ignoring action: \(action)")
+                return
+            }
+            TillerLogger.debug("keyboard", "[Action] Dispatching: \(action)")
             switch action {
             case .switchLayout(let layoutID):
-                guard let activeMonitorID = MonitorManager.shared.activeMonitor?.id else { return }
-                orch.switchLayout(to: layoutID, on: activeMonitorID)
+                let monitorID = orch.activeMonitorID() ?? MonitorManager.shared.activeMonitor?.id
+                guard let monitorID else {
+                    TillerLogger.debug("keyboard", "[Action] switchLayout failed: no active monitor")
+                    return
+                }
+                orch.switchLayout(to: layoutID, on: monitorID)
             case .moveWindow(let direction):
                 orch.moveWindowToContainer(direction: direction)
             case .focusContainer(let direction):
