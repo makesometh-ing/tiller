@@ -8,14 +8,17 @@
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var orchestrator: AutoTilingOrchestrator?
     private var leaderKeyManager: LeaderKeyManager?
     private var overlayPanel: LeaderOverlayPanel?
     private var highlightManager: ContainerHighlightManager?
+    private var statusItem: NSStatusItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+        setupStatusItem()
         let result = ConfigManager.shared.loadConfiguration()
         if case .fallbackToDefault = result {
             TillerMenuState.shared.hasConfigError = ConfigManager.shared.hasConfigError
@@ -114,27 +117,120 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             TillerMenuState.shared.isTilingEnabled = true
         }
     }
+
+    // MARK: - Status Item
+
+    private func setupStatusItem() {
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        guard let button = statusItem?.button else { return }
+        button.image = NSImage(named: "MenuBarIcon")
+        button.imagePosition = .imageLeading
+
+        let menu = NSMenu()
+        menu.delegate = self
+        statusItem?.menu = menu
+
+        observeStatusText()
+    }
+
+    private func updateStatusTitle() {
+        statusItem?.button?.attributedTitle = NSAttributedString(
+            string: TillerMenuState.shared.statusText,
+            attributes: [.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)]
+        )
+        statusItem?.button?.toolTip = TillerMenuState.shared.configErrorTooltip
+    }
+
+    private func observeStatusText() {
+        withObservationTracking {
+            _ = TillerMenuState.shared.statusText
+            _ = TillerMenuState.shared.configErrorTooltip
+        } onChange: {
+            Task { @MainActor in
+                self.updateStatusTitle()
+                self.observeStatusText()
+            }
+        }
+        updateStatusTitle()
+    }
+
+    // MARK: - NSMenuDelegate
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        let state = TillerMenuState.shared
+
+        let toggleTitle = state.isTilingEnabled
+            ? "✓  Tiller is tiling your windows..."
+            : "✗  Tiller is sleeping..."
+        let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleTiling), keyEquivalent: "")
+        toggleItem.target = self
+        toggleItem.isEnabled = state.canToggleTiling
+        menu.addItem(toggleItem)
+
+        menu.addItem(.separator())
+
+        for (monitorIdx, monitor) in state.monitors.enumerated() {
+            let header = NSMenuItem(title: "[\(monitorIdx + 1)] \(monitor.name)", action: nil, keyEquivalent: "")
+            header.isEnabled = false
+            menu.addItem(header)
+
+            for (layoutIdx, layout) in LayoutID.allCases.enumerated() {
+                let isActive = state.activeLayoutPerMonitor[monitor.id] == layout
+                let item = NSMenuItem(
+                    title: "\(isActive ? "✓ " : "  ")\(layoutIdx + 1)-\(layout.displayName)",
+                    action: #selector(switchLayout(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.tag = monitorIdx * 100 + layoutIdx
+                menu.addItem(item)
+            }
+
+            menu.addItem(.separator())
+        }
+
+        let settingsItem = NSMenuItem(title: "Settings...", action: nil, keyEquivalent: "")
+        settingsItem.isEnabled = false
+        menu.addItem(settingsItem)
+
+        let reloadTitle = state.hasConfigError && state.configErrorMessage != nil
+            ? "Reload Config — \(state.configErrorMessage!)"
+            : "Reload Config"
+        let reloadItem = NSMenuItem(title: reloadTitle, action: #selector(reloadConfig), keyEquivalent: "")
+        reloadItem.target = self
+        menu.addItem(reloadItem)
+
+        let resetItem = NSMenuItem(title: "Reset to Defaults", action: #selector(resetToDefaults), keyEquivalent: "")
+        resetItem.target = self
+        menu.addItem(resetItem)
+
+        menu.addItem(.separator())
+
+        let quitItem = NSMenuItem(title: "Quit Tiller", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+    }
+
+    @objc private func toggleTiling() { TillerMenuState.shared.toggleTiling() }
+    @objc private func reloadConfig() { TillerMenuState.shared.reloadConfig() }
+    @objc private func resetToDefaults() { TillerMenuState.shared.resetToDefaults() }
+    @objc private func quitApp() { TillerMenuState.shared.quit() }
+
+    @objc private func switchLayout(_ sender: NSMenuItem) {
+        let state = TillerMenuState.shared
+        let monitorIdx = sender.tag / 100
+        let layoutIdx = sender.tag % 100
+        guard monitorIdx < state.monitors.count, layoutIdx < LayoutID.allCases.count else { return }
+        state.switchLayout(to: LayoutID.allCases[layoutIdx], on: state.monitors[monitorIdx].id)
+    }
 }
 
 @main
 struct TillerApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    private var monospaceStatusText: AttributedString {
-        var s = AttributedString(TillerMenuState.shared.statusText)
-        s.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        return s
-    }
-
     var body: some Scene {
-        MenuBarExtra {
-            TillerMenuView(menuState: TillerMenuState.shared)
-        } label: {
-            HStack(spacing: 4) {
-                Image("MenuBarIcon")
-                Text(monospaceStatusText)
-            }
-            .help(TillerMenuState.shared.configErrorTooltip ?? "")
-        }
+        Settings { EmptyView() }
     }
 }
