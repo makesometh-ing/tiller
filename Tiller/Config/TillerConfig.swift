@@ -44,6 +44,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
     var padding: Int
     var accordionOffset: Int
     var leaderTimeout: Double = 5.0
+    var containerHighlightsEnabled: Bool = true
     var floatingApps: [String]
     var logLocation: String?
     var keybindings: KeybindingsConfig
@@ -54,6 +55,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         padding: Int,
         accordionOffset: Int,
         leaderTimeout: Double = 5.0,
+        containerHighlightsEnabled: Bool = true,
         floatingApps: [String],
         logLocation: String? = nil,
         keybindings: KeybindingsConfig = .default
@@ -63,6 +65,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         self.padding = padding
         self.accordionOffset = accordionOffset
         self.leaderTimeout = leaderTimeout
+        self.containerHighlightsEnabled = containerHighlightsEnabled
         self.floatingApps = floatingApps
         self.logLocation = logLocation
         self.keybindings = keybindings
@@ -75,6 +78,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         padding = try container.decode(Int.self, forKey: .padding)
         accordionOffset = try container.decode(Int.self, forKey: .accordionOffset)
         leaderTimeout = try container.decodeIfPresent(Double.self, forKey: .leaderTimeout) ?? 5.0
+        containerHighlightsEnabled = try container.decodeIfPresent(Bool.self, forKey: .containerHighlightsEnabled) ?? true
         floatingApps = try container.decode([String].self, forKey: .floatingApps)
         logLocation = try container.decodeIfPresent(String.self, forKey: .logLocation)
         keybindings = try container.decodeIfPresent(KeybindingsConfig.self, forKey: .keybindings) ?? .default

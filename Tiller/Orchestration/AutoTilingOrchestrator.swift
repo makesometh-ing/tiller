@@ -103,6 +103,13 @@ final class AutoTilingOrchestrator {
         monitorStates[monitorID]?.activeLayout ?? .monocle
     }
 
+    /// Returns container frames and focused container ID for a monitor. Used by UI overlay.
+    func containerInfo(for monitorID: MonitorID) -> (frames: [(id: ContainerID, frame: CGRect)], focusedID: ContainerID?)? {
+        guard let state = monitorStates[monitorID] else { return nil }
+        let frames = state.containers.map { (id: $0.id, frame: $0.frame) }
+        return (frames, state.focusedContainerID)
+    }
+
     func switchLayout(to layout: LayoutID, on monitorID: MonitorID) {
         guard var state = monitorStates[monitorID] else {
             TillerLogger.debug("orchestration", "[Action] switchLayout failed: no state for monitor \(monitorID.rawValue). Known monitors: \(monitorStates.keys.map { $0.rawValue })")

@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var orchestrator: AutoTilingOrchestrator?
     private var leaderKeyManager: LeaderKeyManager?
     private var overlayPanel: LeaderOverlayPanel?
+    private var highlightManager: ContainerHighlightManager?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let result = ConfigManager.shared.loadConfiguration()
@@ -49,7 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         TillerMenuState.shared.configureConfig(manager: ConfigManager.shared)
 
         let leader = LeaderKeyManager(configManager: ConfigManager.shared)
-        leader.onAction = { [weak orch] action in
+        leader.onAction = { [weak orch, weak self] action in
             guard let orch else {
                 TillerLogger.debug("keyboard", "[Action] Orchestrator deallocated, ignoring action: \(action)")
                 return
@@ -72,20 +73,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .exitLeader:
                 break
             }
+
+            // Update container highlights after any action that may change focus
+            if let monitorID = MonitorManager.shared.activeMonitor?.id {
+                self?.highlightManager?.update(on: monitorID)
+            }
         }
         let overlay = LeaderOverlayPanel(menuState: TillerMenuState.shared)
         self.overlayPanel = overlay
 
-        leader.onStateChanged = { [weak overlay] state in
+        let highlights = ContainerHighlightManager(orchestrator: orch, configManager: ConfigManager.shared)
+        self.highlightManager = highlights
+
+        leader.onStateChanged = { [weak overlay, weak highlights] state in
             TillerMenuState.shared.leaderState = state
+            let monitorID = MonitorManager.shared.activeMonitor?.id
 
             switch state {
-            case .leaderActive, .subLayerActive:
+            case .leaderActive:
                 if let monitor = MonitorManager.shared.activeMonitor, overlay?.isVisible != true {
                     overlay?.show(on: monitor)
                 }
+                if let monitorID { highlights?.show(on: monitorID) }
+            case .subLayerActive:
+                if let monitorID { highlights?.update(on: monitorID) }
             case .idle:
                 overlay?.hide()
+                highlights?.hide()
             }
         }
         leader.start()
