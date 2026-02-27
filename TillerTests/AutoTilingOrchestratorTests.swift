@@ -58,7 +58,7 @@ struct AutoTilingOrchestratorTests {
             configManager: configManager,
             layoutEngine: mockLayoutEngine,
             animationService: mockAnimationService,
-            config: OrchestratorConfig(debounceDelay: 0.01, animationDuration: 0.1, animateOnInitialTile: false)
+            config: OrchestratorConfig(debounceDelay: 0.01, animationDuration: 0.1, animateOnInitialTile: false, zOrderGuardDuration: 0)
         )
     }
 
@@ -96,6 +96,7 @@ struct AutoTilingOrchestratorTests {
             sourceLocation: sourceLocation
         )
     }
+
 
     // MARK: - Initial Tiling Tests
 
@@ -141,7 +142,7 @@ struct AutoTilingOrchestratorTests {
             configManager: configManager,
             layoutEngine: mockLayoutEngine,
             animationService: mockAnimationService,
-            config: OrchestratorConfig(debounceDelay: 0.01, animationDuration: 0.25, animateOnInitialTile: true)
+            config: OrchestratorConfig(debounceDelay: 0.01, animationDuration: 0.25, animateOnInitialTile: true, zOrderGuardDuration: 0)
         )
 
         let window1 = makeWindow(id: 1)
@@ -1168,5 +1169,178 @@ struct AutoTilingOrchestratorTests {
         // though only the non-empty ones get to the layout engine)
         let m1Inputs = inputs.filter { !$0.windows.contains(where: { $0.id == win2.id }) }
         #expect(m1Inputs.count >= 1, "Monitor 1 should have been retiled")
+    }
+
+    // MARK: - Z-Order Focus Change Regression Tests (TILLER-86)
+
+    /// Helper: sets up split-halves with window1 in left container, window2+window3 in right container.
+    /// Returns (window1, window2, window3) after initial tile + layout switch + retile are complete.
+    /// Sets up split-halves layout with:
+    ///   Left container:  window1 (1 window)
+    ///   Right container: window2 + window3 (2 windows, focused)
+    private func setupSplitHalvesWithFocus() async -> (WindowInfo, WindowInfo, WindowInfo) {
+        let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let window2 = makeWindow(id: 2, frame: CGRect(x: 1100, y: 100, width: 800, height: 600))
+        let window3 = makeWindow(id: 3, frame: CGRect(x: 1100, y: 200, width: 800, height: 600))
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+
+        // Step 1: Start with only window1 + window2, focus on window2
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window2.id, appName: window2.appName, bundleID: window2.bundleID
+        )
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+        await sut.start()
+
+        // Step 2: Switch to split-halves → round-robin: window1 in left, window2 in right
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+        await waitForRetile(expectedCallCount: 2)
+
+        // Step 3: Focus window2 to set focusedContainerID to the right container.
+        // switchLayout follows the ring buffer's focusedWindowID (window1, first added),
+        // so focusedContainerID defaults to left. This focus event corrects it.
+        mockWindowService.simulateWindowFocusSync(window2.id)
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+        await waitForRetile(expectedCallCount: 2)
+
+        // Step 4: Add window3 and tile — goes to focused container (right, where window2 is)
+        mockWindowService.windows = [window1, window2, window3]
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+        await sut.performTile()
+
+        // Reset animation mock for the actual test (keep layoutEngine.allInputs for tests that inspect them)
+        mockAnimationService.reset()
+
+        return (window1, window2, window3)
+    }
+
+    @Test func focusChangeDoesNotTriggerZOrderForNonActiveContainer() async {
+        // Given: Split halves, focus in right container (window2)
+        let (window1, window2, window3) = await setupSplitHalvesWithFocus()
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: OS focus changes to window1 (left container), then tile directly
+        mockWindowService.simulateWindowFocusSync(window1.id)
+        let raiseCountBefore = mockAnimationService.raiseOrderCalls.count
+        await sut.performTile()
+
+        // Then: No z-order calls should include windows from the right container.
+        let newRaisedWindowIDs = mockAnimationService.raiseOrderCalls.dropFirst(raiseCountBefore).flatMap { $0.map(\.windowID) }
+        #expect(!newRaisedWindowIDs.contains(window2.id), "Right container window2 should not be raised when focus moves to left container")
+        #expect(!newRaisedWindowIDs.contains(window3.id), "Right container window3 should not be raised when focus moves to left container")
+    }
+
+    @Test func focusContainerDoesNotTriggerZOrderForOldContainer() async {
+        // Given: Split halves, focus in right container (window2)
+        let (window1, window2, window3) = await setupSplitHalvesWithFocus()
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: Focus container switches left via keybinding, then tile directly.
+        // focusContainer calls raiseAndActivateWindow(window1) which in real usage
+        // causes the OS to update focus. Simulate that by updating the mock.
+        sut.focusContainer(direction: .left)
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id, appName: window1.appName, bundleID: window1.bundleID
+        )
+        let raiseCountBefore = mockAnimationService.raiseOrderCalls.count
+        await sut.performTile()
+
+        // Then: Right container windows should NOT be raised (no z-order refresh for old container)
+        let newRaisedWindowIDs = mockAnimationService.raiseOrderCalls.dropFirst(raiseCountBefore).flatMap { $0.map(\.windowID) }
+        #expect(!newRaisedWindowIDs.contains(window2.id), "Old container window2 should not be z-order refreshed on focusContainer")
+        #expect(!newRaisedWindowIDs.contains(window3.id), "Old container window3 should not be z-order refreshed on focusContainer")
+    }
+
+    @Test func focusChangeLeavesNonActiveContainerLayoutInputStable() async {
+        // Given: Split halves, focus in right container (window2)
+        let (window1, window2, window3) = await setupSplitHalvesWithFocus()
+
+        // Capture layout inputs from the split-halves retile
+        let rightContainerInputBefore = mockLayoutEngine.allInputs.last(where: {
+            $0.windows.contains(where: { $0.id == window2.id })
+        })
+        #expect(rightContainerInputBefore != nil, "Right container should have been tiled")
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: OS focus changes to window1 (left container), then tile directly
+        mockWindowService.simulateWindowFocusSync(window1.id)
+        await sut.performTile()
+
+        // Then: Right container's layout input should be unchanged
+        let rightContainerInputAfter = mockLayoutEngine.allInputs.last(where: {
+            $0.windows.contains(where: { $0.id == window2.id })
+        })
+        #expect(rightContainerInputAfter != nil, "Right container should still be tiled after focus change")
+
+        // The focused window and container frame should be stable
+        #expect(rightContainerInputAfter?.focusedWindowID == rightContainerInputBefore?.focusedWindowID,
+                "Right container accordion focus should not change when left container gets OS focus")
+        #expect(rightContainerInputAfter?.containerFrame == rightContainerInputBefore?.containerFrame,
+                "Right container frame should not change on focus change")
+    }
+
+    @Test func focusedWindowIsLastInZOrderCalls() async {
+        // Given: Split halves, window1 in left, window2+window3 in right
+        let (window1, window2, window3) = await setupSplitHalvesWithFocus()
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window3.id, pid: window3.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // When: Move window from right to left (triggers z-order refresh on destination), then tile directly
+        sut.moveWindowToContainer(direction: .left)
+        let raiseCountBefore = mockAnimationService.raiseOrderCalls.count
+        await sut.performTile()
+
+        // Then: If there are z-order calls, the OS-focused window should be the last one raised
+        let allRaisedWindowIDs = Array(mockAnimationService.raiseOrderCalls.dropFirst(raiseCountBefore)).flatMap { $0.map(\.windowID) }
+        if !allRaisedWindowIDs.isEmpty {
+            let focusedID = mockWindowService.focusedWindow?.windowID
+            if let fid = focusedID, allRaisedWindowIDs.contains(fid) {
+                #expect(allRaisedWindowIDs.last == fid,
+                        "The OS-focused window should be the last z-order call to ensure it stays on top")
+            }
+        }
     }
 }

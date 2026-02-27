@@ -199,14 +199,8 @@ final class AutoTilingOrchestrator {
         }
         let monitorID = result.0
         var state = result.1
-        let previousFocusedCID = state.focusedContainerID
         state.setFocusedContainer(direction: direction)
         monitorStates[monitorID] = state
-
-        // Mark the old container for z-order refresh — the OS no longer manages its z-order
-        if let prev = previousFocusedCID, prev != state.focusedContainerID {
-            containersNeedingZOrderRefresh.insert(prev)
-        }
 
         if let focusedCID = state.focusedContainerID,
            let container = state.containers.first(where: { $0.id == focusedCID }),
@@ -238,7 +232,7 @@ final class AutoTilingOrchestrator {
         // own tracking during that window so actions operate on the correct container.
         let focusedWindowID: WindowID?
         if let lastAdjust = lastZOrderAdjustment,
-           Date().timeIntervalSince(lastAdjust) < 0.2,
+           Date().timeIntervalSince(lastAdjust) < config.zOrderGuardDuration,
            let lastFocused = lastFocusedWindowID {
             focusedWindowID = lastFocused
         } else {
@@ -292,7 +286,7 @@ final class AutoTilingOrchestrator {
     private func handleFocusChange(_ focusedWindow: FocusedWindowInfo?) {
         // Ignore focus changes caused by our own z-order adjustments (within 200ms)
         if let lastAdjust = lastZOrderAdjustment,
-           Date().timeIntervalSince(lastAdjust) < 0.2 {
+           Date().timeIntervalSince(lastAdjust) < config.zOrderGuardDuration {
             TillerLogger.debug("orchestration","[Orchestrator] Ignoring focus change within 200ms of z-order adjustment")
             return
         }
@@ -311,14 +305,11 @@ final class AutoTilingOrchestrator {
             monitorManager.updateActiveMonitor(forWindowAtPoint: CGPoint(x: window.frame.midX, y: window.frame.midY))
 
             // Update focused container to match the newly focused window.
-            // Mark the old container for z-order refresh since the OS no longer manages it.
+            // No z-order refresh needed: macOS doesn't rearrange z-order of unfocused windows,
+            // so the old container's accordion appearance stays intact without intervention.
             for (monitorID, var state) in monitorStates {
                 if state.containerForWindow(windowID) != nil {
-                    let previousFocusedCID = state.focusedContainerID
                     state.updateFocusedContainer(forWindow: windowID)
-                    if let prev = previousFocusedCID, prev != state.focusedContainerID {
-                        containersNeedingZOrderRefresh.insert(prev)
-                    }
                     monitorStates[monitorID] = state
                     break
                 }
@@ -428,6 +419,7 @@ final class AutoTilingOrchestrator {
         var allAnimations: [(windowID: WindowID, pid: pid_t, startFrame: CGRect, targetFrame: CGRect)] = []
         var allZOrderCalls: [(windowID: WindowID, pid: pid_t)] = []
         var didRaiseNonResizable = false
+        var didRefreshNonActiveContainer = false
 
         for monitor in monitors {
             let monitorWindows = windowsByMonitor[monitor.id] ?? []
@@ -573,6 +565,7 @@ final class AutoTilingOrchestrator {
                     // In the active container, the OS already keeps the focused window on top.
                     if !osHasFocusInContainer, let fid = containerFocusedID, let focusedWin = windowByID[fid] {
                         allZOrderCalls.append((windowID: fid, pid: focusedWin.ownerPID))
+                        didRefreshNonActiveContainer = true
                     }
                 } else if focusedIsNonResizable, let fid = containerFocusedID, let focusedWin = windowByID[fid] {
                     TillerLogger.debug("orchestration","[Orchestrator] Raising non-resizable window \(fid.rawValue) to top (overlay)")
@@ -596,6 +589,12 @@ final class AutoTilingOrchestrator {
             let result = TilingResult.success(tiledCount: 0)
             lastTileResult = result
             return result
+        }
+
+        // After refreshing a non-active container's z-order (e.g. after moveWindowToContainer),
+        // re-raise the OS-focused window so it stays on top of the non-active container's windows.
+        if didRefreshNonActiveContainer, let fid = focusedID, let focusedWin = windowByID[fid] {
+            allZOrderCalls.append((windowID: fid, pid: focusedWin.ownerPID))
         }
 
         // Execute z-order adjustments
