@@ -159,6 +159,13 @@ struct MonitorTilingState: Equatable, Sendable {
         }
     }
 
+    /// Updates focusedContainerID to match whichever container holds `windowID`.
+    /// No-op if the window isn't found in any container.
+    mutating func updateFocusedContainer(forWindow windowID: WindowID) {
+        guard let container = containers.first(where: { $0.windowIDs.contains(windowID) }) else { return }
+        focusedContainerID = container.id
+    }
+
     /// Changes the focused container without moving any window.
     /// No-op at boundaries or with a single container.
     mutating func setFocusedContainer(direction: MoveDirection) {

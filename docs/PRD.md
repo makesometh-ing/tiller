@@ -176,7 +176,7 @@ Animated Transitions
 
   * Native macOS-style animation
 
-  * 200ms duration per transition
+  * 50ms duration per transition
 
   * Hardware acceleration and 60fps target; no dropped frames
 
@@ -605,6 +605,7 @@ User Control of Floating Windows
       * `activeBorderWidth` (default: 2), `activeBorderColor` (hex, default: "#007AFF")
       * `activeGlowRadius` (default: 8), `activeGlowOpacity` (default: 0.6)
       * `inactiveBorderWidth` (default: 1), `inactiveBorderColor` (hex, default: "#FFFFFF66")
+      * `cornerRadius` (default: 8, range: 0-20)
 
   * A full command palette with grouped, visually structured commands is planned for a future milestone.
 
@@ -809,7 +810,7 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
 ### Animated Behavior
 
-* **Intra-layout operations** (window moves, resizes, cycling, peek) are animated with an ease-out-cubic curve and use a 200ms default duration (user-configurable from 150–300ms).
+* **Intra-layout operations** (window moves, resizes, cycling, peek) are animated with an ease-out-cubic curve and use a 50ms default duration.
 
 * All related containers and windows within the same layout animate together for each change.
 
@@ -914,7 +915,7 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 | Open at Login | Boolean | true/false | false | Yes | — |
 | UI Hint Display | Boolean | true/false | true | Yes | — |
 | Show Dock Icon | Boolean | true/false | false | Yes | — |
-| Animation Duration | Integer (ms) | 150–300 | 200 | Yes | Out-of-range: Red border |
+| Animation Duration | Integer (ms) | 0–300 | 50 | Yes | Out-of-range: Red border |
 | Floating App List | List | App names | None | Yes | Typos: Suggest correction |
 | Log Location | String (path) | Absolute file path or null | ~/.tiller/logs/tiller-debug.log | No (requires relaunch) | Invalid path: Falls back to default |
 

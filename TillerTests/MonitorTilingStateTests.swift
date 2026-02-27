@@ -571,6 +571,37 @@ final class MonitorTilingStateTests: XCTestCase {
         XCTAssertEqual(state.focusedContainerID, left.id)
     }
 
+    // MARK: - updateFocusedContainer Tests
+
+    func testUpdateFocusedContainerForWindow() {
+        let left = makeContainer(id: 0, windowIDs: [1, 2], focusedWindowID: 1)
+        let right = makeContainer(id: 1, windowIDs: [3, 4], focusedWindowID: 3)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: left.id
+        )
+
+        // Focus a window in the right container — focusedContainerID should follow
+        state.updateFocusedContainer(forWindow: wid(4))
+        XCTAssertEqual(state.focusedContainerID, right.id)
+
+        // Focus a window in the left container — focusedContainerID should follow back
+        state.updateFocusedContainer(forWindow: wid(2))
+        XCTAssertEqual(state.focusedContainerID, left.id)
+    }
+
+    func testUpdateFocusedContainerNoOpForUnknownWindow() {
+        let left = makeContainer(id: 0, windowIDs: [1], focusedWindowID: 1)
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .monocle,
+            containers: [left], focusedContainerID: left.id
+        )
+
+        // Unknown window should not change focused container
+        state.updateFocusedContainer(forWindow: wid(99))
+        XCTAssertEqual(state.focusedContainerID, left.id)
+    }
+
     // MARK: - setFocusedContainer Tests
 
     func testSetFocusedContainerRight() {
