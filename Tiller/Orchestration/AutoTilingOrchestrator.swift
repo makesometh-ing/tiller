@@ -167,7 +167,14 @@ final class AutoTilingOrchestrator {
         state.moveWindow(from: windowID, direction: direction)
         monitorStates[monitorID] = state
 
-        raiseAndActivateWindow(windowID)
+        // Activate the source container's next window so focus stays on source.
+        // If the source emptied, moveWindow already shifted focusedContainerID
+        // to the destination, so we activate that container's focused window.
+        if let focusedCID = state.focusedContainerID,
+           let container = state.containers.first(where: { $0.id == focusedCID }),
+           let nextWindowID = container.focusedWindowID {
+            raiseAndActivateWindow(nextWindowID)
+        }
 
         TillerLogger.debug("orchestration", "[Action] moveWindow \(direction) on monitor \(monitorID.rawValue)")
         scheduleRetile()
