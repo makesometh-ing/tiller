@@ -23,29 +23,33 @@ final class ContainerHighlightManager {
     // MARK: - Show / Hide
 
     func show(on monitorID: MonitorID) {
-        let highlightConfig = configManager.getConfig().containerHighlights
-        guard highlightConfig.enabled else { return }
+        let config = configManager.getConfig().containerHighlights
+        guard config.enabled else { return }
         guard let info = orchestrator.containerInfo(for: monitorID) else { return }
 
         hide()
 
         for (id, cgFrame) in info.frames {
             let isFocused = id == info.focusedID
-            let window = makeHighlightWindow(frame: cgFrame, focused: isFocused, config: highlightConfig)
+            let window = makeHighlightWindow(frame: cgFrame, focused: isFocused, config: config)
             window.orderFrontRegardless()
             windows[id] = window
         }
     }
 
     func update(on monitorID: MonitorID) {
-        let highlightConfig = configManager.getConfig().containerHighlights
-        guard highlightConfig.enabled else { return }
+        let config = configManager.getConfig().containerHighlights
+        guard config.enabled else { return }
         guard let info = orchestrator.containerInfo(for: monitorID) else { return }
 
         for (id, _) in info.frames {
             guard let window = windows[id] else { continue }
             let isFocused = id == info.focusedID
-            updateHighlightAppearance(window: window, focused: isFocused, config: highlightConfig)
+            if let view = window.contentView as? ContainerHighlightView {
+                view.isFocused = isFocused
+                view.applyConfig(config)
+                view.needsDisplay = true
+            }
         }
     }
 
@@ -59,10 +63,10 @@ final class ContainerHighlightManager {
     // MARK: - Private
 
     private func makeHighlightWindow(frame cgFrame: CGRect, focused: Bool, config: ContainerHighlightConfig) -> NSWindow {
-        // Expand the frame to accommodate the glow so shadow isn't clipped
-        let glowPadding = CGFloat(config.activeGlowRadius) * 2 + CGFloat(config.activeBorderWidth)
-        let expandedCGFrame = cgFrame.insetBy(dx: -glowPadding, dy: -glowPadding)
-        let appKitFrame = convertToAppKit(expandedCGFrame)
+        // Expand frame by glow radius so the outer glow isn't clipped at the window edge
+        let pad = CGFloat(config.activeGlowRadius) + CGFloat(config.activeBorderWidth)
+        let expandedCG = cgFrame.insetBy(dx: -pad, dy: -pad)
+        let appKitFrame = convertToAppKit(expandedCG)
 
         let window = NSWindow(
             contentRect: appKitFrame,
@@ -77,22 +81,11 @@ final class ContainerHighlightManager {
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        let highlightView = ContainerHighlightView(
-            frameSize: appKitFrame.size,
-            glowPadding: glowPadding
-        )
-        highlightView.isFocused = focused
-        highlightView.applyConfig(config)
-        window.contentView = highlightView
-
-        return window
-    }
-
-    private func updateHighlightAppearance(window: NSWindow, focused: Bool, config: ContainerHighlightConfig) {
-        guard let view = window.contentView as? ContainerHighlightView else { return }
+        let view = ContainerHighlightView(frameSize: appKitFrame.size, glowPadding: pad)
         view.isFocused = focused
         view.applyConfig(config)
-        view.updateGlow()
+        window.contentView = view
+        return window
     }
 
     private func convertToAppKit(_ cgRect: CGRect) -> NSRect {
@@ -114,9 +107,7 @@ private class ContainerHighlightView: NSView {
 
     var isFocused: Bool = false
     private let glowPadding: CGFloat
-    private let borderLayer = CAShapeLayer()
 
-    // Config-driven values
     private var activeBorderWidth: CGFloat = 2
     private var activeBorderColor: NSColor = .systemBlue
     private var activeGlowRadius: CGFloat = 8
@@ -128,8 +119,6 @@ private class ContainerHighlightView: NSView {
         self.glowPadding = glowPadding
         super.init(frame: NSRect(origin: .zero, size: frameSize))
         wantsLayer = true
-        layer?.addSublayer(borderLayer)
-        borderLayer.fillColor = nil
     }
 
     @available(*, unavailable)
@@ -144,34 +133,42 @@ private class ContainerHighlightView: NSView {
         inactiveBorderColor = NSColor.fromHex(config.inactiveBorderColor) ?? NSColor.white.withAlphaComponent(0.4)
     }
 
-    override func layout() {
-        super.layout()
-        updateGlow()
-    }
-
-    func updateGlow() {
+    override func draw(_ dirtyRect: NSRect) {
         let containerRect = bounds.insetBy(dx: glowPadding, dy: glowPadding)
-        let cornerRadius: CGFloat = 8
-        let path = CGPath(roundedRect: containerRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
-
-        borderLayer.frame = bounds
-        borderLayer.path = path
-        borderLayer.fillColor = nil
+        let cr: CGFloat = 8
 
         if isFocused {
-            borderLayer.strokeColor = activeBorderColor.withAlphaComponent(0.8).cgColor
-            borderLayer.lineWidth = activeBorderWidth
-            borderLayer.shadowColor = activeBorderColor.cgColor
-            borderLayer.shadowRadius = activeGlowRadius
-            borderLayer.shadowOpacity = Float(activeGlowOpacity)
-            borderLayer.shadowOffset = .zero
-            borderLayer.shadowPath = path
+            // Clip to EXTERIOR only — prevents glow from filling the container interior
+            NSGraphicsContext.saveGraphicsState()
+            let clipOuter = NSBezierPath(rect: bounds)
+            let clipInner = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
+            clipOuter.append(clipInner)
+            clipOuter.windingRule = .evenOdd
+            clipOuter.addClip()
+
+            // Draw border with NSShadow → shadow only renders outside (clipped)
+            let shadow = NSShadow()
+            shadow.shadowColor = activeBorderColor.withAlphaComponent(activeGlowOpacity)
+            shadow.shadowBlurRadius = activeGlowRadius
+            shadow.shadowOffset = .zero
+            shadow.set()
+
+            activeBorderColor.withAlphaComponent(0.8).setStroke()
+            let path = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
+            path.lineWidth = activeBorderWidth
+            path.stroke()
+            NSGraphicsContext.restoreGraphicsState()
+
+            // Redraw border without shadow (clean, no clipping)
+            activeBorderColor.withAlphaComponent(0.8).setStroke()
+            let cleanBorder = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
+            cleanBorder.lineWidth = activeBorderWidth
+            cleanBorder.stroke()
         } else {
-            borderLayer.strokeColor = inactiveBorderColor.cgColor
-            borderLayer.lineWidth = inactiveBorderWidth
-            borderLayer.shadowColor = nil
-            borderLayer.shadowRadius = 0
-            borderLayer.shadowOpacity = 0
+            inactiveBorderColor.setStroke()
+            let path = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
+            path.lineWidth = inactiveBorderWidth
+            path.stroke()
         }
     }
 }
@@ -187,14 +184,14 @@ extension NSColor {
         guard Scanner(string: hexStr).scanHexInt64(&rgba) else { return nil }
 
         switch hexStr.count {
-        case 6: // RGB
+        case 6:
             return NSColor(
                 red: CGFloat((rgba >> 16) & 0xFF) / 255,
                 green: CGFloat((rgba >> 8) & 0xFF) / 255,
                 blue: CGFloat(rgba & 0xFF) / 255,
                 alpha: 1.0
             )
-        case 8: // RGBA
+        case 8:
             return NSColor(
                 red: CGFloat((rgba >> 24) & 0xFF) / 255,
                 green: CGFloat((rgba >> 16) & 0xFF) / 255,
