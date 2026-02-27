@@ -444,7 +444,7 @@ final class ConfigTests: XCTestCase {
 
     func testMigrationNoOpOnCurrentVersion() {
         let json = """
-        { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        { "version": \(TillerConfig.currentVersion), "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
         XCTAssertFalse(result.didMigrate)
@@ -467,10 +467,10 @@ final class ConfigTests: XCTestCase {
 
     func testConfigDecodesVersionField() throws {
         let json = """
-        { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        { "version": \(TillerConfig.currentVersion), "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
-        XCTAssertEqual(config.version, 1)
+        XCTAssertEqual(config.version, TillerConfig.currentVersion)
     }
 
     func testConfigMissingVersionDefaultsToZero() throws {
@@ -483,6 +483,83 @@ final class ConfigTests: XCTestCase {
 
     func testDefaultConfigHasCurrentVersion() {
         XCTAssertEqual(TillerConfig.default.version, TillerConfig.currentVersion)
+    }
+
+    // MARK: - V1→V2 Migration (containerHighlightsEnabled → containerHighlights)
+
+    func testMigrationV1ToV2MovesContainerHighlightsEnabled() {
+        let json = """
+        { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [], "containerHighlightsEnabled": false }
+        """
+        let result = ConfigMigrator.migrate(Data(json.utf8))
+        XCTAssertTrue(result.didMigrate)
+
+        let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
+        XCTAssertEqual(config.version, TillerConfig.currentVersion)
+        XCTAssertFalse(config.containerHighlights.enabled)
+    }
+
+    func testMigrationV1ToV2DefaultsHighlightsWhenFieldMissing() {
+        let json = """
+        { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let result = ConfigMigrator.migrate(Data(json.utf8))
+        XCTAssertTrue(result.didMigrate)
+
+        let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
+        XCTAssertTrue(config.containerHighlights.enabled) // default is true
+    }
+
+    func testContainerHighlightConfigDecoding() throws {
+        let json = """
+        {
+            "version": 2, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
+            "containerHighlights": {
+                "enabled": true,
+                "activeBorderWidth": 3,
+                "activeBorderColor": "#FF0000",
+                "activeGlowRadius": 12,
+                "activeGlowOpacity": 0.8,
+                "inactiveBorderWidth": 2,
+                "inactiveBorderColor": "#FFFFFF80"
+            }
+        }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(config.containerHighlights.activeBorderWidth, 3)
+        XCTAssertEqual(config.containerHighlights.activeBorderColor, "#FF0000")
+        XCTAssertEqual(config.containerHighlights.activeGlowRadius, 12)
+        XCTAssertEqual(config.containerHighlights.activeGlowOpacity, 0.8)
+        XCTAssertEqual(config.containerHighlights.inactiveBorderWidth, 2)
+        XCTAssertEqual(config.containerHighlights.inactiveBorderColor, "#FFFFFF80")
+    }
+
+    func testContainerHighlightConfigDefaultsWhenMissing() throws {
+        let json = """
+        { "version": 2, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(config.containerHighlights, ContainerHighlightConfig.default)
+    }
+
+    func testContainerHighlightValidationRejectsInvalidBorderWidth() {
+        var config = TillerConfig.default
+        config.containerHighlights.activeBorderWidth = 50
+        let errors = ConfigValidator.validate(config)
+        XCTAssertTrue(errors.contains(where: {
+            if case .highlightBorderWidthOutOfRange("Active", 50) = $0 { return true }
+            return false
+        }))
+    }
+
+    func testContainerHighlightValidationRejectsInvalidHexColor() {
+        var config = TillerConfig.default
+        config.containerHighlights.activeBorderColor = "not-a-color"
+        let errors = ConfigValidator.validate(config)
+        XCTAssertTrue(errors.contains(where: {
+            if case .invalidHexColor("activeBorderColor", _) = $0 { return true }
+            return false
+        }))
     }
 
     func testMigrationWritesBackToDisk() async throws {

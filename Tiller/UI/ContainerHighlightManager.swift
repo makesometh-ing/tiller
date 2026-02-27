@@ -5,6 +5,9 @@
 
 import AppKit
 
+/// Window level for container highlights — below .floating so the leader overlay renders on top.
+private let containerHighlightLevel = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue - 1)
+
 @MainActor
 final class ContainerHighlightManager {
 
@@ -20,28 +23,29 @@ final class ContainerHighlightManager {
     // MARK: - Show / Hide
 
     func show(on monitorID: MonitorID) {
-        guard configManager.getConfig().containerHighlightsEnabled else { return }
+        let highlightConfig = configManager.getConfig().containerHighlights
+        guard highlightConfig.enabled else { return }
         guard let info = orchestrator.containerInfo(for: monitorID) else { return }
 
         hide()
 
         for (id, cgFrame) in info.frames {
             let isFocused = id == info.focusedID
-            let window = makeHighlightWindow(frame: cgFrame, focused: isFocused)
+            let window = makeHighlightWindow(frame: cgFrame, focused: isFocused, config: highlightConfig)
             window.orderFrontRegardless()
             windows[id] = window
         }
     }
 
     func update(on monitorID: MonitorID) {
-        guard configManager.getConfig().containerHighlightsEnabled else { return }
+        let highlightConfig = configManager.getConfig().containerHighlights
+        guard highlightConfig.enabled else { return }
         guard let info = orchestrator.containerInfo(for: monitorID) else { return }
 
-        // Update focused state in-place
         for (id, _) in info.frames {
             guard let window = windows[id] else { continue }
             let isFocused = id == info.focusedID
-            updateHighlightAppearance(window: window, focused: isFocused)
+            updateHighlightAppearance(window: window, focused: isFocused, config: highlightConfig)
         }
     }
 
@@ -54,9 +58,11 @@ final class ContainerHighlightManager {
 
     // MARK: - Private
 
-    private func makeHighlightWindow(frame cgFrame: CGRect, focused: Bool) -> NSWindow {
-        // Convert from CG coordinates (top-left origin) to AppKit (bottom-left origin)
-        let appKitFrame = convertToAppKit(cgFrame)
+    private func makeHighlightWindow(frame cgFrame: CGRect, focused: Bool, config: ContainerHighlightConfig) -> NSWindow {
+        // Expand the frame to accommodate the glow so shadow isn't clipped
+        let glowPadding = CGFloat(config.activeGlowRadius) * 2 + CGFloat(config.activeBorderWidth)
+        let expandedCGFrame = cgFrame.insetBy(dx: -glowPadding, dy: -glowPadding)
+        let appKitFrame = convertToAppKit(expandedCGFrame)
 
         let window = NSWindow(
             contentRect: appKitFrame,
@@ -64,24 +70,29 @@ final class ContainerHighlightManager {
             backing: .buffered,
             defer: false
         )
-        window.level = .floating
+        window.level = containerHighlightLevel
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
         window.ignoresMouseEvents = true
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        let highlightView = ContainerHighlightView(frame: appKitFrame.size)
+        let highlightView = ContainerHighlightView(
+            frameSize: appKitFrame.size,
+            glowPadding: glowPadding
+        )
         highlightView.isFocused = focused
+        highlightView.applyConfig(config)
         window.contentView = highlightView
 
         return window
     }
 
-    private func updateHighlightAppearance(window: NSWindow, focused: Bool) {
+    private func updateHighlightAppearance(window: NSWindow, focused: Bool, config: ContainerHighlightConfig) {
         guard let view = window.contentView as? ContainerHighlightView else { return }
         view.isFocused = focused
-        view.needsDisplay = true
+        view.applyConfig(config)
+        view.updateGlow()
     }
 
     private func convertToAppKit(_ cgRect: CGRect) -> NSRect {
@@ -102,35 +113,96 @@ final class ContainerHighlightManager {
 private class ContainerHighlightView: NSView {
 
     var isFocused: Bool = false
+    private let glowPadding: CGFloat
+    private let borderLayer = CAShapeLayer()
 
-    init(frame size: NSSize) {
-        super.init(frame: NSRect(origin: .zero, size: size))
+    // Config-driven values
+    private var activeBorderWidth: CGFloat = 2
+    private var activeBorderColor: NSColor = .systemBlue
+    private var activeGlowRadius: CGFloat = 8
+    private var activeGlowOpacity: CGFloat = 0.6
+    private var inactiveBorderWidth: CGFloat = 1
+    private var inactiveBorderColor: NSColor = NSColor.white.withAlphaComponent(0.4)
+
+    init(frameSize: NSSize, glowPadding: CGFloat) {
+        self.glowPadding = glowPadding
+        super.init(frame: NSRect(origin: .zero, size: frameSize))
         wantsLayer = true
+        layer?.addSublayer(borderLayer)
+        borderLayer.fillColor = nil
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let inset: CGFloat = 2
-        let rect = bounds.insetBy(dx: inset, dy: inset)
-        let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
+    func applyConfig(_ config: ContainerHighlightConfig) {
+        activeBorderWidth = CGFloat(config.activeBorderWidth)
+        activeBorderColor = NSColor.fromHex(config.activeBorderColor) ?? .systemBlue
+        activeGlowRadius = CGFloat(config.activeGlowRadius)
+        activeGlowOpacity = CGFloat(config.activeGlowOpacity)
+        inactiveBorderWidth = CGFloat(config.inactiveBorderWidth)
+        inactiveBorderColor = NSColor.fromHex(config.inactiveBorderColor) ?? NSColor.white.withAlphaComponent(0.4)
+    }
+
+    override func layout() {
+        super.layout()
+        updateGlow()
+    }
+
+    func updateGlow() {
+        let containerRect = bounds.insetBy(dx: glowPadding, dy: glowPadding)
+        let cornerRadius: CGFloat = 8
+        let path = CGPath(roundedRect: containerRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+
+        borderLayer.frame = bounds
+        borderLayer.path = path
+        borderLayer.fillColor = nil
 
         if isFocused {
-            // Glow effect: colored border with shadow
-            NSColor.systemBlue.withAlphaComponent(0.5).setStroke()
-            path.lineWidth = 3
-            path.stroke()
-
-            // Inner glow
-            let glowPath = NSBezierPath(roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: 7, yRadius: 7)
-            NSColor.systemBlue.withAlphaComponent(0.15).setFill()
-            glowPath.fill()
+            borderLayer.strokeColor = activeBorderColor.withAlphaComponent(0.8).cgColor
+            borderLayer.lineWidth = activeBorderWidth
+            borderLayer.shadowColor = activeBorderColor.cgColor
+            borderLayer.shadowRadius = activeGlowRadius
+            borderLayer.shadowOpacity = Float(activeGlowOpacity)
+            borderLayer.shadowOffset = .zero
+            borderLayer.shadowPath = path
         } else {
-            // Subtle border
-            NSColor.white.withAlphaComponent(0.15).setStroke()
-            path.lineWidth = 1
-            path.stroke()
+            borderLayer.strokeColor = inactiveBorderColor.cgColor
+            borderLayer.lineWidth = inactiveBorderWidth
+            borderLayer.shadowColor = nil
+            borderLayer.shadowRadius = 0
+            borderLayer.shadowOpacity = 0
+        }
+    }
+}
+
+// MARK: - Hex Color Parsing
+
+extension NSColor {
+    static func fromHex(_ hex: String) -> NSColor? {
+        var hexStr = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if hexStr.hasPrefix("#") { hexStr.removeFirst() }
+
+        var rgba: UInt64 = 0
+        guard Scanner(string: hexStr).scanHexInt64(&rgba) else { return nil }
+
+        switch hexStr.count {
+        case 6: // RGB
+            return NSColor(
+                red: CGFloat((rgba >> 16) & 0xFF) / 255,
+                green: CGFloat((rgba >> 8) & 0xFF) / 255,
+                blue: CGFloat(rgba & 0xFF) / 255,
+                alpha: 1.0
+            )
+        case 8: // RGBA
+            return NSColor(
+                red: CGFloat((rgba >> 24) & 0xFF) / 255,
+                green: CGFloat((rgba >> 16) & 0xFF) / 255,
+                blue: CGFloat((rgba >> 8) & 0xFF) / 255,
+                alpha: CGFloat(rgba & 0xFF) / 255
+            )
+        default:
+            return nil
         }
     }
 }
