@@ -79,10 +79,10 @@ Work is **NOT done** until the PR is merged into `main`.
    git checkout main && git pull
    ```
 
-5. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
-6. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
-7. **Verify** — PR is merged into `main`, local `main` is up to date, Linear reflects actual state
-8. **Reconcile** - PRD is updated to reconcile with any requirements changes and decisions that were made during the development session
+5. **Reconcile** - PRD is updated to reconcile with any requirements changes and decisions that were made for this issue
+6. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
+7. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
+8. **Verify** — PR is merged into `main`, local `main` is up to date, Linear reflects actual state
 9. **Hand off** — Provide context for next session: what was done, what's next, any blockers
 
 **CRITICAL RULES:**
@@ -104,6 +104,28 @@ When bugs or new requirements are discovered during a session (e.g. from user te
 
 Never fix bugs or implement new work without a corresponding Linear issue. All work must be tracked.
 
+## Linear management
+
+### Needs triage
+
+Some issues will be marked as "Needs triage". You cannot work on these issues without first:
+
+1. List issues with "Needs triage" label
+2. Read issue title and any description
+3. Ask the user to confirm details and remove ambiguity
+4. Pull relevant requirements from PRD
+5. Update the linear issue with a clear description, reproduction steps, and acceptance criteria and verfication/validation criteria
+
+### Unconfirmed
+
+Some issue will be marked as "Unconfirmed". UNLESS the user asks you for help with confirming the issue/bug, DO NOT TOUCH these issue types and never list them as ready for work. If the user asks for help then
+
+1. Read issue title and any description
+2. Ask the user to confirm details and remove ambiguity
+3. Work with the user to investigate and find the root cause
+4. If the user confirms that the issue has been confirmed and it needs fixing then update the linear issue with a clear description, reproduction steps, and acceptance criteria and verfication/validation criteria
+5. End the session and follow hand off procedures.
+
 ## Project documentation
 
 Project documentation is always available in `docs/`. This includes:
@@ -116,3 +138,5 @@ Project documentation is always available in `docs/`. This includes:
 ### Sticking to requirements
 
 **Before beginning work on an issue**, re-read the PRD to verify if the PRD has changed since the issue was created or if the issue does not capture all relevant info from the documentation. If there is missing information, notify the user and offer to update the issue before starting work.
+
+**Before declaring an issue done**, review the work that's been done in for the issue (a session might contain multiple issues - only reconcile per issue), and update the PRD if any of the work has created misalignment between the PRD and the implementation.
