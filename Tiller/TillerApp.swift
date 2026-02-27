@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var orchestrator: AutoTilingOrchestrator?
     private var leaderKeyManager: LeaderKeyManager?
+    private var overlayPanel: LeaderOverlayPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let result = ConfigManager.shared.loadConfiguration()
@@ -72,8 +73,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 break
             }
         }
-        leader.onStateChanged = { state in
+        let overlay = LeaderOverlayPanel(menuState: TillerMenuState.shared)
+        self.overlayPanel = overlay
+
+        leader.onStateChanged = { [weak overlay] state in
             TillerMenuState.shared.leaderState = state
+
+            switch state {
+            case .leaderActive, .subLayerActive:
+                if let monitor = MonitorManager.shared.activeMonitor, overlay?.isVisible != true {
+                    overlay?.show(on: monitor)
+                }
+            case .idle:
+                overlay?.hide()
+            }
         }
         leader.start()
         self.leaderKeyManager = leader
