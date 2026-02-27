@@ -3,26 +3,25 @@
 //  TillerTests
 //
 
-import XCTest
+import CoreGraphics
+import Foundation
+import Testing
 @testable import Tiller
 
-@MainActor
-final class TillerMenuStateTests: XCTestCase {
+struct TillerMenuStateTests {
 
-    private var sut: TillerMenuState!
-    private var orchestrator: AutoTilingOrchestrator!
-    private var mockWindowService: MockWindowService!
-    private var mockMonitorService: MockMonitorService!
-    private var mockLayoutEngine: MockLayoutEngine!
-    private var mockAnimationService: MockWindowAnimationService!
-    private var windowDiscoveryManager: WindowDiscoveryManager!
-    private var monitorManager: MonitorManager!
-    private var configManager: ConfigManager!
-    private var tempDirectory: URL!
+    private let sut: TillerMenuState
+    private let orchestrator: AutoTilingOrchestrator
+    private let mockWindowService: MockWindowService
+    private let mockMonitorService: MockMonitorService
+    private let mockLayoutEngine: MockLayoutEngine
+    private let mockAnimationService: MockWindowAnimationService
+    private let windowDiscoveryManager: WindowDiscoveryManager
+    private let monitorManager: MonitorManager
+    private let configManager: ConfigManager
+    private let tempDirectory: URL
 
-    override func setUp() async throws {
-        try await super.setUp()
-
+    init() throws {
         mockWindowService = MockWindowService()
         mockMonitorService = MockMonitorService()
         mockLayoutEngine = MockLayoutEngine()
@@ -62,63 +61,54 @@ final class TillerMenuStateTests: XCTestCase {
         sut = TillerMenuState(monitorManager: monitorManager)
     }
 
-    override func tearDown() async throws {
-        sut = nil
-        orchestrator = nil
-        if let tempDirectory {
-            try? FileManager.default.removeItem(at: tempDirectory)
-        }
-        try await super.tearDown()
-    }
-
     // MARK: - canToggleTiling
 
-    func testCanToggleTilingFalseBeforeConfigure() {
-        XCTAssertFalse(sut.canToggleTiling)
+    @Test func canToggleTilingFalseBeforeConfigure() {
+        #expect(!sut.canToggleTiling)
     }
 
-    func testCanToggleTilingTrueAfterConfigure() {
+    @Test func canToggleTilingTrueAfterConfigure() {
         sut.configure(orchestrator: orchestrator)
-        XCTAssertTrue(sut.canToggleTiling)
+        #expect(sut.canToggleTiling)
     }
 
     // MARK: - configure
 
-    func testConfigureInitializesMonitorList() {
+    @Test func configureInitializesMonitorList() {
         sut.configure(orchestrator: orchestrator)
 
-        XCTAssertEqual(sut.monitors.count, 1)
-        XCTAssertEqual(sut.monitors.first?.name, "Test Monitor")
+        #expect(sut.monitors.count == 1)
+        #expect(sut.monitors.first?.name == "Test Monitor")
     }
 
-    func testConfigureInitializesActiveMonitor() {
+    @Test func configureInitializesActiveMonitor() {
         monitorManager.startMonitoring()
         sut.configure(orchestrator: orchestrator)
 
-        XCTAssertEqual(sut.activeMonitorID, MonitorID(rawValue: 1))
+        #expect(sut.activeMonitorID == MonitorID(rawValue: 1))
     }
 
-    func testConfigureSetsTilingEnabledFromOrchestrator() {
+    @Test func configureSetsTilingEnabledFromOrchestrator() {
         sut.configure(orchestrator: orchestrator)
-        XCTAssertFalse(sut.isTilingEnabled)
+        #expect(!sut.isTilingEnabled)
     }
 
     // MARK: - toggleTiling
 
-    func testToggleTilingStartsOrchestrator() async {
+    @Test func toggleTilingStartsOrchestrator() async {
         sut.configure(orchestrator: orchestrator)
-        XCTAssertFalse(sut.isTilingEnabled)
+        #expect(!sut.isTilingEnabled)
 
         sut.toggleTiling()
 
         // Wait for the async start() to complete
         try? await Task.sleep(nanoseconds: 100_000_000)
 
-        XCTAssertTrue(sut.isTilingEnabled)
-        XCTAssertTrue(orchestrator.isCurrentlyRunning)
+        #expect(sut.isTilingEnabled)
+        #expect(orchestrator.isCurrentlyRunning)
     }
 
-    func testToggleTilingStopsOrchestrator() async {
+    @Test func toggleTilingStopsOrchestrator() async {
         sut.configure(orchestrator: orchestrator)
 
         // Start first
@@ -127,27 +117,27 @@ final class TillerMenuStateTests: XCTestCase {
 
         sut.toggleTiling()
 
-        XCTAssertFalse(sut.isTilingEnabled)
-        XCTAssertFalse(orchestrator.isCurrentlyRunning)
+        #expect(!sut.isTilingEnabled)
+        #expect(!orchestrator.isCurrentlyRunning)
     }
 
-    func testToggleTilingDoesNothingWithoutConfigure() {
+    @Test func toggleTilingDoesNothingWithoutConfigure() {
         sut.toggleTiling()
-        XCTAssertFalse(sut.isTilingEnabled)
+        #expect(!sut.isTilingEnabled)
     }
 
     // MARK: - Monitor updates
 
     // MARK: - Layout State
 
-    func testConfigureInitializesLayoutState() {
+    @Test func configureInitializesLayoutState() {
         sut.configure(orchestrator: orchestrator)
 
         // Default layout is monocle for the connected monitor
-        XCTAssertEqual(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)], .monocle)
+        #expect(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)] == .monocle)
     }
 
-    func testSwitchLayoutUpdatesState() async {
+    @Test func switchLayoutUpdatesState() async {
         // Need windows for the orchestrator to create monitor state
         let window = MockWindowService.createTestWindow(id: 1, title: "W1", frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         mockWindowService.windows = [window]
@@ -161,10 +151,10 @@ final class TillerMenuStateTests: XCTestCase {
         // Now switch layout
         sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
 
-        XCTAssertEqual(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)], .splitHalves)
+        #expect(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)] == .splitHalves)
     }
 
-    func testLayoutChangeCallbackUpdatesState() async {
+    @Test func layoutChangeCallbackUpdatesState() async {
         let window = MockWindowService.createTestWindow(id: 1, title: "W1", frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         mockWindowService.windows = [window]
         mockLayoutEngine.resultToReturn = LayoutResult(placements: [
@@ -177,27 +167,27 @@ final class TillerMenuStateTests: XCTestCase {
         // Simulate layout change via orchestrator (as if triggered by keyboard)
         orchestrator.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
 
-        XCTAssertEqual(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)], .splitHalves)
+        #expect(sut.activeLayoutPerMonitor[MonitorID(rawValue: 1)] == .splitHalves)
     }
 
-    func testSwitchLayoutDoesNothingWithoutConfigure() {
+    @Test func switchLayoutDoesNothingWithoutConfigure() {
         // Should not crash
         sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
-        XCTAssertTrue(sut.activeLayoutPerMonitor.isEmpty)
+        #expect(sut.activeLayoutPerMonitor.isEmpty)
     }
 
     // MARK: - Status Text
 
-    func testStatusTextDefaultsToMonitor1Idle() {
-        XCTAssertEqual(sut.statusText, "1 | 1 | -")
+    @Test func statusTextDefaultsToMonitor1Idle() {
+        #expect(sut.statusText == "1 | 1 | -")
     }
 
-    func testStatusTextReflectsLeaderActive() {
+    @Test func statusTextReflectsLeaderActive() {
         sut.leaderState = .leaderActive
-        XCTAssertEqual(sut.statusText, "1 | 1 | *")
+        #expect(sut.statusText == "1 | 1 | *")
     }
 
-    func testStatusTextCombinesMonitorAndLeader() {
+    @Test func statusTextCombinesMonitorAndLeader() {
         let secondMonitor = MockMonitorService.createTestMonitor(
             id: 2,
             name: "External Monitor",
@@ -211,22 +201,22 @@ final class TillerMenuStateTests: XCTestCase {
         sut.activeMonitorID = MonitorID(rawValue: 2)
         sut.leaderState = .leaderActive
 
-        XCTAssertEqual(sut.statusText, "2 | 1 | *")
+        #expect(sut.statusText == "2 | 1 | *")
     }
 
-    func testStatusTextDefaultsToMonitor1WhenNoActiveMonitor() {
+    @Test func statusTextDefaultsToMonitor1WhenNoActiveMonitor() {
         sut.activeMonitorID = nil
         sut.leaderState = .leaderActive
-        XCTAssertEqual(sut.statusText, "1 | 1 | *")
+        #expect(sut.statusText == "1 | 1 | *")
     }
 
-    func testStatusTextShowsSubLayerKey() {
+    @Test func statusTextShowsSubLayerKey() {
         sut.configure(orchestrator: orchestrator)
         sut.leaderState = .subLayerActive(key: "m")
-        XCTAssertEqual(sut.statusText, "1 | 1 | m")
+        #expect(sut.statusText == "1 | 1 | m")
     }
 
-    func testStatusTextShowsLayoutNumber() async {
+    @Test func statusTextShowsLayoutNumber() async {
         let window = MockWindowService.createTestWindow(id: 1, title: "W1", frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         mockWindowService.windows = [window]
         mockLayoutEngine.resultToReturn = LayoutResult(placements: [
@@ -239,40 +229,40 @@ final class TillerMenuStateTests: XCTestCase {
 
         sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
 
-        XCTAssertEqual(sut.statusText, "1 | 2 | -")
+        #expect(sut.statusText == "1 | 2 | -")
     }
 
     // MARK: - Config Error Indicator
 
-    func testStatusTextAppendsErrorSuffix() {
+    @Test func statusTextAppendsErrorSuffix() {
         sut.hasConfigError = true
-        XCTAssertEqual(sut.statusText, "1 | 1 | - !")
+        #expect(sut.statusText == "1 | 1 | - !")
     }
 
-    func testStatusTextNormalWhenNoError() {
+    @Test func statusTextNormalWhenNoError() {
         sut.hasConfigError = false
-        XCTAssertEqual(sut.statusText, "1 | 1 | -")
+        #expect(sut.statusText == "1 | 1 | -")
     }
 
-    func testStatusTextErrorWithLeaderActive() {
+    @Test func statusTextErrorWithLeaderActive() {
         sut.hasConfigError = true
         sut.leaderState = .leaderActive
-        XCTAssertEqual(sut.statusText, "1 | 1 | * !")
+        #expect(sut.statusText == "1 | 1 | * !")
     }
 
-    func testConfigErrorTooltipWhenError() {
+    @Test func configErrorTooltipWhenError() {
         sut.hasConfigError = true
         sut.configErrorMessage = "Margin value 999 is out of range (0-20)"
-        XCTAssertEqual(sut.configErrorTooltip, "Margin value 999 is out of range (0-20)")
+        #expect(sut.configErrorTooltip == "Margin value 999 is out of range (0-20)")
     }
 
-    func testConfigErrorTooltipNilWhenNoError() {
+    @Test func configErrorTooltipNilWhenNoError() {
         sut.hasConfigError = false
         sut.configErrorMessage = nil
-        XCTAssertNil(sut.configErrorTooltip)
+        #expect(sut.configErrorTooltip == nil)
     }
 
-    func testConfigureConfigSyncsErrorState() {
+    @Test func configureConfigSyncsErrorState() {
         let errorManager = ConfigManager(
             fileManager: .default,
             basePath: tempDirectory.path,
@@ -288,15 +278,15 @@ final class TillerMenuStateTests: XCTestCase {
 
         sut.configureConfig(manager: errorManager)
 
-        XCTAssertTrue(sut.hasConfigError)
-        XCTAssertNotNil(sut.configErrorMessage)
+        #expect(sut.hasConfigError)
+        #expect(sut.configErrorMessage != nil)
     }
 
     // MARK: - Monitor Updates
 
-    func testMonitorListUpdatesOnChange() {
+    @Test func monitorListUpdatesOnChange() {
         sut.configure(orchestrator: orchestrator)
-        XCTAssertEqual(sut.monitors.count, 1)
+        #expect(sut.monitors.count == 1)
 
         let secondMonitor = MockMonitorService.createTestMonitor(
             id: 2,
@@ -309,7 +299,7 @@ final class TillerMenuStateTests: XCTestCase {
         // Trigger the monitor change callback
         monitorManager.handleScreenConfigurationChange()
 
-        XCTAssertEqual(sut.monitors.count, 2)
-        XCTAssertEqual(sut.monitors.last?.name, "External Monitor")
+        #expect(sut.monitors.count == 2)
+        #expect(sut.monitors.last?.name == "External Monitor")
     }
 }

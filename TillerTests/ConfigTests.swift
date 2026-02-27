@@ -3,28 +3,19 @@
 //  TillerTests
 //
 
-import XCTest
+import Testing
+import Foundation
 @testable import Tiller
 
-@MainActor
-final class ConfigTests: XCTestCase {
-    private var tempDirectory: URL!
-    private var mockNotificationService: MockNotificationService!
+struct ConfigTests {
+    let tempDirectory: URL
+    let mockNotificationService: MockNotificationService
 
-    override func setUp() async throws {
-        try await super.setUp()
+    init() throws {
         tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         mockNotificationService = MockNotificationService()
-    }
-
-    override func tearDown() async throws {
-        if let tempDirectory = tempDirectory {
-            try? FileManager.default.removeItem(at: tempDirectory)
-        }
-        mockNotificationService = nil
-        try await super.tearDown()
     }
 
     private func createConfigManager() -> ConfigManager {
@@ -37,49 +28,49 @@ final class ConfigTests: XCTestCase {
 
     // MARK: - Test 1: Default Config Creation
 
-    func testDefaultConfigCreation() async throws {
+    @Test func defaultConfigCreation() async throws {
         let manager = createConfigManager()
         let result = manager.loadConfiguration()
 
         if case .createdDefault = result {
             let configPath = (tempDirectory.path as NSString)
                 .appendingPathComponent(".config/tiller/config.json")
-            XCTAssertTrue(FileManager.default.fileExists(atPath: configPath))
+            #expect(FileManager.default.fileExists(atPath: configPath))
         } else {
-            XCTFail("Expected createdDefault result, got \(result)")
+            Issue.record("Expected createdDefault result, got \(result)")
         }
     }
 
     // MARK: - Test 2: Default Config Values
 
-    func testDefaultConfigValues() async throws {
+    @Test func defaultConfigValues() async throws {
         let defaultConfig = TillerConfig.default
 
-        XCTAssertEqual(defaultConfig.margin, 8)
-        XCTAssertEqual(defaultConfig.padding, 8)
-        XCTAssertEqual(defaultConfig.accordionOffset, 16)
+        #expect(defaultConfig.margin == 8)
+        #expect(defaultConfig.padding == 8)
+        #expect(defaultConfig.accordionOffset == 16)
         // BetterDisplay is in default floatingApps (overlay utility that can't be positioned)
-        XCTAssertEqual(defaultConfig.floatingApps, ["pro.betterdisplay.BetterDisplay"])
+        #expect(defaultConfig.floatingApps == ["pro.betterdisplay.BetterDisplay"])
     }
 
     // MARK: - Test 3: Config Directory Creation
 
-    func testConfigDirectoryCreation() async throws {
+    @Test func configDirectoryCreation() async throws {
         let manager = createConfigManager()
         _ = manager.loadConfiguration()
 
         let configDir = (tempDirectory.path as NSString)
             .appendingPathComponent(".config/tiller")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: configDir))
+        #expect(FileManager.default.fileExists(atPath: configDir))
 
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: configDir, isDirectory: &isDirectory)
-        XCTAssertTrue(isDirectory.boolValue)
+        #expect(isDirectory.boolValue)
     }
 
     // MARK: - Test 4: Config Loading
 
-    func testConfigLoading() async throws {
+    @Test func configLoading() async throws {
         let manager = createConfigManager()
         let configPath = (tempDirectory.path as NSString)
             .appendingPathComponent(".config/tiller/config.json")
@@ -103,18 +94,18 @@ final class ConfigTests: XCTestCase {
         let result = manager.loadConfiguration()
 
         if case .loaded(let config) = result {
-            XCTAssertEqual(config.margin, 10)
-            XCTAssertEqual(config.padding, 12)
-            XCTAssertEqual(config.accordionOffset, 16)
-            XCTAssertEqual(config.floatingApps, ["Safari", "Finder"])
+            #expect(config.margin == 10)
+            #expect(config.padding == 12)
+            #expect(config.accordionOffset == 16)
+            #expect(config.floatingApps == ["Safari", "Finder"])
         } else {
-            XCTFail("Expected loaded result, got \(result)")
+            Issue.record("Expected loaded result, got \(result)")
         }
     }
 
     // MARK: - Test 5: Config Validation - Valid Config
 
-    func testConfigValidation_ValidConfig() async throws {
+    @Test func configValidation_ValidConfig() async throws {
         let validConfig = TillerConfig(
             margin: 10,
             padding: 15,
@@ -122,13 +113,13 @@ final class ConfigTests: XCTestCase {
             floatingApps: []
         )
 
-        XCTAssertTrue(ConfigValidator.isValid(validConfig))
-        XCTAssertTrue(ConfigValidator.validate(validConfig).isEmpty)
+        #expect(ConfigValidator.isValid(validConfig))
+        #expect(ConfigValidator.validate(validConfig).isEmpty)
     }
 
     // MARK: - Test 6: Config Validation - Invalid Margin
 
-    func testConfigValidation_InvalidMargin() async throws {
+    @Test func configValidation_InvalidMargin() async throws {
         let invalidConfig = TillerConfig(
             margin: 25,
             padding: 8,
@@ -136,15 +127,15 @@ final class ConfigTests: XCTestCase {
             floatingApps: []
         )
 
-        XCTAssertFalse(ConfigValidator.isValid(invalidConfig))
+        #expect(!ConfigValidator.isValid(invalidConfig))
         let errors = ConfigValidator.validate(invalidConfig)
-        XCTAssertEqual(errors.count, 1)
-        XCTAssertEqual(errors.first, .marginOutOfRange(25))
+        #expect(errors.count == 1)
+        #expect(errors.first == .marginOutOfRange(25))
     }
 
     // MARK: - Test 7: Config Validation - Invalid Padding
 
-    func testConfigValidation_InvalidPadding() async throws {
+    @Test func configValidation_InvalidPadding() async throws {
         let invalidConfig = TillerConfig(
             margin: 8,
             padding: -5,
@@ -152,15 +143,15 @@ final class ConfigTests: XCTestCase {
             floatingApps: []
         )
 
-        XCTAssertFalse(ConfigValidator.isValid(invalidConfig))
+        #expect(!ConfigValidator.isValid(invalidConfig))
         let errors = ConfigValidator.validate(invalidConfig)
-        XCTAssertEqual(errors.count, 1)
-        XCTAssertEqual(errors.first, .paddingOutOfRange(-5))
+        #expect(errors.count == 1)
+        #expect(errors.first == .paddingOutOfRange(-5))
     }
 
     // MARK: - Test 8: Config Validation - Invalid Accordion Offset
 
-    func testConfigValidation_InvalidAccordionOffset() async throws {
+    @Test func configValidation_InvalidAccordionOffset() async throws {
         let invalidConfig = TillerConfig(
             margin: 8,
             padding: 8,
@@ -168,15 +159,15 @@ final class ConfigTests: XCTestCase {
             floatingApps: []
         )
 
-        XCTAssertFalse(ConfigValidator.isValid(invalidConfig))
+        #expect(!ConfigValidator.isValid(invalidConfig))
         let errors = ConfigValidator.validate(invalidConfig)
-        XCTAssertEqual(errors.count, 1)
-        XCTAssertEqual(errors.first, .accordionOffsetOutOfRange(2))
+        #expect(errors.count == 1)
+        #expect(errors.first == .accordionOffsetOutOfRange(2))
     }
 
     // MARK: - Test 9: Invalid Config Fallback
 
-    func testInvalidConfigFallback() async throws {
+    @Test func invalidConfigFallback() async throws {
         let manager = createConfigManager()
         let configPath = (tempDirectory.path as NSString)
             .appendingPathComponent(".config/tiller/config.json")
@@ -200,28 +191,28 @@ final class ConfigTests: XCTestCase {
         let result = manager.loadConfiguration()
 
         if case .fallbackToDefault(let config, _) = result {
-            XCTAssertEqual(config, TillerConfig.default)
-            XCTAssertFalse(mockNotificationService.validationErrors.isEmpty)
+            #expect(config == TillerConfig.default)
+            #expect(!mockNotificationService.validationErrors.isEmpty)
         } else {
-            XCTFail("Expected fallbackToDefault result, got \(result)")
+            Issue.record("Expected fallbackToDefault result, got \(result)")
         }
     }
 
     // MARK: - Test 10: Config Singleton Access
 
-    func testConfigSingletonAccess() async throws {
+    @Test func configSingletonAccess() async throws {
         let manager = createConfigManager()
         _ = manager.loadConfiguration()
 
         let config1 = manager.getConfig()
         let config2 = manager.getConfig()
 
-        XCTAssertEqual(config1, config2)
+        #expect(config1 == config2)
     }
 
     // MARK: - Keybinding Decoding
 
-    func testDecodeConfigWithKeybindings() throws {
+    @Test func decodeConfigWithKeybindings() throws {
         let json = """
         {
             "margin": 8, "padding": 8, "accordionOffset": 16,
@@ -237,32 +228,31 @@ final class ConfigTests: XCTestCase {
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
 
-        XCTAssertEqual(config.keybindings.leaderTrigger, ["option", "space"])
-        XCTAssertEqual(config.keybindings.actions.count, 2)
-        XCTAssertEqual(config.keybindings.actions["moveWindow.left"]?.keys, ["j"])
+        #expect(config.keybindings.leaderTrigger == ["option", "space"])
+        #expect(config.keybindings.actions.count == 2)
+        #expect(config.keybindings.actions["moveWindow.left"]?.keys == ["j"])
     }
 
-    func testDecodeConfigWithoutKeybindingsGetsDefaults() throws {
+    @Test func decodeConfigWithoutKeybindingsGetsDefaults() throws {
         let json = """
         { "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
 
-        XCTAssertEqual(config.keybindings, KeybindingsConfig.default)
+        #expect(config.keybindings == KeybindingsConfig.default)
     }
 
-    func testDefaultConfigIncludesKeybindings() {
-        XCTAssertEqual(TillerConfig.default.keybindings, KeybindingsConfig.default)
-        XCTAssertEqual(TillerConfig.default.keybindings.actions.count, 9)
-        XCTAssertNotNil(TillerConfig.default.keybindings.actions["exitLeader"])
+    @Test func defaultConfigIncludesKeybindings() {
+        #expect(TillerConfig.default.keybindings == KeybindingsConfig.default)
+        #expect(TillerConfig.default.keybindings.actions.count == 9)
+        #expect(TillerConfig.default.keybindings.actions["exitLeader"] != nil)
     }
 
     // MARK: - Keybinding Validation
 
-    func testValidationDuplicateKeybinding() {
+    @Test func validationDuplicateKeybinding() {
         var config = TillerConfig.default
         var kb = KeybindingsConfig.default
-        // Make two actions share the same keys in the same layer
         kb.actions["moveWindow.left"] = ActionBinding(keys: ["h"], leaderLayer: true, subLayer: nil, staysInLeader: true)
         kb.actions["focusContainer.left"] = ActionBinding(keys: ["h"], leaderLayer: true, subLayer: nil, staysInLeader: true)
         config.keybindings = kb
@@ -272,10 +262,10 @@ final class ConfigTests: XCTestCase {
             if case .duplicateKeybinding = $0 { return true }
             return false
         }
-        XCTAssertFalse(dupes.isEmpty, "Should detect duplicate keybinding")
+        #expect(!dupes.isEmpty, "Should detect duplicate keybinding")
     }
 
-    func testValidationInvalidKeyName() {
+    @Test func validationInvalidKeyName() {
         var config = TillerConfig.default
         var kb = KeybindingsConfig.default
         kb.actions["moveWindow.left"] = ActionBinding(keys: ["INVALID_KEY"], leaderLayer: true, subLayer: nil, staysInLeader: true)
@@ -286,10 +276,10 @@ final class ConfigTests: XCTestCase {
             if case .invalidKeyName = $0 { return true }
             return false
         }
-        XCTAssertFalse(invalidKeys.isEmpty, "Should detect invalid key name")
+        #expect(!invalidKeys.isEmpty, "Should detect invalid key name")
     }
 
-    func testValidationMissingExitLeader() {
+    @Test func validationMissingExitLeader() {
         var config = TillerConfig.default
         var kb = KeybindingsConfig.default
         kb.actions.removeValue(forKey: "exitLeader")
@@ -300,10 +290,10 @@ final class ConfigTests: XCTestCase {
             if case .missingRequiredAction = $0 { return true }
             return false
         }
-        XCTAssertFalse(missing.isEmpty, "Should require exitLeader action")
+        #expect(!missing.isEmpty, "Should require exitLeader action")
     }
 
-    func testValidationSubLayerOnNonLeader() {
+    @Test func validationSubLayerOnNonLeader() {
         var config = TillerConfig.default
         var kb = KeybindingsConfig.default
         kb.actions["moveWindow.left"] = ActionBinding(keys: ["h"], leaderLayer: false, subLayer: "m", staysInLeader: false)
@@ -314,16 +304,16 @@ final class ConfigTests: XCTestCase {
             if case .subLayerOnNonLeader = $0 { return true }
             return false
         }
-        XCTAssertFalse(subLayerErrors.isEmpty, "Should reject subLayer when leaderLayer is false")
+        #expect(!subLayerErrors.isEmpty, "Should reject subLayer when leaderLayer is false")
     }
 
-    func testValidationDefaultConfigIsValid() {
-        XCTAssertTrue(ConfigValidator.isValid(.default))
+    @Test func validationDefaultConfigIsValid() {
+        #expect(ConfigValidator.isValid(.default))
     }
 
     // MARK: - Reload
 
-    func testReloadValidConfig() async throws {
+    @Test func reloadValidConfig() async throws {
         let manager = createConfigManager()
         manager.loadConfiguration()
 
@@ -335,15 +325,15 @@ final class ConfigTests: XCTestCase {
         let result = manager.reloadConfiguration()
 
         if case .loaded(let config) = result {
-            XCTAssertEqual(config.margin, 10)
-            XCTAssertFalse(manager.hasConfigError)
-            XCTAssertNil(manager.configErrorMessage)
+            #expect(config.margin == 10)
+            #expect(!manager.hasConfigError)
+            #expect(manager.configErrorMessage == nil)
         } else {
-            XCTFail("Expected loaded result, got \(result)")
+            Issue.record("Expected loaded result, got \(result)")
         }
     }
 
-    func testReloadInvalidConfigFallsBack() async throws {
+    @Test func reloadInvalidConfigFallsBack() async throws {
         let manager = createConfigManager()
         manager.loadConfiguration()
 
@@ -355,15 +345,15 @@ final class ConfigTests: XCTestCase {
         let result = manager.reloadConfiguration()
 
         if case .fallbackToDefault = result {
-            XCTAssertTrue(manager.hasConfigError)
-            XCTAssertNotNil(manager.configErrorMessage)
-            XCTAssertEqual(manager.getConfig(), TillerConfig.default)
+            #expect(manager.hasConfigError)
+            #expect(manager.configErrorMessage != nil)
+            #expect(manager.getConfig() == TillerConfig.default)
         } else {
-            XCTFail("Expected fallbackToDefault result, got \(result)")
+            Issue.record("Expected fallbackToDefault result, got \(result)")
         }
     }
 
-    func testReloadCallsOnConfigReloaded() async throws {
+    @Test func reloadCallsOnConfigReloaded() async throws {
         let manager = createConfigManager()
         manager.loadConfiguration()
 
@@ -378,13 +368,13 @@ final class ConfigTests: XCTestCase {
 
         manager.reloadConfiguration()
 
-        XCTAssertNotNil(reloadedConfig)
-        XCTAssertEqual(reloadedConfig?.margin, 5)
+        #expect(reloadedConfig != nil)
+        #expect(reloadedConfig?.margin == 5)
     }
 
     // MARK: - Reset to Defaults
 
-    func testResetToDefaultsClearsError() async throws {
+    @Test func resetToDefaultsClearsError() async throws {
         let manager = createConfigManager()
         manager.loadConfiguration()
 
@@ -393,124 +383,124 @@ final class ConfigTests: XCTestCase {
         let data = try JSONEncoder().encode(invalidConfig)
         try data.write(to: URL(fileURLWithPath: manager.configFilePath))
         manager.reloadConfiguration()
-        XCTAssertTrue(manager.hasConfigError)
+        #expect(manager.hasConfigError)
 
         // Reset
         manager.resetToDefaults()
 
-        XCTAssertFalse(manager.hasConfigError)
-        XCTAssertNil(manager.configErrorMessage)
-        XCTAssertEqual(manager.getConfig(), TillerConfig.default)
+        #expect(!manager.hasConfigError)
+        #expect(manager.configErrorMessage == nil)
+        #expect(manager.getConfig() == TillerConfig.default)
     }
 
     // MARK: - Error Message Formatting
 
-    func testLineNumberCalculation() {
+    @Test func lineNumberCalculation() {
         let json = "{\n  \"margin\": 8,\n  \"bad\": !\n}"
         let data = Data(json.utf8)
 
         // Offset of '!' is at line 3
         let offset = json.distance(from: json.startIndex, to: json.range(of: "!")!.lowerBound)
-        XCTAssertEqual(ConfigManager.lineNumber(in: data, at: offset), 3)
+        #expect(ConfigManager.lineNumber(in: data, at: offset) == 3)
     }
 
     // MARK: - Version Migration
 
-    func testMigrationAddsVersionToPreVersioningConfig() {
+    @Test func migrationAddsVersionToPreVersioningConfig() {
         let json = """
         { "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
 
-        XCTAssertTrue(result.didMigrate)
+        #expect(result.didMigrate)
 
         let migrated = try! JSONSerialization.jsonObject(with: result.data) as! [String: Any]
-        XCTAssertEqual(migrated["version"] as? Int, TillerConfig.currentVersion)
+        #expect(migrated["version"] as? Int == TillerConfig.currentVersion)
     }
 
-    func testMigrationPreservesUserValues() {
+    @Test func migrationPreservesUserValues() {
         let json = """
         { "margin": 12, "padding": 14, "accordionOffset": 20, "leaderTimeout": 10, "floatingApps": ["com.test.app"] }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
 
         let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
-        XCTAssertEqual(config.margin, 12)
-        XCTAssertEqual(config.padding, 14)
-        XCTAssertEqual(config.accordionOffset, 20)
-        XCTAssertEqual(config.leaderTimeout, 10)
-        XCTAssertEqual(config.floatingApps, ["com.test.app"])
+        #expect(config.margin == 12)
+        #expect(config.padding == 14)
+        #expect(config.accordionOffset == 20)
+        #expect(config.leaderTimeout == 10)
+        #expect(config.floatingApps == ["com.test.app"])
     }
 
-    func testMigrationNoOpOnCurrentVersion() {
+    @Test func migrationNoOpOnCurrentVersion() {
         let json = """
         { "version": \(TillerConfig.currentVersion), "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
-        XCTAssertFalse(result.didMigrate)
+        #expect(!result.didMigrate)
     }
 
-    func testMigrationNoOpOnNewerVersion() {
+    @Test func migrationNoOpOnNewerVersion() {
         let json = """
         { "version": 99, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
-        XCTAssertFalse(result.didMigrate)
+        #expect(!result.didMigrate)
     }
 
-    func testMigrationHandlesInvalidJSON() {
+    @Test func migrationHandlesInvalidJSON() {
         let data = Data("not json".utf8)
         let result = ConfigMigrator.migrate(data)
-        XCTAssertFalse(result.didMigrate)
-        XCTAssertEqual(result.data, data)
+        #expect(!result.didMigrate)
+        #expect(result.data == data)
     }
 
-    func testConfigDecodesVersionField() throws {
+    @Test func configDecodesVersionField() throws {
         let json = """
         { "version": \(TillerConfig.currentVersion), "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
-        XCTAssertEqual(config.version, TillerConfig.currentVersion)
+        #expect(config.version == TillerConfig.currentVersion)
     }
 
-    func testConfigMissingVersionDefaultsToZero() throws {
+    @Test func configMissingVersionDefaultsToZero() throws {
         let json = """
         { "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
-        XCTAssertEqual(config.version, 0)
+        #expect(config.version == 0)
     }
 
-    func testDefaultConfigHasCurrentVersion() {
-        XCTAssertEqual(TillerConfig.default.version, TillerConfig.currentVersion)
+    @Test func defaultConfigHasCurrentVersion() {
+        #expect(TillerConfig.default.version == TillerConfig.currentVersion)
     }
 
-    // MARK: - V1→V2 Migration (containerHighlightsEnabled → containerHighlights)
+    // MARK: - V1->V2 Migration (containerHighlightsEnabled -> containerHighlights)
 
-    func testMigrationV1ToV2MovesContainerHighlightsEnabled() {
+    @Test func migrationV1ToV2MovesContainerHighlightsEnabled() {
         let json = """
         { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [], "containerHighlightsEnabled": false }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
-        XCTAssertTrue(result.didMigrate)
+        #expect(result.didMigrate)
 
         let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
-        XCTAssertEqual(config.version, TillerConfig.currentVersion)
-        XCTAssertFalse(config.containerHighlights.enabled)
+        #expect(config.version == TillerConfig.currentVersion)
+        #expect(!config.containerHighlights.enabled)
     }
 
-    func testMigrationV1ToV2DefaultsHighlightsWhenFieldMissing() {
+    @Test func migrationV1ToV2DefaultsHighlightsWhenFieldMissing() {
         let json = """
         { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
-        XCTAssertTrue(result.didMigrate)
+        #expect(result.didMigrate)
 
         let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
-        XCTAssertTrue(config.containerHighlights.enabled) // default is true
+        #expect(config.containerHighlights.enabled) // default is true
     }
 
-    func testContainerHighlightConfigDecoding() throws {
+    @Test func containerHighlightConfigDecoding() throws {
         let json = """
         {
             "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
@@ -527,46 +517,46 @@ final class ConfigTests: XCTestCase {
         }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
-        XCTAssertEqual(config.containerHighlights.activeBorderWidth, 3)
-        XCTAssertEqual(config.containerHighlights.activeBorderColor, "#FF0000")
-        XCTAssertEqual(config.containerHighlights.activeGlowRadius, 12)
-        XCTAssertEqual(config.containerHighlights.activeGlowOpacity, 0.8)
-        XCTAssertEqual(config.containerHighlights.inactiveBorderWidth, 2)
-        XCTAssertEqual(config.containerHighlights.inactiveBorderColor, "#FFFFFF80")
-        XCTAssertEqual(config.containerHighlights.cornerRadius, 10)
+        #expect(config.containerHighlights.activeBorderWidth == 3)
+        #expect(config.containerHighlights.activeBorderColor == "#FF0000")
+        #expect(config.containerHighlights.activeGlowRadius == 12)
+        #expect(config.containerHighlights.activeGlowOpacity == 0.8)
+        #expect(config.containerHighlights.inactiveBorderWidth == 2)
+        #expect(config.containerHighlights.inactiveBorderColor == "#FFFFFF80")
+        #expect(config.containerHighlights.cornerRadius == 10)
     }
 
-    func testContainerHighlightConfigDefaultsWhenMissing() throws {
+    @Test func containerHighlightConfigDefaultsWhenMissing() throws {
         let json = """
         { "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
-        XCTAssertEqual(config.containerHighlights, ContainerHighlightConfig.default)
+        #expect(config.containerHighlights == ContainerHighlightConfig.default)
     }
 
-    func testContainerHighlightValidationRejectsInvalidBorderWidth() {
+    @Test func containerHighlightValidationRejectsInvalidBorderWidth() {
         var config = TillerConfig.default
         config.containerHighlights.activeBorderWidth = 50
         let errors = ConfigValidator.validate(config)
-        XCTAssertTrue(errors.contains(where: {
+        #expect(errors.contains(where: {
             if case .highlightBorderWidthOutOfRange("Active", 50) = $0 { return true }
             return false
         }))
     }
 
-    func testContainerHighlightValidationRejectsInvalidHexColor() {
+    @Test func containerHighlightValidationRejectsInvalidHexColor() {
         var config = TillerConfig.default
         config.containerHighlights.activeBorderColor = "not-a-color"
         let errors = ConfigValidator.validate(config)
-        XCTAssertTrue(errors.contains(where: {
+        #expect(errors.contains(where: {
             if case .invalidHexColor("activeBorderColor", _) = $0 { return true }
             return false
         }))
     }
 
-    // MARK: - V2→V3 Migration (add cornerRadius)
+    // MARK: - V2->V3 Migration (add cornerRadius)
 
-    func testMigrationV2ToV3AddsCornerRadius() {
+    @Test func migrationV2ToV3AddsCornerRadius() {
         let json = """
         {
             "version": 2, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
@@ -578,14 +568,14 @@ final class ConfigTests: XCTestCase {
         }
         """
         let result = ConfigMigrator.migrate(Data(json.utf8))
-        XCTAssertTrue(result.didMigrate)
+        #expect(result.didMigrate)
 
         let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
-        XCTAssertEqual(config.version, TillerConfig.currentVersion)
-        XCTAssertEqual(config.containerHighlights.cornerRadius, 8)
+        #expect(config.version == TillerConfig.currentVersion)
+        #expect(config.containerHighlights.cornerRadius == 8)
     }
 
-    func testCornerRadiusDefaultsWhenMissing() throws {
+    @Test func cornerRadiusDefaultsWhenMissing() throws {
         let json = """
         {
             "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
@@ -593,10 +583,10 @@ final class ConfigTests: XCTestCase {
         }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
-        XCTAssertEqual(config.containerHighlights.cornerRadius, 8)
+        #expect(config.containerHighlights.cornerRadius == 8)
     }
 
-    func testCornerRadiusDecodesCustomValue() throws {
+    @Test func cornerRadiusDecodesCustomValue() throws {
         let json = """
         {
             "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
@@ -604,20 +594,20 @@ final class ConfigTests: XCTestCase {
         }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
-        XCTAssertEqual(config.containerHighlights.cornerRadius, 12)
+        #expect(config.containerHighlights.cornerRadius == 12)
     }
 
-    func testCornerRadiusValidationRejectsOutOfRange() {
+    @Test func cornerRadiusValidationRejectsOutOfRange() {
         var config = TillerConfig.default
         config.containerHighlights.cornerRadius = 25
         let errors = ConfigValidator.validate(config)
-        XCTAssertTrue(errors.contains(where: {
+        #expect(errors.contains(where: {
             if case .highlightCornerRadiusOutOfRange(25) = $0 { return true }
             return false
         }))
     }
 
-    func testMigrationWritesBackToDisk() async throws {
+    @Test func migrationWritesBackToDisk() async throws {
         let manager = createConfigManager()
 
         // Write a pre-versioning config
@@ -632,14 +622,14 @@ final class ConfigTests: XCTestCase {
         // Load triggers migration
         let result = manager.loadConfiguration()
         if case .loaded(let config) = result {
-            XCTAssertEqual(config.version, TillerConfig.currentVersion)
+            #expect(config.version == TillerConfig.currentVersion)
         } else {
-            XCTFail("Expected loaded result, got \(result)")
+            Issue.record("Expected loaded result, got \(result)")
         }
 
         // Verify the file on disk was updated with version
         let diskData = try Data(contentsOf: URL(fileURLWithPath: manager.configFilePath))
         let diskJSON = try JSONSerialization.jsonObject(with: diskData) as! [String: Any]
-        XCTAssertEqual(diskJSON["version"] as? Int, TillerConfig.currentVersion)
+        #expect(diskJSON["version"] as? Int == TillerConfig.currentVersion)
     }
 }

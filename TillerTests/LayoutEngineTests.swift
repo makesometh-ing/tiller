@@ -3,23 +3,18 @@
 //  TillerTests
 //
 
-import XCTest
+import CoreGraphics
+import Testing
 @testable import Tiller
 
-final class LayoutEngineTests: XCTestCase {
+struct LayoutEngineTests {
 
-    var sut: FullscreenLayoutEngine!
+    var sut: FullscreenLayoutEngine
     let containerFrame = CGRect(x: 0, y: 0, width: 1920, height: 1080)
     let defaultAccordionOffset = 50
 
-    override func setUp() {
-        super.setUp()
+    init() {
         sut = FullscreenLayoutEngine()
-    }
-
-    override func tearDown() {
-        sut = nil
-        super.tearDown()
     }
 
     // MARK: - Helper Methods
@@ -46,7 +41,7 @@ final class LayoutEngineTests: XCTestCase {
 
     // MARK: - Empty Input Tests
 
-    func testEmptyWindowsReturnsEmpty() {
+    @Test func emptyWindowsReturnsEmpty() {
         let input = LayoutInput(
             windows: [],
             focusedWindowID: nil,
@@ -57,12 +52,12 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertTrue(result.placements.isEmpty)
+        #expect(result.placements.isEmpty)
     }
 
     // MARK: - Single Window Tests
 
-    func testSingleWindowLayout() {
+    @Test func singleWindowLayout() {
         let window = makeWindow(id: 1)
         let input = LayoutInput(
             windows: [window],
@@ -74,12 +69,12 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements.count, 1)
-        XCTAssertEqual(result.placements[0].windowID, window.id)
-        XCTAssertEqual(result.placements[0].targetFrame, containerFrame)
+        #expect(result.placements.count == 1)
+        #expect(result.placements[0].windowID == window.id)
+        #expect(result.placements[0].targetFrame == containerFrame)
     }
 
-    func testSingleWindowWithNoFocusDefaultsToFirst() {
+    @Test func singleWindowWithNoFocusDefaultsToFirst() {
         let window = makeWindow(id: 1)
         let input = LayoutInput(
             windows: [window],
@@ -91,13 +86,13 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements.count, 1)
-        XCTAssertEqual(result.placements[0].targetFrame, containerFrame)
+        #expect(result.placements.count == 1)
+        #expect(result.placements[0].targetFrame == containerFrame)
     }
 
     // MARK: - Two Window Tests
 
-    func testTwoWindowLayout() {
+    @Test func twoWindowLayout() {
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
         let input = LayoutInput(
@@ -110,28 +105,28 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements.count, 2)
+        #expect(result.placements.count == 2)
 
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
 
         // Both windows have width = container - offset
         let expectedWidth = containerFrame.width - CGFloat(defaultAccordionOffset)
-        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
+        #expect(placement1.targetFrame.width == expectedWidth)
+        #expect(placement2.targetFrame.width == expectedWidth)
 
         // Focused window (window2) is left-aligned at container origin
-        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX)
+        #expect(placement2.targetFrame.origin.x == containerFrame.minX)
 
         // Other window (window1) is offset right, showing strip on right of focused
-        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX + CGFloat(defaultAccordionOffset))
+        #expect(placement1.targetFrame.origin.x == containerFrame.minX + CGFloat(defaultAccordionOffset))
 
         // All windows stay on screen
-        XCTAssertGreaterThanOrEqual(placement1.targetFrame.minX, containerFrame.minX)
-        XCTAssertGreaterThanOrEqual(placement2.targetFrame.minX, containerFrame.minX)
+        #expect(placement1.targetFrame.minX >= containerFrame.minX)
+        #expect(placement2.targetFrame.minX >= containerFrame.minX)
     }
 
-    func testTwoWindowLayoutFocusedFirst() {
+    @Test func twoWindowLayoutFocusedFirst() {
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
         let input = LayoutInput(
@@ -150,17 +145,17 @@ final class LayoutEngineTests: XCTestCase {
         let expectedWidth = containerFrame.width - CGFloat(defaultAccordionOffset)
 
         // Focused window (window1) left-aligned
-        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
-        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
+        #expect(placement1.targetFrame.origin.x == containerFrame.minX)
+        #expect(placement1.targetFrame.width == expectedWidth)
 
         // Other window (window2) offset right
-        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + CGFloat(defaultAccordionOffset))
-        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
+        #expect(placement2.targetFrame.origin.x == containerFrame.minX + CGFloat(defaultAccordionOffset))
+        #expect(placement2.targetFrame.width == expectedWidth)
     }
 
     // MARK: - Three Window Tests
 
-    func testThreeWindowLayout() {
+    @Test func threeWindowLayout() {
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
         let window3 = makeWindow(id: 3)
@@ -174,7 +169,7 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements.count, 3)
+        #expect(result.placements.count == 3)
 
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
@@ -185,28 +180,28 @@ final class LayoutEngineTests: XCTestCase {
         let expectedWidth = containerFrame.width - (2 * offset)
 
         // All windows have same width
-        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement3.targetFrame.width, expectedWidth)
+        #expect(placement1.targetFrame.width == expectedWidth)
+        #expect(placement2.targetFrame.width == expectedWidth)
+        #expect(placement3.targetFrame.width == expectedWidth)
 
         // Previous (window1) at minX
-        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
+        #expect(placement1.targetFrame.origin.x == containerFrame.minX)
 
         // Focused (window2) at minX + offset
-        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + offset)
+        #expect(placement2.targetFrame.origin.x == containerFrame.minX + offset)
 
         // Next (window3) at minX + 2*offset
-        XCTAssertEqual(placement3.targetFrame.origin.x, containerFrame.minX + (2 * offset))
+        #expect(placement3.targetFrame.origin.x == containerFrame.minX + (2 * offset))
 
         // All windows stay on screen
-        XCTAssertGreaterThanOrEqual(placement1.targetFrame.minX, containerFrame.minX)
-        XCTAssertGreaterThanOrEqual(placement2.targetFrame.minX, containerFrame.minX)
-        XCTAssertGreaterThanOrEqual(placement3.targetFrame.minX, containerFrame.minX)
+        #expect(placement1.targetFrame.minX >= containerFrame.minX)
+        #expect(placement2.targetFrame.minX >= containerFrame.minX)
+        #expect(placement3.targetFrame.minX >= containerFrame.minX)
     }
 
     // MARK: - Four+ Window Tests
 
-    func testFourPlusWindowLayout() {
+    @Test func fourPlusWindowLayout() {
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
         let window3 = makeWindow(id: 3)
@@ -222,7 +217,7 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements.count, 5)
+        #expect(result.placements.count == 5)
 
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
@@ -234,37 +229,37 @@ final class LayoutEngineTests: XCTestCase {
         let expectedWidth = containerFrame.width - (2 * offset)
 
         // All windows have same width
-        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement3.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement4.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement5.targetFrame.width, expectedWidth)
+        #expect(placement1.targetFrame.width == expectedWidth)
+        #expect(placement2.targetFrame.width == expectedWidth)
+        #expect(placement3.targetFrame.width == expectedWidth)
+        #expect(placement4.targetFrame.width == expectedWidth)
+        #expect(placement5.targetFrame.width == expectedWidth)
 
         // Previous (window2) at minX
-        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX)
+        #expect(placement2.targetFrame.origin.x == containerFrame.minX)
 
         // Focused (window3) at minX + offset
-        XCTAssertEqual(placement3.targetFrame.origin.x, containerFrame.minX + offset)
+        #expect(placement3.targetFrame.origin.x == containerFrame.minX + offset)
 
         // Next (window4) at minX + 2*offset
-        XCTAssertEqual(placement4.targetFrame.origin.x, containerFrame.minX + (2 * offset))
+        #expect(placement4.targetFrame.origin.x == containerFrame.minX + (2 * offset))
 
         // Others (window1, window5) positioned same as focused (hidden behind)
-        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX + offset)
-        XCTAssertEqual(placement5.targetFrame.origin.x, containerFrame.minX + offset)
+        #expect(placement1.targetFrame.origin.x == containerFrame.minX + offset)
+        #expect(placement5.targetFrame.origin.x == containerFrame.minX + offset)
 
         // CRITICAL: All windows stay ON screen
         for placement in result.placements {
-            XCTAssertGreaterThanOrEqual(placement.targetFrame.minX, containerFrame.minX,
+            #expect(placement.targetFrame.minX >= containerFrame.minX,
                 "Window must not be positioned off-screen left")
-            XCTAssertLessThanOrEqual(placement.targetFrame.maxX, containerFrame.maxX,
+            #expect(placement.targetFrame.maxX <= containerFrame.maxX,
                 "Window must not be positioned off-screen right")
         }
     }
 
     // MARK: - Floating Window Tests
 
-    func testFloatingWindowsExcluded() {
+    @Test func floatingWindowsExcluded() {
         let normalWindow = makeWindow(id: 1, isFloating: false)
         let floatingWindow = makeWindow(id: 2, isFloating: true)
         let input = LayoutInput(
@@ -278,11 +273,11 @@ final class LayoutEngineTests: XCTestCase {
         let result = sut.calculate(input: input)
 
         // Only the non-floating window should be in placements
-        XCTAssertEqual(result.placements.count, 1)
-        XCTAssertEqual(result.placements[0].windowID, normalWindow.id)
+        #expect(result.placements.count == 1)
+        #expect(result.placements[0].windowID == normalWindow.id)
     }
 
-    func testAllFloatingWindowsReturnsEmpty() {
+    @Test func allFloatingWindowsReturnsEmpty() {
         let floating1 = makeWindow(id: 1, isFloating: true)
         let floating2 = makeWindow(id: 2, isFloating: true)
         let input = LayoutInput(
@@ -295,12 +290,12 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertTrue(result.placements.isEmpty)
+        #expect(result.placements.isEmpty)
     }
 
     // MARK: - Non-Resizable Window Tests
 
-    func testNonResizableWindowCenteredWhenFocused() {
+    @Test func nonResizableWindowCenteredWhenFocused() {
         let nonResizableWindow = makeWindow(
             id: 1,
             isResizable: false,
@@ -316,16 +311,16 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements.count, 1)
+        #expect(result.placements.count == 1)
         let placement = result.placements[0]
-        XCTAssertEqual(placement.windowID, nonResizableWindow.id)
+        #expect(placement.windowID == nonResizableWindow.id)
 
-        // Should be centered: (1920 - 400) / 2 = 760, (1080 - 300) / 2 = 390
-        XCTAssertEqual(placement.targetFrame.origin.x, 760)
-        XCTAssertEqual(placement.targetFrame.origin.y, 390)
+        // Should be centered: CGFloat(1920 - 400) / 2 = 760, CGFloat(1080 - 300) / 2 = 390
+        #expect(placement.targetFrame.origin.x == 760)
+        #expect(placement.targetFrame.origin.y == 390)
     }
 
-    func testNonResizableWindowPreservesSize() {
+    @Test func nonResizableWindowPreservesSize() {
         let originalSize = CGSize(width: 500, height: 350)
         let nonResizableWindow = makeWindow(
             id: 1,
@@ -342,13 +337,13 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements.count, 1)
+        #expect(result.placements.count == 1)
         let placement = result.placements[0]
-        XCTAssertEqual(placement.targetFrame.width, originalSize.width)
-        XCTAssertEqual(placement.targetFrame.height, originalSize.height)
+        #expect(placement.targetFrame.width == originalSize.width)
+        #expect(placement.targetFrame.height == originalSize.height)
     }
 
-    func testNonResizableWindowTooLargeIsSkipped() {
+    @Test func nonResizableWindowTooLargeIsSkipped() {
         let oversizedWindow = makeWindow(
             id: 1,
             isResizable: false,
@@ -365,10 +360,10 @@ final class LayoutEngineTests: XCTestCase {
         let result = sut.calculate(input: input)
 
         // Too large for container — no placement (auto-float)
-        XCTAssertTrue(result.placements.isEmpty)
+        #expect(result.placements.isEmpty)
     }
 
-    func testMixedWindowTypes() {
+    @Test func mixedWindowTypes() {
         let resizableWindow = makeWindow(id: 1, isResizable: true)
         let nonResizableWindow = makeWindow(
             id: 2,
@@ -388,7 +383,7 @@ final class LayoutEngineTests: XCTestCase {
         let result = sut.calculate(input: input)
 
         // 2 placements: resizable (tiled) + non-resizable (at ring position). Floating excluded.
-        XCTAssertEqual(result.placements.count, 2)
+        #expect(result.placements.count == 2)
 
         let tiledPlacement = result.placements.first(where: { $0.windowID == resizableWindow.id })!
         let nonResPlacement = result.placements.first(where: { $0.windowID == nonResizableWindow.id })!
@@ -397,23 +392,22 @@ final class LayoutEngineTests: XCTestCase {
         let expectedWidth = containerFrame.width - offset
 
         // Resizable at focused position (left-aligned for 2-window accordion)
-        XCTAssertEqual(tiledPlacement.targetFrame.origin.x, containerFrame.minX)
-        XCTAssertEqual(tiledPlacement.targetFrame.width, expectedWidth)
+        #expect(tiledPlacement.targetFrame.origin.x == containerFrame.minX)
+        #expect(tiledPlacement.targetFrame.width == expectedWidth)
 
         // Non-resizable at "next" ring position with natural size, centered vertically
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX + offset)
-        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
-        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+        #expect(nonResPlacement.targetFrame.origin.x == containerFrame.minX + offset)
+        #expect(nonResPlacement.targetFrame.width == 400)
+        #expect(nonResPlacement.targetFrame.height == 300)
+        #expect(nonResPlacement.targetFrame.origin.y == CGFloat(1080 - 300) / 2)
 
         // Floating window has no placement
-        XCTAssertNil(result.placements.first(where: { $0.windowID == floatingWindow.id }))
+        #expect(result.placements.first(where: { $0.windowID == floatingWindow.id }) == nil)
     }
 
     // MARK: - Non-Resizable Ring Buffer Tests
 
-    func testNonResizableAtPrevPosition() {
-        // Ring: [nonRes(prev), resizable(focused), resizable2(next)]
+    @Test func nonResizableAtPrevPosition() {
         let nonRes = makeWindow(id: 1, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
         let resizable = makeWindow(id: 2)
         let resizable2 = makeWindow(id: 3)
@@ -427,27 +421,24 @@ final class LayoutEngineTests: XCTestCase {
         )
 
         let result = sut.calculate(input: input)
-        XCTAssertEqual(result.placements.count, 3)
+        #expect(result.placements.count == 3)
 
         let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
         let offset = CGFloat(defaultAccordionOffset)
 
-        // Non-resizable at prev position (minX), natural size, centered vertically
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX)
-        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
-        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+        #expect(nonResPlacement.targetFrame.origin.x == containerFrame.minX)
+        #expect(nonResPlacement.targetFrame.width == 400)
+        #expect(nonResPlacement.targetFrame.height == 300)
+        #expect(nonResPlacement.targetFrame.origin.y == CGFloat(1080 - 300) / 2)
 
-        // Resizable windows at their accordion positions with full accordion dimensions
         let focusedPlacement = result.placements.first(where: { $0.windowID == resizable.id })!
         let nextPlacement = result.placements.first(where: { $0.windowID == resizable2.id })!
-        XCTAssertEqual(focusedPlacement.targetFrame.origin.x, containerFrame.minX + offset)
-        XCTAssertEqual(nextPlacement.targetFrame.origin.x, containerFrame.minX + 2 * offset)
-        XCTAssertEqual(focusedPlacement.targetFrame.width, containerFrame.width - 2 * offset)
+        #expect(focusedPlacement.targetFrame.origin.x == containerFrame.minX + offset)
+        #expect(nextPlacement.targetFrame.origin.x == containerFrame.minX + 2 * offset)
+        #expect(focusedPlacement.targetFrame.width == containerFrame.width - 2 * offset)
     }
 
-    func testNonResizableAtNextPosition() {
-        // Ring: [resizable2(prev), resizable(focused), nonRes(next)]
+    @Test func nonResizableAtNextPosition() {
         let resizable2 = makeWindow(id: 1)
         let resizable = makeWindow(id: 2)
         let nonRes = makeWindow(id: 3, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
@@ -461,49 +452,44 @@ final class LayoutEngineTests: XCTestCase {
         )
 
         let result = sut.calculate(input: input)
-        XCTAssertEqual(result.placements.count, 3)
+        #expect(result.placements.count == 3)
 
         let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
         let offset = CGFloat(defaultAccordionOffset)
 
-        // Non-resizable at next position (minX + 2*offset), natural size, centered vertically
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX + 2 * offset)
-        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
-        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
+        #expect(nonResPlacement.targetFrame.origin.x == containerFrame.minX + 2 * offset)
+        #expect(nonResPlacement.targetFrame.width == 400)
+        #expect(nonResPlacement.targetFrame.height == 300)
+        #expect(nonResPlacement.targetFrame.origin.y == CGFloat(1080 - 300) / 2)
     }
 
-    func testFocusedNonResizableCenteredWithFrozenAccordion() {
-        // Non-resizable is actual focus, accordion frozen on resizable
+    @Test func focusedNonResizableCenteredWithFrozenAccordion() {
         let resizable = makeWindow(id: 1)
         let nonRes = makeWindow(id: 2, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
 
         let input = LayoutInput(
             windows: [resizable, nonRes],
-            focusedWindowID: resizable.id,        // accordion frozen on resizable
-            actualFocusedWindowID: nonRes.id,      // user is actually focused on nonRes
+            focusedWindowID: resizable.id,
+            actualFocusedWindowID: nonRes.id,
             containerFrame: containerFrame,
             accordionOffset: defaultAccordionOffset
         )
 
         let result = sut.calculate(input: input)
-        XCTAssertEqual(result.placements.count, 2)
+        #expect(result.placements.count == 2)
 
         let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
         let resPlacement = result.placements.first(where: { $0.windowID == resizable.id })!
 
-        // Non-resizable: centered in container (overlay behavior)
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, (1920 - 400) / 2)
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.y, (1080 - 300) / 2)
-        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
-        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
+        #expect(nonResPlacement.targetFrame.origin.x == CGFloat(1920 - 400) / 2)
+        #expect(nonResPlacement.targetFrame.origin.y == CGFloat(1080 - 300) / 2)
+        #expect(nonResPlacement.targetFrame.width == 400)
+        #expect(nonResPlacement.targetFrame.height == 300)
 
-        // Resizable: at focused accordion position (left-aligned for 2-window)
-        XCTAssertEqual(resPlacement.targetFrame.origin.x, containerFrame.minX)
+        #expect(resPlacement.targetFrame.origin.x == containerFrame.minX)
     }
 
-    func testMultipleNonResizableWindowsInRing() {
-        // Ring: [nonRes1(prev), resizable(focused), nonRes2(next)]
+    @Test func multipleNonResizableWindowsInRing() {
         let nonRes1 = makeWindow(id: 1, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
         let resizable = makeWindow(id: 2)
         let nonRes2 = makeWindow(id: 3, isResizable: false, frame: CGRect(x: 0, y: 0, width: 500, height: 350))
@@ -517,36 +503,31 @@ final class LayoutEngineTests: XCTestCase {
         )
 
         let result = sut.calculate(input: input)
-        XCTAssertEqual(result.placements.count, 3)
+        #expect(result.placements.count == 3)
 
         let offset = CGFloat(defaultAccordionOffset)
         let p1 = result.placements.first(where: { $0.windowID == nonRes1.id })!
         let p2 = result.placements.first(where: { $0.windowID == resizable.id })!
         let p3 = result.placements.first(where: { $0.windowID == nonRes2.id })!
 
-        // nonRes1 at prev (minX), natural size
-        XCTAssertEqual(p1.targetFrame.origin.x, containerFrame.minX)
-        XCTAssertEqual(p1.targetFrame.width, 400)
-        XCTAssertEqual(p1.targetFrame.height, 300)
+        #expect(p1.targetFrame.origin.x == containerFrame.minX)
+        #expect(p1.targetFrame.width == 400)
+        #expect(p1.targetFrame.height == 300)
 
-        // resizable at focused (minX + offset), accordion dimensions
-        XCTAssertEqual(p2.targetFrame.origin.x, containerFrame.minX + offset)
-        XCTAssertEqual(p2.targetFrame.width, containerFrame.width - 2 * offset)
+        #expect(p2.targetFrame.origin.x == containerFrame.minX + offset)
+        #expect(p2.targetFrame.width == containerFrame.width - 2 * offset)
 
-        // nonRes2 at next (minX + 2*offset), natural size
-        XCTAssertEqual(p3.targetFrame.origin.x, containerFrame.minX + 2 * offset)
-        XCTAssertEqual(p3.targetFrame.width, 500)
-        XCTAssertEqual(p3.targetFrame.height, 350)
+        #expect(p3.targetFrame.origin.x == containerFrame.minX + 2 * offset)
+        #expect(p3.targetFrame.width == 500)
+        #expect(p3.targetFrame.height == 350)
     }
 
-    func testNonResizableAtOtherPositionHiddenBehindFocused() {
-        // 4 windows: nonRes at "other" position (not prev/focused/next)
+    @Test func nonResizableAtOtherPositionHiddenBehindFocused() {
         let resizable1 = makeWindow(id: 1)
         let resizable2 = makeWindow(id: 2)
         let resizable3 = makeWindow(id: 3)
         let nonRes = makeWindow(id: 4, isResizable: false, frame: CGRect(x: 0, y: 0, width: 400, height: 300))
 
-        // Ring: [res1(prev), res2(focused), res3(next), nonRes(other)]
         let input = LayoutInput(
             windows: [resizable1, resizable2, resizable3, nonRes],
             focusedWindowID: resizable2.id,
@@ -556,20 +537,19 @@ final class LayoutEngineTests: XCTestCase {
         )
 
         let result = sut.calculate(input: input)
-        XCTAssertEqual(result.placements.count, 4)
+        #expect(result.placements.count == 4)
 
         let offset = CGFloat(defaultAccordionOffset)
         let nonResPlacement = result.placements.first(where: { $0.windowID == nonRes.id })!
 
-        // "Other" position: same X as focused (hidden behind)
-        XCTAssertEqual(nonResPlacement.targetFrame.origin.x, containerFrame.minX + offset)
-        XCTAssertEqual(nonResPlacement.targetFrame.width, 400)
-        XCTAssertEqual(nonResPlacement.targetFrame.height, 300)
+        #expect(nonResPlacement.targetFrame.origin.x == containerFrame.minX + offset)
+        #expect(nonResPlacement.targetFrame.width == 400)
+        #expect(nonResPlacement.targetFrame.height == 300)
     }
 
     // MARK: - Accordion Offset Tests
 
-    func testAccordionOffsetApplication() {
+    @Test func accordionOffsetApplication() {
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
         let window3 = makeWindow(id: 3)
@@ -591,23 +571,17 @@ final class LayoutEngineTests: XCTestCase {
 
         let offset = CGFloat(customOffset)
 
-        // Previous at minX
-        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
+        #expect(placement1.targetFrame.origin.x == containerFrame.minX)
+        #expect(placement2.targetFrame.origin.x == containerFrame.minX + offset)
+        #expect(placement3.targetFrame.origin.x == containerFrame.minX + (2 * offset))
 
-        // Focused at minX + offset
-        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + offset)
-
-        // Next at minX + 2*offset
-        XCTAssertEqual(placement3.targetFrame.origin.x, containerFrame.minX + (2 * offset))
-
-        // Width = container - 2*offset
         let expectedWidth = containerFrame.width - (2 * offset)
-        XCTAssertEqual(placement1.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement2.targetFrame.width, expectedWidth)
-        XCTAssertEqual(placement3.targetFrame.width, expectedWidth)
+        #expect(placement1.targetFrame.width == expectedWidth)
+        #expect(placement2.targetFrame.width == expectedWidth)
+        #expect(placement3.targetFrame.width == expectedWidth)
     }
 
-    func testZeroAccordionOffset() {
+    @Test func zeroAccordionOffset() {
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
         let input = LayoutInput(
@@ -623,16 +597,15 @@ final class LayoutEngineTests: XCTestCase {
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
 
-        // With 0 offset, both windows at same position, full container width
-        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
-        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX)
-        XCTAssertEqual(placement1.targetFrame.width, containerFrame.width)
-        XCTAssertEqual(placement2.targetFrame.width, containerFrame.width)
+        #expect(placement1.targetFrame.origin.x == containerFrame.minX)
+        #expect(placement2.targetFrame.origin.x == containerFrame.minX)
+        #expect(placement1.targetFrame.width == containerFrame.width)
+        #expect(placement2.targetFrame.width == containerFrame.width)
     }
 
     // MARK: - Container Frame Tests
 
-    func testContainerFrameCalculation() {
+    @Test func containerFrameCalculation() {
         let customContainer = CGRect(x: 50, y: 50, width: 1000, height: 800)
         let window = makeWindow(id: 1)
         let input = LayoutInput(
@@ -645,11 +618,10 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements[0].targetFrame, customContainer)
+        #expect(result.placements[0].targetFrame == customContainer)
     }
 
-    func testContainerFrameWithMargins() {
-        // Simulate a container with margins applied
+    @Test func containerFrameWithMargins() {
         let margin: CGFloat = 20
         let screenFrame = CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let containerWithMargins = screenFrame.insetBy(dx: margin, dy: margin)
@@ -665,17 +637,16 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        // Window should fill the margin-adjusted container
-        XCTAssertEqual(result.placements[0].targetFrame, containerWithMargins)
-        XCTAssertEqual(result.placements[0].targetFrame.origin.x, margin)
-        XCTAssertEqual(result.placements[0].targetFrame.origin.y, margin)
-        XCTAssertEqual(result.placements[0].targetFrame.width, screenFrame.width - margin * 2)
-        XCTAssertEqual(result.placements[0].targetFrame.height, screenFrame.height - margin * 2)
+        #expect(result.placements[0].targetFrame == containerWithMargins)
+        #expect(result.placements[0].targetFrame.origin.x == margin)
+        #expect(result.placements[0].targetFrame.origin.y == margin)
+        #expect(result.placements[0].targetFrame.width == screenFrame.width - margin * 2)
+        #expect(result.placements[0].targetFrame.height == screenFrame.height - margin * 2)
     }
 
     // MARK: - PID Passthrough Tests
 
-    func testWindowPlacementIncludesPID() {
+    @Test func windowPlacementIncludesPID() {
         let pid: pid_t = 12345
         let window = makeWindow(id: 1, pid: pid)
         let input = LayoutInput(
@@ -688,12 +659,12 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        XCTAssertEqual(result.placements[0].pid, pid)
+        #expect(result.placements[0].pid == pid)
     }
 
     // MARK: - Focus Edge Cases
 
-    func testFocusedWindowNotInListDefaultsToFirst() {
+    @Test func focusedWindowNotInListDefaultsToFirst() {
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
         let nonExistentFocusID = WindowID(rawValue: 999)
@@ -707,15 +678,14 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        // First window (window1) should be treated as focused (left-aligned)
         let placement1 = result.placements.first(where: { $0.windowID == window1.id })!
         let placement2 = result.placements.first(where: { $0.windowID == window2.id })!
 
-        XCTAssertEqual(placement1.targetFrame.origin.x, containerFrame.minX)
-        XCTAssertEqual(placement2.targetFrame.origin.x, containerFrame.minX + CGFloat(defaultAccordionOffset))
+        #expect(placement1.targetFrame.origin.x == containerFrame.minX)
+        #expect(placement2.targetFrame.origin.x == containerFrame.minX + CGFloat(defaultAccordionOffset))
     }
 
-    func testFocusedFloatingWindowFallsBackToFirstTileable() {
+    @Test func focusedFloatingWindowFallsBackToFirstTileable() {
         let floatingWindow = makeWindow(id: 1, isFloating: true)
         let normalWindow = makeWindow(id: 2, isFloating: false)
         let input = LayoutInput(
@@ -728,9 +698,8 @@ final class LayoutEngineTests: XCTestCase {
 
         let result = sut.calculate(input: input)
 
-        // Normal window should be placed since floating is excluded
-        XCTAssertEqual(result.placements.count, 1)
-        XCTAssertEqual(result.placements[0].windowID, normalWindow.id)
-        XCTAssertEqual(result.placements[0].targetFrame, containerFrame)
+        #expect(result.placements.count == 1)
+        #expect(result.placements[0].windowID == normalWindow.id)
+        #expect(result.placements[0].targetFrame == containerFrame)
     }
 }

@@ -112,12 +112,11 @@ final class MockMonitorService: MonitorServiceProtocol {
     }
 }
 
-@MainActor
 final class MonitorManager {
     static let shared = MonitorManager()
 
     private let monitorService: MonitorServiceProtocol
-    private var notificationObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var notificationObserver: NSObjectProtocol?
     private var _activeMonitor: MonitorInfo?
 
     var onMonitorChange: ((MonitorChangeEvent) -> Void)?

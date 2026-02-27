@@ -3,10 +3,12 @@
 //  TillerTests
 //
 
-import XCTest
+import CoreGraphics
+import Foundation
+import Testing
 @testable import Tiller
 
-final class ContainerTests: XCTestCase {
+struct ContainerTests {
 
     private let defaultFrame = CGRect(x: 0, y: 0, width: 1920, height: 1080)
 
@@ -29,217 +31,217 @@ final class ContainerTests: XCTestCase {
 
     // MARK: - ContainerID Tests
 
-    func testContainerIDEquality() {
-        XCTAssertEqual(ContainerID(rawValue: 1), ContainerID(rawValue: 1))
-        XCTAssertNotEqual(ContainerID(rawValue: 1), ContainerID(rawValue: 2))
+    @Test func containerIDEquality() {
+        #expect(ContainerID(rawValue: 1) == ContainerID(rawValue: 1))
+        #expect(ContainerID(rawValue: 1) != ContainerID(rawValue: 2))
     }
 
-    func testContainerIDHashable() {
+    @Test func containerIDHashable() {
         var dict: [ContainerID: String] = [:]
         dict[ContainerID(rawValue: 0)] = "first"
         dict[ContainerID(rawValue: 1)] = "second"
-        XCTAssertEqual(dict[ContainerID(rawValue: 0)], "first")
-        XCTAssertEqual(dict[ContainerID(rawValue: 1)], "second")
+        #expect(dict[ContainerID(rawValue: 0)] == "first")
+        #expect(dict[ContainerID(rawValue: 1)] == "second")
     }
 
     // MARK: - LayoutID Tests
 
-    func testLayoutIDEquality() {
-        XCTAssertEqual(LayoutID.monocle, LayoutID.monocle)
-        XCTAssertNotEqual(LayoutID.monocle, LayoutID.splitHalves)
+    @Test func layoutIDEquality() {
+        #expect(LayoutID.monocle == LayoutID.monocle)
+        #expect(LayoutID.monocle != LayoutID.splitHalves)
     }
 
-    func testLayoutIDCodableRoundTrip() throws {
+    @Test func layoutIDCodableRoundTrip() throws {
         let original = LayoutID.splitHalves
         let data = try JSONEncoder().encode(original)
         let decoded = try JSONDecoder().decode(LayoutID.self, from: data)
-        XCTAssertEqual(original, decoded)
+        #expect(original == decoded)
     }
 
-    func testLayoutIDCaseIterable() {
-        XCTAssertEqual(LayoutID.allCases, [.monocle, .splitHalves])
+    @Test func layoutIDCaseIterable() {
+        #expect(LayoutID.allCases == [.monocle, .splitHalves])
     }
 
     // MARK: - Container Initialization
 
-    func testEmptyContainerInit() {
+    @Test func emptyContainerInit() {
         let container = makeContainer()
-        XCTAssertTrue(container.windowIDs.isEmpty)
-        XCTAssertNil(container.focusedWindowID)
+        #expect(container.windowIDs.isEmpty)
+        #expect(container.focusedWindowID == nil)
     }
 
-    func testContainerInitWithWindows() {
+    @Test func containerInitWithWindows() {
         let container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 2)
-        XCTAssertEqual(container.windowIDs, [wid(1), wid(2), wid(3)])
-        XCTAssertEqual(container.focusedWindowID, wid(2))
+        #expect(container.windowIDs == [wid(1), wid(2), wid(3)])
+        #expect(container.focusedWindowID == wid(2))
     }
 
     // MARK: - addWindow
 
-    func testAddWindowToEmptyContainerSetsFocus() {
+    @Test func addWindowToEmptyContainerSetsFocus() {
         var container = makeContainer()
         container.addWindow(wid(1))
-        XCTAssertEqual(container.windowIDs, [wid(1)])
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.windowIDs == [wid(1)])
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testAddWindowToNonEmptyDoesNotChangeFocus() {
+    @Test func addWindowToNonEmptyDoesNotChangeFocus() {
         var container = makeContainer(windowIDs: [1], focusedWindowID: 1)
         container.addWindow(wid(2))
-        XCTAssertEqual(container.windowIDs, [wid(1), wid(2)])
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.windowIDs == [wid(1), wid(2)])
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testAddDuplicateWindowIsNoOp() {
+    @Test func addDuplicateWindowIsNoOp() {
         var container = makeContainer(windowIDs: [1, 2], focusedWindowID: 1)
         container.addWindow(wid(1))
-        XCTAssertEqual(container.windowIDs, [wid(1), wid(2)])
+        #expect(container.windowIDs == [wid(1), wid(2)])
     }
 
     // MARK: - removeWindow
 
-    func testRemoveOnlyWindowClearsFocus() {
+    @Test func removeOnlyWindowClearsFocus() {
         var container = makeContainer(windowIDs: [1], focusedWindowID: 1)
         container.removeWindow(wid(1))
-        XCTAssertTrue(container.windowIDs.isEmpty)
-        XCTAssertNil(container.focusedWindowID)
+        #expect(container.windowIDs.isEmpty)
+        #expect(container.focusedWindowID == nil)
     }
 
-    func testRemoveFocusedWindowAdvancesFocus() {
+    @Test func removeFocusedWindowAdvancesFocus() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 1)
         container.removeWindow(wid(1))
-        XCTAssertEqual(container.windowIDs, [wid(2), wid(3)])
-        XCTAssertEqual(container.focusedWindowID, wid(2))
+        #expect(container.windowIDs == [wid(2), wid(3)])
+        #expect(container.focusedWindowID == wid(2))
     }
 
-    func testRemoveFocusedLastWindowWrapsToFirst() {
+    @Test func removeFocusedLastWindowWrapsToFirst() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 3)
         container.removeWindow(wid(3))
-        XCTAssertEqual(container.windowIDs, [wid(1), wid(2)])
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.windowIDs == [wid(1), wid(2)])
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testRemoveNonFocusedWindowPreservesFocus() {
+    @Test func removeNonFocusedWindowPreservesFocus() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 2)
         container.removeWindow(wid(1))
-        XCTAssertEqual(container.windowIDs, [wid(2), wid(3)])
-        XCTAssertEqual(container.focusedWindowID, wid(2))
+        #expect(container.windowIDs == [wid(2), wid(3)])
+        #expect(container.focusedWindowID == wid(2))
     }
 
-    func testRemoveNonExistentWindowIsNoOp() {
+    @Test func removeNonExistentWindowIsNoOp() {
         var container = makeContainer(windowIDs: [1, 2], focusedWindowID: 1)
         container.removeWindow(wid(99))
-        XCTAssertEqual(container.windowIDs, [wid(1), wid(2)])
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.windowIDs == [wid(1), wid(2)])
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testRemoveWindowFromMiddlePreservesOrder() {
+    @Test func removeWindowFromMiddlePreservesOrder() {
         var container = makeContainer(windowIDs: [1, 2, 3, 4], focusedWindowID: 1)
         container.removeWindow(wid(3))
-        XCTAssertEqual(container.windowIDs, [wid(1), wid(2), wid(4)])
+        #expect(container.windowIDs == [wid(1), wid(2), wid(4)])
     }
 
     // MARK: - cycleNext
 
-    func testCycleNextAdvancesFocus() {
+    @Test func cycleNextAdvancesFocus() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 1)
         container.cycleNext()
-        XCTAssertEqual(container.focusedWindowID, wid(2))
+        #expect(container.focusedWindowID == wid(2))
     }
 
-    func testCycleNextWrapsAround() {
+    @Test func cycleNextWrapsAround() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 3)
         container.cycleNext()
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testCycleNextSingleWindowNoOp() {
+    @Test func cycleNextSingleWindowNoOp() {
         var container = makeContainer(windowIDs: [1], focusedWindowID: 1)
         container.cycleNext()
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testCycleNextEmptyContainerNoOp() {
+    @Test func cycleNextEmptyContainerNoOp() {
         var container = makeContainer()
         container.cycleNext()
-        XCTAssertNil(container.focusedWindowID)
+        #expect(container.focusedWindowID == nil)
     }
 
     // MARK: - cyclePrevious
 
-    func testCyclePreviousDecrementsFocus() {
+    @Test func cyclePreviousDecrementsFocus() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 2)
         container.cyclePrevious()
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testCyclePreviousWrapsAround() {
+    @Test func cyclePreviousWrapsAround() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 1)
         container.cyclePrevious()
-        XCTAssertEqual(container.focusedWindowID, wid(3))
+        #expect(container.focusedWindowID == wid(3))
     }
 
-    func testCyclePreviousSingleWindowNoOp() {
+    @Test func cyclePreviousSingleWindowNoOp() {
         var container = makeContainer(windowIDs: [1], focusedWindowID: 1)
         container.cyclePrevious()
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testCyclePreviousEmptyContainerNoOp() {
+    @Test func cyclePreviousEmptyContainerNoOp() {
         var container = makeContainer()
         container.cyclePrevious()
-        XCTAssertNil(container.focusedWindowID)
+        #expect(container.focusedWindowID == nil)
     }
 
     // MARK: - moveFocusedWindow
 
-    func testMoveFocusedWindowReturnsWindowID() {
+    @Test func moveFocusedWindowReturnsWindowID() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 2)
         let moved = container.moveFocusedWindow()
-        XCTAssertEqual(moved, wid(2))
+        #expect(moved == wid(2))
     }
 
-    func testMoveFocusedWindowRemovesFromRing() {
+    @Test func moveFocusedWindowRemovesFromRing() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 2)
         _ = container.moveFocusedWindow()
-        XCTAssertEqual(container.windowIDs, [wid(1), wid(3)])
+        #expect(container.windowIDs == [wid(1), wid(3)])
     }
 
-    func testMoveFocusedWindowAdvancesFocus() {
+    @Test func moveFocusedWindowAdvancesFocus() {
         var container = makeContainer(windowIDs: [1, 2, 3], focusedWindowID: 2)
         _ = container.moveFocusedWindow()
-        XCTAssertEqual(container.focusedWindowID, wid(3))
+        #expect(container.focusedWindowID == wid(3))
     }
 
-    func testMoveFocusedWindowFromEmptyReturnsNil() {
+    @Test func moveFocusedWindowFromEmptyReturnsNil() {
         var container = makeContainer()
         let moved = container.moveFocusedWindow()
-        XCTAssertNil(moved)
+        #expect(moved == nil)
     }
 
-    func testMoveFocusedWindowSingleWindowEmptiesContainer() {
+    @Test func moveFocusedWindowSingleWindowEmptiesContainer() {
         var container = makeContainer(windowIDs: [1], focusedWindowID: 1)
         let moved = container.moveFocusedWindow()
-        XCTAssertEqual(moved, wid(1))
-        XCTAssertTrue(container.windowIDs.isEmpty)
-        XCTAssertNil(container.focusedWindowID)
+        #expect(moved == wid(1))
+        #expect(container.windowIDs.isEmpty)
+        #expect(container.focusedWindowID == nil)
     }
 
     // MARK: - Full Cycle Tests
 
-    func testFullCycleForwardReturnsToStart() {
+    @Test func fullCycleForwardReturnsToStart() {
         var container = makeContainer(windowIDs: [1, 2, 3, 4], focusedWindowID: 1)
         for _ in 0..<4 {
             container.cycleNext()
         }
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.focusedWindowID == wid(1))
     }
 
-    func testFullCycleBackwardReturnsToStart() {
+    @Test func fullCycleBackwardReturnsToStart() {
         var container = makeContainer(windowIDs: [1, 2, 3, 4], focusedWindowID: 1)
         for _ in 0..<4 {
             container.cyclePrevious()
         }
-        XCTAssertEqual(container.focusedWindowID, wid(1))
+        #expect(container.focusedWindowID == wid(1))
     }
 }

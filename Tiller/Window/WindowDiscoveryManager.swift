@@ -5,7 +5,6 @@
 
 import Foundation
 
-@MainActor
 final class WindowDiscoveryManager {
     static let shared = WindowDiscoveryManager()
 

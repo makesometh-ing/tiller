@@ -3,7 +3,7 @@
 //  Tiller
 //
 
-import ApplicationServices
+@preconcurrency import ApplicationServices
 import Foundation
 
 protocol AccessibilityServiceProtocol {
@@ -38,13 +38,12 @@ final class MockAccessibilityService: AccessibilityServiceProtocol {
     }
 }
 
-@MainActor
 final class AccessibilityManager {
     static let shared = AccessibilityManager()
 
     private let accessibilityService: AccessibilityServiceProtocol
     private let notificationService: NotificationServiceProtocol
-    private var pollingTimer: Timer?
+    nonisolated(unsafe) private var pollingTask: Task<Void, Never>?
     private let pollingInterval: TimeInterval
 
     private var _currentStatus: AccessibilityPermissionStatus = .notDetermined
@@ -101,16 +100,19 @@ final class AccessibilityManager {
     func startPolling() {
         stopPolling()
 
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: pollingInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
+        let interval = pollingInterval
+        pollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(interval))
+                guard !Task.isCancelled else { break }
                 self?.checkForPermissionChange()
             }
         }
     }
 
     func stopPolling() {
-        pollingTimer?.invalidate()
-        pollingTimer = nil
+        pollingTask?.cancel()
+        pollingTask = nil
     }
 
     private func checkForPermissionChange() {
@@ -136,6 +138,6 @@ final class AccessibilityManager {
     }
 
     deinit {
-        pollingTimer?.invalidate()
+        pollingTask?.cancel()
     }
 }

@@ -5,11 +5,11 @@
 
 import CoreGraphics
 
-struct ContainerID: Hashable, Equatable, Sendable {
+nonisolated struct ContainerID: Hashable, Equatable, Sendable {
     let rawValue: UInt
 }
 
-enum LayoutID: String, Sendable, Codable, Equatable, Hashable, CaseIterable {
+nonisolated enum LayoutID: String, Sendable, Codable, Equatable, Hashable, CaseIterable {
     case monocle
     case splitHalves
 
@@ -27,7 +27,7 @@ enum LayoutID: String, Sendable, Codable, Equatable, Hashable, CaseIterable {
 
 typealias LayoutDefinition = @Sendable (_ monitorFrame: CGRect, _ margin: Int, _ padding: Int) -> [CGRect]
 
-struct Container: Equatable, Sendable {
+nonisolated struct Container: Equatable, Sendable {
     let id: ContainerID
     private(set) var frame: CGRect
     private(set) var windowIDs: [WindowID]

@@ -6,14 +6,14 @@
 import CoreGraphics
 import Foundation
 
-struct WindowAnimationTarget: Sendable, Equatable {
+nonisolated struct WindowAnimationTarget: Sendable, Equatable {
     let windowID: WindowID
     let pid: pid_t
     let startFrame: CGRect
     let endFrame: CGRect
 }
 
-final class AnimationState: @unchecked Sendable {
+nonisolated final class AnimationState: @unchecked Sendable {
     let targets: [WindowAnimationTarget]
     let startTime: CFTimeInterval
     let duration: CFTimeInterval
@@ -53,7 +53,7 @@ final class AnimationState: @unchecked Sendable {
     }
 }
 
-enum EasingFunction: Sendable {
+nonisolated enum EasingFunction: Sendable {
     case linear
     case easeOutCubic
     case easeInOutCubic
@@ -74,20 +74,20 @@ enum EasingFunction: Sendable {
     }
 }
 
-enum AnimationError: Error, Equatable {
+nonisolated enum AnimationError: Error, Equatable {
     case windowNotFound(WindowID)
     case accessibilityError(Int32)  // AXError raw value
     case windowElementNotFound(WindowID)
     case animationAlreadyInProgress(WindowID)
 }
 
-enum AnimationResult: Equatable {
+nonisolated enum AnimationResult: Equatable {
     case completed
     case cancelled
     case failed(AnimationError)
 }
 
-func interpolateFrame(from: CGRect, to: CGRect, progress: Double) -> CGRect {
+nonisolated func interpolateFrame(from: CGRect, to: CGRect, progress: Double) -> CGRect {
     CGRect(
         x: from.origin.x + (to.origin.x - from.origin.x) * progress,
         y: from.origin.y + (to.origin.y - from.origin.y) * progress,

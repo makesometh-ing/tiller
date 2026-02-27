@@ -5,7 +5,7 @@
 
 import CoreGraphics
 
-struct MonitorTilingState: Equatable, Sendable {
+nonisolated struct MonitorTilingState: Equatable, Sendable {
     let monitorID: MonitorID
     private(set) var activeLayout: LayoutID
     private(set) var containers: [Container]

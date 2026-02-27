@@ -7,7 +7,7 @@ import CoreGraphics
 
 /// Horizontal accordion layout.
 /// All windows same size, overlapping. Focused centered, prev/next offset to show edges.
-final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
+nonisolated final class FullscreenLayoutEngine: LayoutEngineProtocol, Sendable {
 
     func calculate(input: LayoutInput) -> LayoutResult {
         TillerLogger.debug("layout","Received \(input.windows.count) windows, focused=\(input.focusedWindowID?.rawValue ?? 0)")

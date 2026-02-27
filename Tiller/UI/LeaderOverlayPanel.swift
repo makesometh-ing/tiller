@@ -6,7 +6,6 @@
 import AppKit
 import SwiftUI
 
-@MainActor
 final class LeaderOverlayPanel {
 
     private var panel: NSPanel?
@@ -64,8 +63,10 @@ final class LeaderOverlayPanel {
             panel.animator().alphaValue = 0
             panel.animator().setFrame(targetFrame, display: true)
         }, completionHandler: { [weak self] in
-            self?.panel?.orderOut(nil)
-            self?.panel = nil
+            MainActor.assumeIsolated {
+                self?.panel?.orderOut(nil)
+                self?.panel = nil
+            }
         })
     }
 

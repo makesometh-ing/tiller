@@ -5,7 +5,7 @@
 
 import CoreGraphics
 
-struct LayoutInput: Equatable, Sendable {
+nonisolated struct LayoutInput: Equatable, Sendable {
     let windows: [WindowInfo]
     let focusedWindowID: WindowID?
     /// The actually focused window (may differ from focusedWindowID when a non-resizable window
@@ -15,16 +15,16 @@ struct LayoutInput: Equatable, Sendable {
     let accordionOffset: Int
 }
 
-struct WindowPlacement: Equatable, Sendable {
+nonisolated struct WindowPlacement: Equatable, Sendable {
     let windowID: WindowID
     let pid: pid_t
     let targetFrame: CGRect
 }
 
-struct LayoutResult: Equatable, Sendable {
+nonisolated struct LayoutResult: Equatable, Sendable {
     let placements: [WindowPlacement]
 }
 
-protocol LayoutEngineProtocol: Sendable {
+nonisolated protocol LayoutEngineProtocol: Sendable {
     func calculate(input: LayoutInput) -> LayoutResult
 }

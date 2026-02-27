@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var orchestrator: AutoTilingOrchestrator?

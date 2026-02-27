@@ -7,7 +7,7 @@ import Foundation
 
 // MARK: - Container Highlight Config
 
-struct ContainerHighlightConfig: Codable, Equatable, Sendable {
+nonisolated struct ContainerHighlightConfig: Codable, Equatable, Sendable {
     var enabled: Bool
     var activeBorderWidth: Double
     var activeBorderColor: String
@@ -57,14 +57,14 @@ struct ContainerHighlightConfig: Codable, Equatable, Sendable {
 
 // MARK: - Keybinding Types
 
-struct ActionBinding: Codable, Equatable, Sendable {
+nonisolated struct ActionBinding: Codable, Equatable, Sendable {
     var keys: [String]
     var leaderLayer: Bool
     var subLayer: String?
     var staysInLeader: Bool
 }
 
-struct KeybindingsConfig: Codable, Equatable, Sendable {
+nonisolated struct KeybindingsConfig: Codable, Equatable, Sendable {
     var leaderTrigger: [String]
     var actions: [String: ActionBinding]
 
@@ -86,7 +86,7 @@ struct KeybindingsConfig: Codable, Equatable, Sendable {
 
 // MARK: - Config
 
-struct TillerConfig: Codable, Equatable, Sendable {
+nonisolated struct TillerConfig: Codable, Equatable, Sendable {
     static let currentVersion = 3
 
     var version: Int

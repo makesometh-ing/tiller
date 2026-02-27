@@ -8,7 +8,6 @@ import Foundation
 import Observation
 
 @Observable
-@MainActor
 final class TillerMenuState {
 
     static let shared = TillerMenuState(monitorManager: MonitorManager.shared)
