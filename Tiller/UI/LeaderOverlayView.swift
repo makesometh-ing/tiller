@@ -13,6 +13,7 @@ struct LeaderOverlayView: View {
             keybindingHints
             layoutBar
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -44,16 +45,22 @@ struct LeaderOverlayView: View {
     private var layoutBar: some View {
         HStack(spacing: 8) {
             ForEach(LayoutID.allCases, id: \.self) { layout in
-                Text("\(layout.displayNumber)")
-                    .font(.system(size: 12, weight: layout == activeLayout ? .bold : .regular, design: .monospaced))
-                    .foregroundStyle(layout == activeLayout ? .primary : .tertiary)
-                    .frame(width: 20, height: 20)
-                    .background(
-                        layout == activeLayout
-                            ? AnyShapeStyle(.tint.opacity(0.3))
-                            : AnyShapeStyle(.clear)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                let isActive = layout == activeLayout
+                HStack(spacing: 4) {
+                    Text("\(layout.displayNumber)")
+                        .font(.system(size: 12, weight: isActive ? .bold : .regular, design: .monospaced))
+                    Text(layout.displayName)
+                        .font(.system(size: 11, weight: isActive ? .medium : .regular))
+                }
+                .foregroundStyle(isActive ? .primary : .tertiary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(
+                    isActive
+                        ? AnyShapeStyle(.tint.opacity(0.3))
+                        : AnyShapeStyle(.clear)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 4))
             }
         }
     }
