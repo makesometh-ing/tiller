@@ -61,6 +61,7 @@ struct ConfigValidator {
         for c in "abcdefghijklmnopqrstuvwxyz" { keys.insert(String(c)) }
         for c in "0123456789" { keys.insert(String(c)) }
         keys.formUnion(["space", "escape", "tab", "return", "delete", "backspace",
+                        "forward_delete",
                         ",", ".", "-", "=", "/", "\\", "[", "]", ";", "'", "`"])
         for i in 1...12 { keys.insert("f\(i)") }
         return keys

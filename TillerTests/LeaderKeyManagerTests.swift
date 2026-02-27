@@ -488,4 +488,27 @@ struct LeaderKeyManagerTests {
         simulateKeyDown(KeyMapping.keyH)
         #expect(actions.last == .moveWindow(.right))
     }
+
+    // MARK: - Hyper Key Support
+
+    @Test mutating func hyperKeyActivatesLeader() {
+        // Configure hyper key (all 4 modifiers + backspace) as leader trigger
+        var kb = KeybindingsConfig.default
+        kb.leaderTrigger = ["cmd", "ctrl", "shift", "option", "backspace"]
+        sut.updateBindings(from: kb)
+
+        // Simulate keyDown with all 4 modifier flags + backspace key code
+        var rawFlags: UInt64 = 0
+        rawFlags |= 0x100000  // cmd
+        rawFlags |= 0x40000   // ctrl
+        rawFlags |= 0x20000   // shift
+        rawFlags |= 0x80000   // option
+        let flags = CGEventFlags(rawValue: rawFlags)
+        let backspaceKeyCode: UInt16 = 51
+
+        let consumed = sut.handleKeyEvent(keyCode: backspaceKeyCode, flags: flags, eventType: .keyDown)
+
+        #expect(consumed, "Hyper key + backspace should be consumed as leader trigger")
+        #expect(sut.state == .leaderActive, "Hyper key + backspace should activate leader mode")
+    }
 }
