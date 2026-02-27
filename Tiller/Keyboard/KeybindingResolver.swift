@@ -103,6 +103,7 @@ nonisolated struct KeybindingResolver: Sendable {
         case "return": return 36
         case "tab": return 48
         case "delete", "backspace": return 51
+        case "forward_delete", "forwarddelete": return 117
         case "escape": return 53
         case "f1": return 122
         case "f2": return 120

@@ -135,4 +135,59 @@ struct KeybindingResolverTests {
         // Should not resolve in leader layer
         #expect(resolver.resolve(keyCode: KeyMapping.keyH, shift: false) == nil)
     }
+
+    // MARK: - Hyper Key (All 4 Modifiers)
+
+    @Test func hyperKeyLeaderTrigger() {
+        var config = KeybindingsConfig.default
+        config.leaderTrigger = ["cmd", "ctrl", "shift", "option", "backspace"]
+
+        let resolver = KeybindingResolver(config: config)
+
+        // All 4 modifiers: cmd(0x100000) + ctrl(0x40000) + shift(0x20000) + option(0x80000)
+        let hyperFlags: UInt64 = 0x100000 | 0x40000 | 0x20000 | 0x80000
+        let backspaceKeyCode: UInt16 = 51
+
+        #expect(resolver.isLeaderTrigger(keyCode: backspaceKeyCode, flags: hyperFlags))
+    }
+
+    @Test func hyperKeyTriggerWithExtraDeviceBits() {
+        // HyperKey apps may set device-dependent bits alongside modifier flags
+        var config = KeybindingsConfig.default
+        config.leaderTrigger = ["cmd", "ctrl", "shift", "option", "space"]
+
+        let resolver = KeybindingResolver(config: config)
+
+        // Hyper flags plus simulated device-dependent bits (lower 16 bits)
+        let hyperFlags: UInt64 = 0x100000 | 0x40000 | 0x20000 | 0x80000
+        let extraDeviceBits: UInt64 = 0x10F // caps lock + device key masks
+        let flagsWithExtras = hyperFlags | extraDeviceBits
+
+        #expect(resolver.isLeaderTrigger(keyCode: KeyMapping.space, flags: flagsWithExtras),
+                "Hyper key trigger should work even with extra device-dependent flag bits")
+    }
+
+    @Test func hyperKeyDoesNotMatchSubset() {
+        // Only 3 of 4 modifiers should NOT match hyper key trigger
+        var config = KeybindingsConfig.default
+        config.leaderTrigger = ["cmd", "ctrl", "shift", "option", "space"]
+
+        let resolver = KeybindingResolver(config: config)
+
+        // Missing option
+        let threeModFlags: UInt64 = 0x100000 | 0x40000 | 0x20000
+        #expect(!resolver.isLeaderTrigger(keyCode: KeyMapping.space, flags: threeModFlags))
+    }
+
+    // MARK: - Forward Delete Key
+
+    @Test func forwardDeleteKeyCode() {
+        #expect(KeybindingResolver.keyCode(for: "forward_delete") == 117)
+        #expect(KeybindingResolver.keyCode(for: "forwarddelete") == 117)
+    }
+
+    @Test func deleteAndBackspaceKeyCode() {
+        #expect(KeybindingResolver.keyCode(for: "delete") == 51)
+        #expect(KeybindingResolver.keyCode(for: "backspace") == 51)
+    }
 }
