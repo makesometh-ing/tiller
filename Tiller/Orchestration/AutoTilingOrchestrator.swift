@@ -247,7 +247,17 @@ final class AutoTilingOrchestrator {
                 return (monitorID, state, focusedWindowID)
             }
         }
-        TillerLogger.debug("orchestration", "[Action] activeMonitorState: focused window \(focusedWindowID.rawValue) not found in any container. Monitor states: \(monitorStates.map { "\($0.key.rawValue): \($0.value.containers.flatMap { $0.windowIDs }.map { $0.rawValue })" })")
+        // Focused window is stale (hidden/minimized/closed). Fall back to any container's focused window.
+        for (monitorID, state) in monitorStates {
+            if let focusedCID = state.focusedContainerID,
+               let container = state.containers.first(where: { $0.id == focusedCID }),
+               let fallbackWindowID = container.focusedWindowID {
+                lastFocusedWindowID = fallbackWindowID
+                TillerLogger.debug("orchestration", "[Action] activeMonitorState: stale focus \(focusedWindowID.rawValue) → fallback to \(fallbackWindowID.rawValue)")
+                return (monitorID, state, fallbackWindowID)
+            }
+        }
+        TillerLogger.debug("orchestration", "[Action] activeMonitorState: no focused window in any container")
         return nil
     }
 
@@ -579,6 +589,30 @@ final class AutoTilingOrchestrator {
 
             if isNewState {
                 onLayoutChanged?(monitor.id, state.activeLayout)
+            }
+        }
+
+        // Recover from stale lastFocusedWindowID (e.g., window hidden via Cmd+H or minimized).
+        // After the per-monitor loop above, the hidden window has been removed from containers
+        // but lastFocusedWindowID may still point to it, causing activeMonitorState() to fail.
+        if let lastFocused = lastFocusedWindowID,
+           !monitorStates.values.contains(where: { $0.containerForWindow(lastFocused) != nil }) {
+            let liveFocused = windowDiscoveryManager.focusedWindow?.windowID
+            if let live = liveFocused,
+               monitorStates.values.contains(where: { $0.containerForWindow(live) != nil }) {
+                lastFocusedWindowID = live
+                TillerLogger.debug("orchestration", "[Orchestrator] Recovered stale focus → live focused window \(live.rawValue)")
+            } else if let fallback = monitorStates.values
+                .compactMap({ state in
+                    state.focusedContainerID.flatMap { cid in
+                        state.containers.first(where: { $0.id == cid })?.focusedWindowID
+                    }
+                }).first {
+                lastFocusedWindowID = fallback
+                TillerLogger.debug("orchestration", "[Orchestrator] Recovered stale focus → container fallback window \(fallback.rawValue)")
+            } else {
+                lastFocusedWindowID = nil
+                TillerLogger.debug("orchestration", "[Orchestrator] Cleared stale lastFocusedWindowID (no windows in containers)")
             }
         }
 
