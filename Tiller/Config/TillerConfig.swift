@@ -37,6 +37,9 @@ struct KeybindingsConfig: Codable, Equatable, Sendable {
 // MARK: - Config
 
 struct TillerConfig: Codable, Equatable, Sendable {
+    static let currentVersion = 1
+
+    var version: Int
     var margin: Int
     var padding: Int
     var accordionOffset: Int
@@ -46,6 +49,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
     var keybindings: KeybindingsConfig
 
     init(
+        version: Int = Self.currentVersion,
         margin: Int,
         padding: Int,
         accordionOffset: Int,
@@ -54,6 +58,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         logLocation: String? = nil,
         keybindings: KeybindingsConfig = .default
     ) {
+        self.version = version
         self.margin = margin
         self.padding = padding
         self.accordionOffset = accordionOffset
@@ -65,6 +70,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 0
         margin = try container.decode(Int.self, forKey: .margin)
         padding = try container.decode(Int.self, forKey: .padding)
         accordionOffset = try container.decode(Int.self, forKey: .accordionOffset)

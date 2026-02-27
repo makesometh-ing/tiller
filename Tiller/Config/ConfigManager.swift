@@ -144,7 +144,7 @@ final class ConfigManager {
     }
 
     private func loadExistingConfig() -> ConfigLoadResult {
-        let data: Data
+        var data: Data
         do {
             data = try Data(contentsOf: URL(fileURLWithPath: configFilePath))
         } catch {
@@ -152,6 +152,13 @@ final class ConfigManager {
             _config = .default
             setError("Cannot read config file: \(error.localizedDescription)")
             return .fallbackToDefault(.default, reason: configErrorMessage!)
+        }
+
+        // Run migrations on raw JSON before decoding
+        let migration = ConfigMigrator.migrate(data)
+        data = migration.data
+        if migration.didMigrate {
+            try? data.write(to: URL(fileURLWithPath: configFilePath))
         }
 
         do {
