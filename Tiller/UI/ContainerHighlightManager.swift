@@ -114,6 +114,7 @@ private class ContainerHighlightView: NSView {
     private var activeGlowOpacity: CGFloat = 0.6
     private var inactiveBorderWidth: CGFloat = 1
     private var inactiveBorderColor: NSColor = NSColor.white.withAlphaComponent(0.4)
+    private var cornerRadius: CGFloat = 8
 
     init(frameSize: NSSize, glowPadding: CGFloat) {
         self.glowPadding = glowPadding
@@ -131,11 +132,12 @@ private class ContainerHighlightView: NSView {
         activeGlowOpacity = CGFloat(config.activeGlowOpacity)
         inactiveBorderWidth = CGFloat(config.inactiveBorderWidth)
         inactiveBorderColor = NSColor.fromHex(config.inactiveBorderColor) ?? NSColor.white.withAlphaComponent(0.4)
+        cornerRadius = CGFloat(config.cornerRadius)
     }
 
     override func draw(_ dirtyRect: NSRect) {
         let containerRect = bounds.insetBy(dx: glowPadding, dy: glowPadding)
-        let cr: CGFloat = 8
+        let cr = cornerRadius
 
         if isFocused {
             // Glow: concentric strokes expanding outward with fading opacity
