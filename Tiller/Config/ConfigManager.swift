@@ -174,6 +174,13 @@ final class ConfigManager {
                 return .fallbackToDefault(.default, reason: configErrorMessage!)
             }
 
+            // Re-encode to fill in any fields populated by decodeIfPresent defaults
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            if let normalized = try? encoder.encode(config), normalized != data {
+                try? normalized.write(to: URL(fileURLWithPath: configFilePath))
+            }
+
             _config = config
             return .loaded(config)
         } catch {

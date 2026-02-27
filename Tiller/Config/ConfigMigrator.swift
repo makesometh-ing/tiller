@@ -70,18 +70,20 @@ enum ConfigMigrator {
     }
 
     private static func migrateV1toV2(_ json: [String: Any]) -> [String: Any] {
-        // v1→v2: Move `containerHighlightsEnabled` bool into `containerHighlights` struct.
+        // v1→v2: Replace `containerHighlightsEnabled` with full `containerHighlights` struct.
         var result = json
-        var highlights: [String: Any] = [:]
+        let wasEnabled = result.removeValue(forKey: "containerHighlightsEnabled") as? Bool ?? true
+        let defaults = ContainerHighlightConfig.default
 
-        if let enabled = result.removeValue(forKey: "containerHighlightsEnabled") as? Bool {
-            highlights["enabled"] = enabled
-        }
-
-        // Only add the struct if we migrated a field; otherwise defaults apply at decode time
-        if !highlights.isEmpty {
-            result["containerHighlights"] = highlights
-        }
+        result["containerHighlights"] = [
+            "enabled": wasEnabled,
+            "activeBorderWidth": defaults.activeBorderWidth,
+            "activeBorderColor": defaults.activeBorderColor,
+            "activeGlowRadius": defaults.activeGlowRadius,
+            "activeGlowOpacity": defaults.activeGlowOpacity,
+            "inactiveBorderWidth": defaults.inactiveBorderWidth,
+            "inactiveBorderColor": defaults.inactiveBorderColor,
+        ] as [String: Any]
 
         return result
     }
