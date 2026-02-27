@@ -140,7 +140,9 @@ struct MonitorTilingState: Equatable, Sendable {
     }
 
     /// Moves a specific window to the adjacent container in `direction`.
-    /// Focus stays on the source container. No-op at boundaries or with a single container.
+    /// Focus stays on the source container so the user can keep sending windows.
+    /// If the source container empties, focus follows to the destination.
+    /// No-op at boundaries or with a single container.
     mutating func moveWindow(from windowID: WindowID, direction: MoveDirection) {
         guard let srcIdx = containers.firstIndex(where: { $0.windowIDs.contains(windowID) }) else { return }
         let dstIdx: Int
@@ -152,6 +154,9 @@ struct MonitorTilingState: Equatable, Sendable {
         guard containers.indices.contains(dstIdx) else { return }
         containers[srcIdx].removeWindow(windowID)
         containers[dstIdx].addWindow(windowID)
+        if containers[srcIdx].windowIDs.isEmpty {
+            focusedContainerID = containers[dstIdx].id
+        }
     }
 
     /// Changes the focused container without moving any window.

@@ -535,10 +535,10 @@ final class MonitorTilingStateTests: XCTestCase {
 
         state.moveWindow(from: wid(1), direction: .right)
 
-        // Left container becomes empty, focus stays on source
+        // Left container becomes empty, focus follows to destination
         XCTAssertTrue(state.containers[0].windowIDs.isEmpty)
         XCTAssertEqual(state.containers[1].windowIDs, [wid(2), wid(1)])
-        XCTAssertEqual(state.focusedContainerID, left.id)
+        XCTAssertEqual(state.focusedContainerID, right.id)
     }
 
     func testMoveWindowMovesSpecificWindowNotContainerFocus() {
