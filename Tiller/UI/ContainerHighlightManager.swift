@@ -138,32 +138,23 @@ private class ContainerHighlightView: NSView {
         let cr: CGFloat = 8
 
         if isFocused {
-            // Clip to EXTERIOR only — prevents glow from filling the container interior
-            NSGraphicsContext.saveGraphicsState()
-            let clipOuter = NSBezierPath(rect: bounds)
-            let clipInner = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
-            clipOuter.append(clipInner)
-            clipOuter.windingRule = .evenOdd
-            clipOuter.addClip()
+            // Glow: concentric strokes expanding outward with fading opacity
+            let steps = Int(activeGlowRadius)
+            for i in stride(from: steps, through: 1, by: -1) {
+                let offset = CGFloat(i)
+                let glowRect = containerRect.insetBy(dx: -offset, dy: -offset)
+                let glowPath = NSBezierPath(roundedRect: glowRect, xRadius: cr + offset, yRadius: cr + offset)
+                let alpha = activeGlowOpacity * (1.0 - offset / (activeGlowRadius + 1))
+                activeBorderColor.withAlphaComponent(alpha).setStroke()
+                glowPath.lineWidth = 2
+                glowPath.stroke()
+            }
 
-            // Draw border with NSShadow → shadow only renders outside (clipped)
-            let shadow = NSShadow()
-            shadow.shadowColor = activeBorderColor.withAlphaComponent(activeGlowOpacity)
-            shadow.shadowBlurRadius = activeGlowRadius
-            shadow.shadowOffset = .zero
-            shadow.set()
-
-            activeBorderColor.withAlphaComponent(0.8).setStroke()
-            let path = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
-            path.lineWidth = activeBorderWidth
-            path.stroke()
-            NSGraphicsContext.restoreGraphicsState()
-
-            // Redraw border without shadow (clean, no clipping)
-            activeBorderColor.withAlphaComponent(0.8).setStroke()
-            let cleanBorder = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
-            cleanBorder.lineWidth = activeBorderWidth
-            cleanBorder.stroke()
+            // Solid border
+            activeBorderColor.withAlphaComponent(0.9).setStroke()
+            let borderPath = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
+            borderPath.lineWidth = activeBorderWidth
+            borderPath.stroke()
         } else {
             inactiveBorderColor.setStroke()
             let path = NSBezierPath(roundedRect: containerRect, xRadius: cr, yRadius: cr)
