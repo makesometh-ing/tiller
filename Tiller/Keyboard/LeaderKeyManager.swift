@@ -3,12 +3,12 @@
 //  Tiller
 //
 
-import CoreGraphics
+@preconcurrency import CoreGraphics
 import Foundation
 
 // MARK: - State
 
-enum LeaderState: Equatable, Sendable {
+nonisolated enum LeaderState: Equatable, Sendable {
     case idle
     case leaderActive
     case subLayerActive(key: String)
@@ -16,7 +16,7 @@ enum LeaderState: Equatable, Sendable {
 
 // MARK: - Key Mapping (static key codes for tests)
 
-enum KeyMapping {
+nonisolated enum KeyMapping {
     static let space: UInt16 = 49
     static let escape: UInt16 = 53
     static let key1: UInt16 = 18
@@ -47,7 +47,6 @@ enum KeyMapping {
 
 // MARK: - LeaderKeyManager
 
-@MainActor
 final class LeaderKeyManager {
 
     private(set) var state: LeaderState = .idle
@@ -56,8 +55,8 @@ final class LeaderKeyManager {
 
     private let configManager: ConfigManager
     private var resolver: KeybindingResolver
-    private var eventTap: CFMachPort?
-    private var runLoopSource: CFRunLoopSource?
+    nonisolated(unsafe) private var eventTap: CFMachPort?
+    nonisolated(unsafe) private var runLoopSource: CFRunLoopSource?
     private var timeoutTask: Task<Void, Never>?
 
     init(configManager: ConfigManager) {
@@ -227,22 +226,23 @@ final class LeaderKeyManager {
     private static let eventTapCallback: CGEventTapCallBack = { _, eventType, event, userInfo in
         guard let userInfo else { return Unmanaged.passUnretained(event) }
         let manager = Unmanaged<LeaderKeyManager>.fromOpaque(userInfo).takeUnretainedValue()
+        return MainActor.assumeIsolated {
+            if eventType == .tapDisabledByUserInput || eventType == .tapDisabledByTimeout {
+                if let tap = manager.eventTap {
+                    CGEvent.tapEnable(tap: tap, enable: true)
+                }
+                return Unmanaged.passUnretained(event)
+            }
 
-        if eventType == .tapDisabledByUserInput || eventType == .tapDisabledByTimeout {
-            if let tap = manager.eventTap {
-                CGEvent.tapEnable(tap: tap, enable: true)
+            let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
+            let flags = event.flags
+
+            let consumed = manager.handleKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType)
+
+            if consumed {
+                return nil
             }
             return Unmanaged.passUnretained(event)
         }
-
-        let keyCode = UInt16(event.getIntegerValueField(.keyboardEventKeycode))
-        let flags = event.flags
-
-        let consumed = manager.handleKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType)
-
-        if consumed {
-            return nil
-        }
-        return Unmanaged.passUnretained(event)
     }
 }

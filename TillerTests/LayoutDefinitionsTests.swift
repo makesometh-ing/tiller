@@ -3,10 +3,11 @@
 //  TillerTests
 //
 
-import XCTest
+import CoreGraphics
+import Testing
 @testable import Tiller
 
-final class LayoutDefinitionsTests: XCTestCase {
+struct LayoutDefinitionsTests {
 
     // Standard 1080p monitor at origin
     let standardFrame = CGRect(x: 0, y: 0, width: 1920, height: 1080)
@@ -15,32 +16,32 @@ final class LayoutDefinitionsTests: XCTestCase {
 
     // MARK: - Monocle Tests
 
-    func testMonocleReturnsSingleFrame() {
+    @Test func monocleReturnsSingleFrame() {
         let frames = LayoutDefinitions.containerFrames(
             for: .monocle, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames.count, 1)
+        #expect(frames.count == 1)
     }
 
-    func testMonocleMatchesInsetByMargin() {
+    @Test func monocleMatchesInsetByMargin() {
         let frames = LayoutDefinitions.containerFrames(
             for: .monocle, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
         let expected = standardFrame.insetBy(dx: defaultMargin, dy: defaultMargin)
-        XCTAssertEqual(frames[0], expected)
+        #expect(frames[0] == expected)
     }
 
-    func testMonocleZeroMargin() {
+    @Test func monocleZeroMargin() {
         let frames = LayoutDefinitions.containerFrames(
             for: .monocle, in: standardFrame,
             margin: 0, padding: 0
         )
-        XCTAssertEqual(frames[0], standardFrame)
+        #expect(frames[0] == standardFrame)
     }
 
-    func testMonocleVariousMonitorSizes() {
+    @Test func monocleVariousMonitorSizes() {
         let sizes: [CGRect] = [
             CGRect(x: 0, y: 0, width: 2560, height: 1440),  // QHD
             CGRect(x: 0, y: 0, width: 3840, height: 2160),  // 4K
@@ -52,115 +53,115 @@ final class LayoutDefinitionsTests: XCTestCase {
                 for: .monocle, in: monitor,
                 margin: defaultMargin, padding: defaultPadding
             )
-            XCTAssertEqual(frames[0], monitor.insetBy(dx: defaultMargin, dy: defaultMargin))
+            #expect(frames[0] == monitor.insetBy(dx: defaultMargin, dy: defaultMargin))
         }
     }
 
-    func testMonocleWithNonZeroOrigin() {
+    @Test func monocleWithNonZeroOrigin() {
         let monitor = CGRect(x: 1920, y: 0, width: 1920, height: 1080)
         let frames = LayoutDefinitions.containerFrames(
             for: .monocle, in: monitor,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames[0], monitor.insetBy(dx: defaultMargin, dy: defaultMargin))
+        #expect(frames[0] == monitor.insetBy(dx: defaultMargin, dy: defaultMargin))
     }
 
     // MARK: - Split Halves Tests
 
-    func testSplitHalvesReturnsTwoFrames() {
+    @Test func splitHalvesReturnsTwoFrames() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames.count, 2)
+        #expect(frames.count == 2)
     }
 
-    func testSplitHalvesLeftStartsAtMargin() {
+    @Test func splitHalvesLeftStartsAtMargin() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames[0].minX, defaultMargin, accuracy: 0.001)
+        #expect(abs(frames[0].minX - defaultMargin) <= 0.001)
     }
 
-    func testSplitHalvesRightEndsAtMonitorWidthMinusMargin() {
+    @Test func splitHalvesRightEndsAtMonitorWidthMinusMargin() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames[1].maxX, standardFrame.width - defaultMargin, accuracy: 0.001)
+        #expect(abs(frames[1].maxX - (standardFrame.width - defaultMargin)) <= 0.001)
     }
 
-    func testSplitHalvesPaddingBetweenContainers() {
+    @Test func splitHalvesPaddingBetweenContainers() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
         let gap = frames[1].minX - frames[0].maxX
-        XCTAssertEqual(gap, defaultPadding, accuracy: 0.001)
+        #expect(abs(gap - defaultPadding) <= 0.001)
     }
 
-    func testSplitHalvesEqualWidths() {
+    @Test func splitHalvesEqualWidths() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames[0].width, frames[1].width, accuracy: 0.001)
+        #expect(abs(frames[0].width - frames[1].width) <= 0.001)
     }
 
-    func testSplitHalvesEqualHeight() {
+    @Test func splitHalvesEqualHeight() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: defaultMargin, padding: defaultPadding
         )
         let expectedHeight = standardFrame.height - 2 * defaultMargin
-        XCTAssertEqual(frames[0].height, expectedHeight, accuracy: 0.001)
-        XCTAssertEqual(frames[1].height, expectedHeight, accuracy: 0.001)
+        #expect(abs(frames[0].height - expectedHeight) <= 0.001)
+        #expect(abs(frames[1].height - expectedHeight) <= 0.001)
     }
 
-    func testSplitHalvesZeroPadding() {
+    @Test func splitHalvesZeroPadding() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: defaultMargin, padding: 0
         )
         // Containers should be flush
-        XCTAssertEqual(frames[0].maxX, frames[1].minX, accuracy: 0.001)
+        #expect(abs(frames[0].maxX - frames[1].minX) <= 0.001)
     }
 
-    func testSplitHalvesZeroMargin() {
+    @Test func splitHalvesZeroMargin() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: 0, padding: defaultPadding
         )
-        XCTAssertEqual(frames[0].minX, 0, accuracy: 0.001)
-        XCTAssertEqual(frames[1].maxX, standardFrame.width, accuracy: 0.001)
-        XCTAssertEqual(frames[0].height, standardFrame.height, accuracy: 0.001)
+        #expect(abs(frames[0].minX - 0) <= 0.001)
+        #expect(abs(frames[1].maxX - standardFrame.width) <= 0.001)
+        #expect(abs(frames[0].height - standardFrame.height) <= 0.001)
     }
 
-    func testSplitHalvesZeroMarginAndPadding() {
+    @Test func splitHalvesZeroMarginAndPadding() {
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: standardFrame,
             margin: 0, padding: 0
         )
-        XCTAssertEqual(frames[0].minX, 0, accuracy: 0.001)
-        XCTAssertEqual(frames[0].width, standardFrame.width / 2, accuracy: 0.001)
-        XCTAssertEqual(frames[1].minX, standardFrame.width / 2, accuracy: 0.001)
-        XCTAssertEqual(frames[1].maxX, standardFrame.width, accuracy: 0.001)
+        #expect(abs(frames[0].minX - 0) <= 0.001)
+        #expect(abs(frames[0].width - standardFrame.width / 2) <= 0.001)
+        #expect(abs(frames[1].minX - standardFrame.width / 2) <= 0.001)
+        #expect(abs(frames[1].maxX - standardFrame.width) <= 0.001)
     }
 
-    func testSplitHalvesWithNonZeroOrigin() {
+    @Test func splitHalvesWithNonZeroOrigin() {
         let monitor = CGRect(x: 1920, y: 0, width: 1920, height: 1080)
         let frames = LayoutDefinitions.containerFrames(
             for: .splitHalves, in: monitor,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames[0].minX, monitor.minX + defaultMargin, accuracy: 0.001)
-        XCTAssertEqual(frames[1].maxX, monitor.maxX - defaultMargin, accuracy: 0.001)
+        #expect(abs(frames[0].minX - (monitor.minX + defaultMargin)) <= 0.001)
+        #expect(abs(frames[1].maxX - (monitor.maxX - defaultMargin)) <= 0.001)
     }
 
     // MARK: - Edge Cases
 
-    func testSplitHalvesVeryNarrowMonitor() {
+    @Test func splitHalvesVeryNarrowMonitor() {
         // Monitor narrower than 2*margin + padding — widths will be negative,
         // but the function should not crash
         let narrow = CGRect(x: 0, y: 0, width: 20, height: 1080)
@@ -168,7 +169,7 @@ final class LayoutDefinitionsTests: XCTestCase {
             for: .splitHalves, in: narrow,
             margin: defaultMargin, padding: defaultPadding
         )
-        XCTAssertEqual(frames.count, 2)
+        #expect(frames.count == 2)
         // Widths will be negative — caller is responsible for clamping
     }
 }

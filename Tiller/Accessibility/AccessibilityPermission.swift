@@ -5,13 +5,13 @@
 
 import Foundation
 
-enum AccessibilityPermissionStatus: Equatable, Sendable {
+nonisolated enum AccessibilityPermissionStatus: Equatable, Sendable {
     case granted
     case denied
     case notDetermined
 }
 
-enum AccessibilityCheckResult: Equatable, Sendable {
+nonisolated enum AccessibilityCheckResult: Equatable, Sendable {
     case permissionGranted
     case permissionDenied
     case promptShown

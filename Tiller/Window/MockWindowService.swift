@@ -104,21 +104,18 @@ final class MockWindowService: WindowServiceProtocol {
         }
     }
 
-    // MARK: - Synchronous Simulation Methods (for @MainActor test contexts)
+    // MARK: - Synchronous Simulation Methods
 
-    @MainActor
     func simulateWindowOpenSync(_ window: WindowInfo) {
         windows.append(window)
         eventCallback?(.windowOpened(window))
     }
 
-    @MainActor
     func simulateWindowCloseSync(_ id: WindowID) {
         windows.removeAll { $0.id == id }
         eventCallback?(.windowClosed(id))
     }
 
-    @MainActor
     func simulateWindowFocusSync(_ id: WindowID) {
         if let window = windows.first(where: { $0.id == id }) {
             focusedWindow = FocusedWindowInfo(
@@ -130,7 +127,6 @@ final class MockWindowService: WindowServiceProtocol {
         }
     }
 
-    @MainActor
     func simulateWindowMoveSync(_ id: WindowID, newFrame: CGRect) {
         if let index = windows.firstIndex(where: { $0.id == id }) {
             let oldWindow = windows[index]
@@ -149,7 +145,6 @@ final class MockWindowService: WindowServiceProtocol {
         }
     }
 
-    @MainActor
     func simulateWindowResizeSync(_ id: WindowID, newFrame: CGRect) {
         if let index = windows.firstIndex(where: { $0.id == id }) {
             let oldWindow = windows[index]

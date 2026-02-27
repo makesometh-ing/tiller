@@ -7,7 +7,6 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-@MainActor
 final class AutoTilingOrchestrator {
 
     // MARK: - Dependencies
@@ -148,10 +147,12 @@ final class AutoTilingOrchestrator {
     // MARK: - Window/Container Operations
 
     func cycleWindow(direction: CycleDirection) {
-        guard var (monitorID, state, windowID) = activeMonitorState() else {
+        guard let result = activeMonitorState() else {
             TillerLogger.debug("orchestration", "[Action] cycleWindow failed: activeMonitorState() returned nil")
             return
         }
+        let (monitorID, windowID) = (result.0, result.2)
+        var state = result.1
         state.cycleWindow(direction: direction, windowID: windowID)
         monitorStates[monitorID] = state
 
@@ -164,10 +165,12 @@ final class AutoTilingOrchestrator {
     }
 
     func moveWindowToContainer(direction: MoveDirection) {
-        guard var (monitorID, state, windowID) = activeMonitorState() else {
+        guard let result = activeMonitorState() else {
             TillerLogger.debug("orchestration", "[Action] moveWindow failed: activeMonitorState() returned nil")
             return
         }
+        let (monitorID, windowID) = (result.0, result.2)
+        var state = result.1
         state.moveWindow(from: windowID, direction: direction)
         monitorStates[monitorID] = state
 
@@ -190,10 +193,12 @@ final class AutoTilingOrchestrator {
     }
 
     func focusContainer(direction: MoveDirection) {
-        guard var (monitorID, state, _) = activeMonitorState() else {
+        guard let result = activeMonitorState() else {
             TillerLogger.debug("orchestration", "[Action] focusContainer failed: activeMonitorState() returned nil")
             return
         }
+        let monitorID = result.0
+        var state = result.1
         let previousFocusedCID = state.focusedContainerID
         state.setFocusedContainer(direction: direction)
         monitorStates[monitorID] = state
@@ -658,12 +663,12 @@ final class AutoTilingOrchestrator {
 
 // MARK: - Direction Types
 
-enum CycleDirection: Sendable {
+nonisolated enum CycleDirection: Sendable {
     case next
     case previous
 }
 
-enum MoveDirection: Sendable {
+nonisolated enum MoveDirection: Sendable {
     case left
     case right
     case up

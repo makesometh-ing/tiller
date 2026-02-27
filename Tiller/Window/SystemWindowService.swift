@@ -8,7 +8,7 @@ import ApplicationServices
 import Foundation
 
 @_silgen_name("_AXUIElementGetWindow")
-private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
+nonisolated private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
 
 final class SystemWindowService: WindowServiceProtocol {
     private var observerCallback: (@MainActor (WindowChangeEvent) -> Void)?
@@ -315,7 +315,10 @@ final class SystemWindowService: WindowServiceProtocol {
                   app.activationPolicy == .regular else {
                 return
             }
-            self?.setupObserver(for: app.processIdentifier)
+            let pid = app.processIdentifier
+            MainActor.assumeIsolated {
+                self?.setupObserver(for: pid)
+            }
         }
         workspaceObservers.append(launchObserver)
 
@@ -327,7 +330,10 @@ final class SystemWindowService: WindowServiceProtocol {
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
                 return
             }
-            self?.removeObserver(for: app.processIdentifier)
+            let pid = app.processIdentifier
+            MainActor.assumeIsolated {
+                self?.removeObserver(for: pid)
+            }
         }
         workspaceObservers.append(terminateObserver)
 
@@ -366,8 +372,10 @@ final class SystemWindowService: WindowServiceProtocol {
             pid,
             { _, element, notification, refcon in
                 guard let refcon = refcon else { return }
-                let service = Unmanaged<SystemWindowService>.fromOpaque(refcon).takeUnretainedValue()
-                service.handleAXNotification(element: element, notification: notification as String)
+                MainActor.assumeIsolated {
+                    let service = Unmanaged<SystemWindowService>.fromOpaque(refcon).takeUnretainedValue()
+                    service.handleAXNotification(element: element, notification: notification as String)
+                }
             },
             &observer
         )

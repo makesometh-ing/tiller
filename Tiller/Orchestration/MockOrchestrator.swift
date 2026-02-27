@@ -6,7 +6,6 @@
 import Foundation
 
 /// Mock orchestrator for integration tests. Tracks start/stop/retile calls.
-@MainActor
 final class MockOrchestrator {
 
     // MARK: - Call Tracking

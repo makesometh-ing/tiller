@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct OrchestratorConfig: Equatable, Sendable {
+nonisolated struct OrchestratorConfig: Equatable, Sendable {
     let debounceDelay: TimeInterval
     let animationDuration: TimeInterval
     let animateOnInitialTile: Bool
@@ -17,7 +17,7 @@ struct OrchestratorConfig: Equatable, Sendable {
     )
 }
 
-enum TilingResult: Equatable, Sendable {
+nonisolated enum TilingResult: Equatable, Sendable {
     case success(tiledCount: Int)
     case noWindowsToTile
     case cancelled

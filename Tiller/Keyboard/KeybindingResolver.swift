@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct KeybindingResolver: Sendable {
+nonisolated struct KeybindingResolver: Sendable {
 
     struct BindingKey: Hashable, Sendable {
         let keyCode: UInt16

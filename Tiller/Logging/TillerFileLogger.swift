@@ -21,7 +21,7 @@ import Foundation
 ///
 /// Or via the convenience on TillerLogger:
 ///   `TillerLogger.debug("window-discovery", "AXResizable failed for window \(id)")`
-final class TillerFileLogger: @unchecked Sendable {
+nonisolated final class TillerFileLogger: @unchecked Sendable {
     static let shared = TillerFileLogger()
 
     private let fileHandle: FileHandle?

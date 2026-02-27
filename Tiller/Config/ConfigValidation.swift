@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum ConfigValidationError: Error, Equatable, Sendable {
+nonisolated enum ConfigValidationError: Error, Equatable, Sendable {
     case marginOutOfRange(Int)
     case paddingOutOfRange(Int)
     case accordionOffsetOutOfRange(Int)

@@ -3,24 +3,17 @@
 //  TillerTests
 //
 
-import XCTest
+import Foundation
+import Testing
 @testable import Tiller
 
-@MainActor
-final class AccessibilityTests: XCTestCase {
-    private var mockAccessibilityService: MockAccessibilityService!
-    private var mockNotificationService: MockNotificationService!
+struct AccessibilityTests {
+    let mockAccessibilityService: MockAccessibilityService
+    let mockNotificationService: MockNotificationService
 
-    override func setUp() async throws {
-        try await super.setUp()
+    init() {
         mockAccessibilityService = MockAccessibilityService()
         mockNotificationService = MockNotificationService()
-    }
-
-    override func tearDown() async throws {
-        mockAccessibilityService = nil
-        mockNotificationService = nil
-        try await super.tearDown()
     }
 
     private func createAccessibilityManager(pollingInterval: TimeInterval = 2.0) -> AccessibilityManager {
@@ -33,62 +26,62 @@ final class AccessibilityTests: XCTestCase {
 
     // MARK: - Test 1: Permission Status Check
 
-    func testPermissionStatusCheck() async throws {
+    @Test func permissionStatusCheck() async throws {
         let manager = createAccessibilityManager()
 
         mockAccessibilityService.isGranted = false
-        XCTAssertEqual(manager.checkPermissionStatus(), .denied)
+        #expect(manager.checkPermissionStatus() == .denied)
 
         mockAccessibilityService.isGranted = true
-        XCTAssertEqual(manager.checkPermissionStatus(), .granted)
+        #expect(manager.checkPermissionStatus() == .granted)
     }
 
     // MARK: - Test 2: Permission Granted
 
-    func testPermissionGranted() async throws {
+    @Test func permissionGranted() async throws {
         mockAccessibilityService.isGranted = true
         let manager = createAccessibilityManager()
 
         let result = manager.requestPermissionsOnLaunch()
 
-        XCTAssertEqual(result, .permissionGranted)
-        XCTAssertEqual(manager.currentStatus, .granted)
-        XCTAssertEqual(mockNotificationService.accessibilityDeniedCount, 0)
+        #expect(result == .permissionGranted)
+        #expect(manager.currentStatus == .granted)
+        #expect(mockNotificationService.accessibilityDeniedCount == 0)
     }
 
     // MARK: - Test 3: Permission Denied
 
-    func testPermissionDenied() async throws {
+    @Test func permissionDenied() async throws {
         mockAccessibilityService.isGranted = false
         let manager = createAccessibilityManager()
 
         let result = manager.requestPermissionsOnLaunch()
 
-        XCTAssertTrue(result == .promptShown || result == .permissionDenied)
-        XCTAssertEqual(manager.currentStatus, .denied)
-        XCTAssertEqual(mockNotificationService.accessibilityDeniedCount, 1)
+        #expect(result == .promptShown || result == .permissionDenied)
+        #expect(manager.currentStatus == .denied)
+        #expect(mockNotificationService.accessibilityDeniedCount == 1)
     }
 
     // MARK: - Test 4: Permission Check Available to Modules
 
-    func testPermissionCheckAvailableToModules() async throws {
+    @Test func permissionCheckAvailableToModules() async throws {
         mockAccessibilityService.isGranted = true
         let manager = createAccessibilityManager()
 
         _ = manager.requestPermissionsOnLaunch()
 
         let status = manager.currentStatus
-        XCTAssertEqual(status, .granted)
+        #expect(status == .granted)
 
         let checkResult = manager.checkPermissionStatus()
-        XCTAssertEqual(checkResult, .granted)
+        #expect(checkResult == .granted)
     }
 
     // MARK: - Test 5: Status Change Callback
 
-    func testStatusChangeCallback() async throws {
+    @Test(.timeLimit(.minutes(1))) func statusChangeCallback() async throws {
         mockAccessibilityService.isGranted = false
-        let manager = createAccessibilityManager()
+        let manager = createAccessibilityManager(pollingInterval: 0.1)
 
         var callbackStatuses: [AccessibilityPermissionStatus] = []
         manager.onPermissionStatusChanged = { status in
@@ -97,42 +90,40 @@ final class AccessibilityTests: XCTestCase {
 
         _ = manager.requestPermissionsOnLaunch()
 
-        XCTAssertTrue(callbackStatuses.contains(.denied))
+        #expect(callbackStatuses.contains(.denied))
 
         mockAccessibilityService.isGranted = true
 
-        let expectation = XCTestExpectation(description: "Permission granted callback")
-        manager.onPermissionStatusChanged = { status in
-            if status == .granted {
-                expectation.fulfill()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            manager.onPermissionStatusChanged = { status in
+                if status == .granted {
+                    continuation.resume()
+                }
             }
+            manager.startPolling()
         }
-
-        manager.startPolling()
-
-        await fulfillment(of: [expectation], timeout: 5.0)
 
         manager.stopPolling()
 
-        XCTAssertEqual(manager.currentStatus, .granted)
-        XCTAssertEqual(mockNotificationService.accessibilityGrantedCount, 1)
+        #expect(manager.currentStatus == .granted)
+        #expect(mockNotificationService.accessibilityGrantedCount == 1)
     }
 
     // MARK: - Test 6: Request Accessibility Called with Prompt
 
-    func testRequestAccessibilityCalledWithPrompt() async throws {
+    @Test func requestAccessibilityCalledWithPrompt() async throws {
         mockAccessibilityService.isGranted = false
         let manager = createAccessibilityManager()
 
         _ = manager.requestPermissionsOnLaunch()
 
-        XCTAssertEqual(mockAccessibilityService.requestCallCount, 1)
-        XCTAssertEqual(mockAccessibilityService.lastShowPromptValue, true)
+        #expect(mockAccessibilityService.requestCallCount == 1)
+        #expect(mockAccessibilityService.lastShowPromptValue == true)
     }
 
     // MARK: - Test 7: Polling Stops After Grant
 
-    func testPollingStopsAfterGrant() async throws {
+    @Test(.timeLimit(.minutes(1))) func pollingStopsAfterGrant() async throws {
         mockAccessibilityService.isGranted = false
         let manager = createAccessibilityManager(pollingInterval: 0.1)
 
@@ -140,49 +131,47 @@ final class AccessibilityTests: XCTestCase {
 
         mockAccessibilityService.isGranted = true
 
-        let expectation = XCTestExpectation(description: "Permission granted")
-        manager.onPermissionStatusChanged = { status in
-            if status == .granted {
-                expectation.fulfill()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            manager.onPermissionStatusChanged = { status in
+                if status == .granted {
+                    continuation.resume()
+                }
             }
+            manager.startPolling()
         }
 
-        manager.startPolling()
-
-        await fulfillment(of: [expectation], timeout: 2.0)
-
-        XCTAssertEqual(manager.currentStatus, .granted)
+        #expect(manager.currentStatus == .granted)
     }
 
     // MARK: - Test 8: Initial Status is Not Determined
 
-    func testInitialStatusIsNotDetermined() async throws {
+    @Test func initialStatusIsNotDetermined() async throws {
         let manager = createAccessibilityManager()
 
-        XCTAssertEqual(manager.currentStatus, .notDetermined)
+        #expect(manager.currentStatus == .notDetermined)
     }
 
     // MARK: - Test 9: Already Granted Returns Immediately
 
-    func testAlreadyGrantedReturnsImmediately() async throws {
+    @Test func alreadyGrantedReturnsImmediately() async throws {
         mockAccessibilityService.isGranted = true
         let manager = createAccessibilityManager()
 
         let result = manager.requestPermissionsOnLaunch()
 
-        XCTAssertEqual(result, .permissionGranted)
-        XCTAssertEqual(mockAccessibilityService.requestCallCount, 0)
+        #expect(result == .permissionGranted)
+        #expect(mockAccessibilityService.requestCallCount == 0)
     }
 
     // MARK: - Test 10: Notification Service Shows Denied Message
 
-    func testNotificationServiceShowsDeniedMessage() async throws {
+    @Test func notificationServiceShowsDeniedMessage() async throws {
         mockAccessibilityService.isGranted = false
         let manager = createAccessibilityManager()
 
         _ = manager.requestPermissionsOnLaunch()
 
-        XCTAssertEqual(mockNotificationService.accessibilityDeniedCount, 1)
-        XCTAssertEqual(mockNotificationService.accessibilityGrantedCount, 0)
+        #expect(mockNotificationService.accessibilityDeniedCount == 1)
+        #expect(mockNotificationService.accessibilityGrantedCount == 0)
     }
 }

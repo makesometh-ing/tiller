@@ -10,22 +10,27 @@ import Foundation
 import os
 
 @_silgen_name("_AXUIElementGetWindow")
-private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
+nonisolated private func _AXUIElementGetWindow(_ element: AXUIElement, _ windowID: UnsafeMutablePointer<CGWindowID>) -> AXError
 
-protocol WindowPositionerProtocol {
+nonisolated protocol WindowPositionerProtocol {
     func setFrame(_ frame: CGRect, for windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError>
     func raiseWindow(_ windowID: WindowID, pid: pid_t) -> Result<Void, AnimationError>
     func getWindowElement(for windowID: WindowID, pid: pid_t) -> AXUIElement?
 }
 
-final class WindowPositioner: WindowPositionerProtocol {
-    private var windowElementCache: [WindowID: AXUIElement] = [:]
+nonisolated final class WindowPositioner: WindowPositionerProtocol {
+    private var windowElementCache: [WindowID: AXUIElement]
     private var isTrustedCache: Bool?
     private var lastTrustedCheck: Date?
 
     /// Windows where size-set was rejected. Thread-safe (written from display link thread).
     private let _resizeRejectedLock = NSLock()
-    private var _resizeRejectedWindowIDs: Set<WindowID> = []
+    private var _resizeRejectedWindowIDs: Set<WindowID>
+
+    init() {
+        self.windowElementCache = [:]
+        self._resizeRejectedWindowIDs = []
+    }
 
     /// Returns the set of window IDs that rejected resize since last clear.
     var resizeRejectedWindowIDs: Set<WindowID> {

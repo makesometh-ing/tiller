@@ -7,7 +7,7 @@ import ApplicationServices
 import CoreGraphics
 import Foundation
 
-final class MockWindowAnimationService: WindowAnimationServiceProtocol {
+nonisolated final class MockWindowAnimationService: WindowAnimationServiceProtocol {
     // Track all animation calls for testing
     struct AnimationCall: Equatable {
         let windowID: WindowID
@@ -32,11 +32,17 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
     private(set) var cancelAllCalled = false
     private(set) var raiseOrderCalls: [[(windowID: WindowID, pid: pid_t)]] = []
 
-    private var animatingWindows: Set<WindowID> = []
-    private var currentFrames: [WindowID: CGRect] = [:]
+    private var animatingWindows: Set<WindowID>
+    private var currentFrames: [WindowID: CGRect]
 
     // Configurable behavior for tests
     var resultToReturn: AnimationResult = .completed
+
+    init() {
+        self.animatingWindows = []
+        self.currentFrames = [:]
+        self._mockResizeRejectedWindowIDs = []
+    }
     var shouldCompleteInstantly: Bool = true
     var animationDelay: TimeInterval = 0
 
@@ -133,7 +139,7 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
     }
 
     // Configurable resize-rejected set for tests
-    var _mockResizeRejectedWindowIDs: Set<WindowID> = []
+    var _mockResizeRejectedWindowIDs: Set<WindowID>
 
     var resizeRejectedWindowIDs: Set<WindowID> {
         return _mockResizeRejectedWindowIDs
@@ -170,7 +176,7 @@ final class MockWindowAnimationService: WindowAnimationServiceProtocol {
 
 // MARK: - Mock Positioner for Testing
 
-final class MockWindowPositioner: WindowPositionerProtocol {
+nonisolated final class MockWindowPositioner: WindowPositionerProtocol {
     struct SetFrameCall: Equatable {
         let frame: CGRect
         let windowID: WindowID

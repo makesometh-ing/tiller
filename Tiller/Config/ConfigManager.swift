@@ -5,7 +5,7 @@
 
 import Foundation
 
-enum ConfigLoadResult: Equatable, Sendable {
+nonisolated enum ConfigLoadResult: Equatable, Sendable {
     case loaded(TillerConfig)
     case createdDefault(TillerConfig)
     case fallbackToDefault(TillerConfig, reason: String)
@@ -20,7 +20,6 @@ enum ConfigLoadResult: Equatable, Sendable {
     }
 }
 
-@MainActor
 final class ConfigManager {
     static let shared = ConfigManager()
 
@@ -68,8 +67,9 @@ final class ConfigManager {
             } catch {
                 notificationService.showConfigParseError(error)
                 _config = .default
-                setError("Failed to create config directory: \(error.localizedDescription)")
-                return .fallbackToDefault(.default, reason: configErrorMessage!)
+                let message = "Failed to create config directory: \(error.localizedDescription)"
+                setError(message)
+                return .fallbackToDefault(.default, reason: message)
             }
         }
 
@@ -150,8 +150,9 @@ final class ConfigManager {
         } catch {
             notificationService.showConfigParseError(error)
             _config = .default
-            setError("Cannot read config file: \(error.localizedDescription)")
-            return .fallbackToDefault(.default, reason: configErrorMessage!)
+            let message = "Cannot read config file: \(error.localizedDescription)"
+            setError(message)
+            return .fallbackToDefault(.default, reason: message)
         }
 
         // Run migrations on raw JSON before decoding
@@ -170,8 +171,9 @@ final class ConfigManager {
                     notificationService.showConfigValidationError(error)
                 }
                 _config = .default
-                setError(validationErrors.first!.description)
-                return .fallbackToDefault(.default, reason: configErrorMessage!)
+                let message = validationErrors[0].description
+                setError(message)
+                return .fallbackToDefault(.default, reason: message)
             }
 
             // Re-encode to fill in any fields populated by decodeIfPresent defaults
@@ -186,8 +188,9 @@ final class ConfigManager {
         } catch {
             notificationService.showConfigParseError(error)
             _config = .default
-            setError(Self.humanReadableParseError(error, jsonData: data))
-            return .fallbackToDefault(.default, reason: configErrorMessage!)
+            let message = Self.humanReadableParseError(error, jsonData: data)
+            setError(message)
+            return .fallbackToDefault(.default, reason: message)
         }
     }
 

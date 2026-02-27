@@ -15,7 +15,7 @@ import os
 ///
 /// Debug logs are written to `.logs/tiller-debug.log` in the project root.
 /// Agents can read this file after a test run to diagnose issues.
-enum TillerLogger {
+nonisolated enum TillerLogger {
     private static let subsystem = "ing.makesometh.Tiller"
 
     // MARK: - OSLog loggers (for .error level — persisted by unified logging)

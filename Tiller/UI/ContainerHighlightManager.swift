@@ -8,7 +8,6 @@ import AppKit
 /// Window level for container highlights — below .floating so the leader overlay renders on top.
 private let containerHighlightLevel = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue - 1)
 
-@MainActor
 final class ContainerHighlightManager {
 
     private var windows: [ContainerID: NSWindow] = [:]

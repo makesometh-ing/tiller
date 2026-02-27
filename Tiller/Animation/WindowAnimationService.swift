@@ -9,7 +9,7 @@ import Foundation
 import os
 import QuartzCore
 
-protocol WindowAnimationServiceProtocol {
+nonisolated protocol WindowAnimationServiceProtocol {
     func animate(
         windowID: WindowID,
         pid: pid_t,
@@ -37,20 +37,23 @@ protocol WindowAnimationServiceProtocol {
     func clearResizeRejected()
 }
 
-final class WindowAnimationService: WindowAnimationServiceProtocol {
+nonisolated final class WindowAnimationService: WindowAnimationServiceProtocol, @unchecked Sendable {
     private var displayLink: CVDisplayLink?
     private let positioner: WindowPositionerProtocol
     private let easing: EasingFunction
 
-    private var activeAnimations: [UUID: AnimationState] = [:]
-    private var windowToAnimationID: [WindowID: UUID] = [:]
-    private var animationContinuations: [UUID: CheckedContinuation<AnimationResult, Never>] = [:]
+    private var activeAnimations: [UUID: AnimationState]
+    private var windowToAnimationID: [WindowID: UUID]
+    private var animationContinuations: [UUID: CheckedContinuation<AnimationResult, Never>]
 
     private let lock = NSLock()
 
     init(positioner: WindowPositionerProtocol = WindowPositioner(), easing: EasingFunction = .easeOutCubic) {
         self.positioner = positioner
         self.easing = easing
+        self.activeAnimations = [:]
+        self.windowToAnimationID = [:]
+        self.animationContinuations = [:]
     }
 
     deinit {

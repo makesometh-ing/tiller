@@ -3,25 +3,24 @@
 //  TillerTests
 //
 
-import XCTest
+import CoreGraphics
+import Foundation
+import Testing
 @testable import Tiller
 
-@MainActor
-final class AutoTilingOrchestratorTests: XCTestCase {
+struct AutoTilingOrchestratorTests {
 
-    private var sut: AutoTilingOrchestrator!
-    private var mockWindowService: MockWindowService!
-    private var mockMonitorService: MockMonitorService!
-    private var mockLayoutEngine: MockLayoutEngine!
-    private var mockAnimationService: MockWindowAnimationService!
-    private var windowDiscoveryManager: WindowDiscoveryManager!
-    private var monitorManager: MonitorManager!
-    private var configManager: ConfigManager!
-    private var tempDirectory: URL!
+    private let sut: AutoTilingOrchestrator
+    private let mockWindowService: MockWindowService
+    private let mockMonitorService: MockMonitorService
+    private let mockLayoutEngine: MockLayoutEngine
+    private let mockAnimationService: MockWindowAnimationService
+    private let windowDiscoveryManager: WindowDiscoveryManager
+    private let monitorManager: MonitorManager
+    private let configManager: ConfigManager
+    private let tempDirectory: URL
 
-    override func setUp() async throws {
-        try await super.setUp()
-
+    init() throws {
         mockWindowService = MockWindowService()
         mockMonitorService = MockMonitorService()
         mockLayoutEngine = MockLayoutEngine()
@@ -63,25 +62,6 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         )
     }
 
-    override func tearDown() async throws {
-        sut?.stop()
-        sut = nil
-        mockWindowService = nil
-        mockMonitorService = nil
-        mockLayoutEngine = nil
-        mockAnimationService = nil
-        windowDiscoveryManager = nil
-        monitorManager = nil
-        configManager = nil
-
-        if let tempDirectory = tempDirectory {
-            try? FileManager.default.removeItem(at: tempDirectory)
-        }
-        tempDirectory = nil
-
-        try await super.tearDown()
-    }
-
     // MARK: - Helper Methods
 
     private func makeWindow(
@@ -104,23 +84,22 @@ final class AutoTilingOrchestratorTests: XCTestCase {
     private func waitForRetile(
         expectedCallCount: Int = 1,
         timeout: Int = 20,
-        file: StaticString = #file,
-        line: UInt = #line
+        sourceLocation: SourceLocation = #_sourceLocation
     ) async {
         for _ in 0..<timeout {
             await Task.yield()
             try? await Task.sleep(nanoseconds: 50_000_000) // 50ms per poll
             if mockLayoutEngine.calculateCallCount >= expectedCallCount { return }
         }
-        XCTFail(
+        Issue.record(
             "Timed out waiting for retile (expected \(expectedCallCount), got \(mockLayoutEngine.calculateCallCount))",
-            file: file, line: line
+            sourceLocation: sourceLocation
         )
     }
 
     // MARK: - Initial Tiling Tests
 
-    func testInitialTiling() async {
+    @Test func initialTiling() async {
         // Given: Multiple non-floating windows exist
         let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         let window2 = makeWindow(id: 2, frame: CGRect(x: 200, y: 200, width: 800, height: 600))
@@ -145,18 +124,18 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         // Then: Layout engine was called and animations were triggered
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
-        XCTAssertEqual(mockAnimationService.batchAnimationCalls.count, 1)
-        XCTAssertEqual(mockAnimationService.batchAnimationCalls.first?.animations.count, 3)
+        #expect(mockLayoutEngine.calculateCallCount == 1)
+        #expect(mockAnimationService.batchAnimationCalls.count == 1)
+        #expect(mockAnimationService.batchAnimationCalls.first?.animations.count == 3)
 
         // Verify initial tile doesn't animate (duration should be 0)
-        XCTAssertEqual(mockAnimationService.batchAnimationCalls.first?.duration, 0)
+        #expect(mockAnimationService.batchAnimationCalls.first?.duration == 0)
     }
 
-    func testInitialTilingWithAnimation() async {
+    @Test func initialTilingWithAnimation() async {
         // Given: Config with animateOnInitialTile = true
         sut.stop()
-        sut = AutoTilingOrchestrator(
+        let animatedSut = AutoTilingOrchestrator(
             windowDiscoveryManager: windowDiscoveryManager,
             monitorManager: monitorManager,
             configManager: configManager,
@@ -174,15 +153,15 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         ])
 
         // When: Orchestrator starts
-        await sut.start()
+        await animatedSut.start()
 
         // Then: Animation should use configured duration
-        XCTAssertEqual(mockAnimationService.batchAnimationCalls.first?.duration, 0.25)
+        #expect(mockAnimationService.batchAnimationCalls.first?.duration == 0.25)
     }
 
     // MARK: - New Window Tests
 
-    func testNewWindowAdded() async {
+    @Test func newWindowAdded() async {
         // Given: Orchestrator is running with one window
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -207,13 +186,13 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await waitForRetile()
 
         // Then: Retile was triggered
-        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
-        XCTAssertGreaterThanOrEqual(mockAnimationService.batchAnimationCalls.count, 1)
+        #expect(mockLayoutEngine.calculateCallCount >= 1)
+        #expect(mockAnimationService.batchAnimationCalls.count >= 1)
     }
 
     // MARK: - Window Closed Tests
 
-    func testWindowClosed() async {
+    @Test func windowClosed() async {
         // Given: Orchestrator is running with two windows
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
@@ -238,12 +217,12 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await waitForRetile()
 
         // Then: Retile was triggered
-        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+        #expect(mockLayoutEngine.calculateCallCount >= 1)
     }
 
     // MARK: - Floating Window Tests
 
-    func testFloatingWindowExcluded() async {
+    @Test func floatingWindowExcluded() async {
         // Given: One normal and one floating window
         let normalWindow = makeWindow(id: 1, isFloating: false)
         let floatingWindow = makeWindow(id: 2, isFloating: true)
@@ -256,18 +235,18 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         // When: Orchestrator starts
         await sut.start()
 
-        // Then: Floating windows are excluded at orchestrator level — only non-floating windows reach the engine
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
-        XCTAssertEqual(mockLayoutEngine.lastInput?.windows.count, 1)
+        // Then: Floating windows are excluded at orchestrator level -- only non-floating windows reach the engine
+        #expect(mockLayoutEngine.calculateCallCount == 1)
+        #expect(mockLayoutEngine.lastInput?.windows.count == 1)
 
         let inputWindows = mockLayoutEngine.lastInput?.windows ?? []
-        XCTAssertTrue(inputWindows.contains(where: { $0.id == normalWindow.id }))
-        XCTAssertFalse(inputWindows.contains(where: { $0.id == floatingWindow.id }))
+        #expect(inputWindows.contains(where: { $0.id == normalWindow.id }))
+        #expect(!inputWindows.contains(where: { $0.id == floatingWindow.id }))
     }
 
     // MARK: - Multi-Monitor Tests
 
-    func testMultipleMonitorTiling() async {
+    @Test func multipleMonitorTiling() async {
         // Given: Two monitors with windows on each
         let monitor1 = MockMonitorService.createTestMonitor(
             id: 1,
@@ -304,24 +283,24 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         // Then: Layout engine was called for each monitor with windows
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 2)
+        #expect(mockLayoutEngine.calculateCallCount == 2)
 
         // Verify separate layouts per monitor
         let inputs = mockLayoutEngine.allInputs
-        XCTAssertEqual(inputs.count, 2)
+        #expect(inputs.count == 2)
 
         // Check that each input has the correct container frame for its monitor
         let containerFrame1 = inputs.first(where: { $0.windows.contains(where: { $0.id == window1.id }) })?.containerFrame
         let containerFrame2 = inputs.first(where: { $0.windows.contains(where: { $0.id == window2.id }) })?.containerFrame
 
-        XCTAssertNotNil(containerFrame1)
-        XCTAssertNotNil(containerFrame2)
-        XCTAssertNotEqual(containerFrame1, containerFrame2)
+        #expect(containerFrame1 != nil)
+        #expect(containerFrame2 != nil)
+        #expect(containerFrame1 != containerFrame2)
     }
 
     // MARK: - Debouncing Tests
 
-    func testRapidEventsDebounced() async {
+    @Test func rapidEventsDebounced() async {
         // Given: Orchestrator is running
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -345,12 +324,12 @@ final class AutoTilingOrchestratorTests: XCTestCase {
 
         // Then: Only a small number of retiles occurred (debounced)
         // With good debouncing, we expect far fewer than 18 calls (9 opens + 9 closes)
-        XCTAssertLessThan(mockLayoutEngine.calculateCallCount, 5)
+        #expect(mockLayoutEngine.calculateCallCount < 5)
     }
 
     // MARK: - Focus Change Tests
 
-    func testWindowFocusChangeUpdatesAccordion() async {
+    @Test func windowFocusChangeUpdatesAccordion() async {
         // Given: Orchestrator is running with multiple windows
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
@@ -394,30 +373,30 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)  // 100ms > 10ms debounce
 
         // Then: Retile was triggered with new focused window
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
-        XCTAssertEqual(mockLayoutEngine.lastInput?.focusedWindowID, window2.id)
+        #expect(mockLayoutEngine.calculateCallCount == 1)
+        #expect(mockLayoutEngine.lastInput?.focusedWindowID == window2.id)
     }
 
     // MARK: - Start/Stop Tests
 
-    func testStartSetsRunningState() async {
-        XCTAssertFalse(sut.isCurrentlyRunning)
+    @Test func startSetsRunningState() async {
+        #expect(!sut.isCurrentlyRunning)
 
         await sut.start()
 
-        XCTAssertTrue(sut.isCurrentlyRunning)
+        #expect(sut.isCurrentlyRunning)
     }
 
-    func testStopClearsRunningState() async {
+    @Test func stopClearsRunningState() async {
         await sut.start()
-        XCTAssertTrue(sut.isCurrentlyRunning)
+        #expect(sut.isCurrentlyRunning)
 
         sut.stop()
 
-        XCTAssertFalse(sut.isCurrentlyRunning)
+        #expect(!sut.isCurrentlyRunning)
     }
 
-    func testStopCancelsPendingRetile() async {
+    @Test func stopCancelsPendingRetile() async {
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
         mockLayoutEngine.resultToReturn = LayoutResult(placements: [])
@@ -435,20 +414,20 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 50_000_000)
 
         // Should not have retiled after stop
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
+        #expect(mockLayoutEngine.calculateCallCount == 0)
     }
 
     // MARK: - Edge Cases
 
-    func testNoWindowsReturnsNoWindowsToTile() async {
+    @Test func noWindowsReturnsNoWindowsToTile() async {
         mockWindowService.windows = []
 
         await sut.start()
 
-        XCTAssertEqual(sut.lastResult, .noWindowsToTile)
+        #expect(sut.lastResult == .noWindowsToTile)
     }
 
-    func testNoMonitorsReturnsFailed() async {
+    @Test func noMonitorsReturnsFailed() async {
         mockMonitorService.monitors = []
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -456,13 +435,13 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         if case .failed(let reason) = sut.lastResult {
-            XCTAssertTrue(reason.contains("No monitors"))
+            #expect(reason.contains("No monitors"))
         } else {
-            XCTFail("Expected failed result with no monitors")
+            Issue.record("Expected failed result with no monitors")
         }
     }
 
-    func testWindowsNotOnAnyMonitorFallbackToMain() async {
+    @Test func windowsNotOnAnyMonitorFallbackToMain() async {
         // Given: A window whose center is outside all monitors
         let offscreenWindow = makeWindow(id: 1, frame: CGRect(x: 5000, y: 5000, width: 800, height: 600))
         mockWindowService.windows = [offscreenWindow]
@@ -476,11 +455,11 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         // Then: Layout was still calculated (window assigned to main monitor)
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 1)
-        XCTAssertEqual(mockLayoutEngine.lastInput?.windows.count, 1)
+        #expect(mockLayoutEngine.calculateCallCount == 1)
+        #expect(mockLayoutEngine.lastInput?.windows.count == 1)
     }
 
-    func testIgnoresMoveEvents() async {
+    @Test func ignoresMoveEvents() async {
         // Given: Orchestrator is running
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -496,10 +475,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 50_000_000)
 
         // Then: No retile was triggered (we don't fight with user-initiated moves)
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
+        #expect(mockLayoutEngine.calculateCallCount == 0)
     }
 
-    func testIgnoresResizeEvents() async {
+    @Test func ignoresResizeEvents() async {
         // Given: Orchestrator is running
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -515,10 +494,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 50_000_000)
 
         // Then: No retile was triggered (we don't fight with user-initiated resizes)
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
+        #expect(mockLayoutEngine.calculateCallCount == 0)
     }
 
-    func testAlwaysPositionsAllWindows() async {
+    @Test func alwaysPositionsAllWindows() async {
         // Given: A window that's already at its target position
         let alreadyPositionedFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
         let window1 = makeWindow(id: 1, frame: alreadyPositionedFrame)
@@ -533,13 +512,13 @@ final class AutoTilingOrchestratorTests: XCTestCase {
 
         // Then: Animation is still triggered (we always position for z-order consistency)
         // Initial tile has duration=0 so we use instant positioning, but the batch call still happens
-        XCTAssertEqual(mockAnimationService.batchAnimationCalls.count, 1)
-        XCTAssertEqual(sut.lastResult, .success(tiledCount: 1))
+        #expect(mockAnimationService.batchAnimationCalls.count == 1)
+        #expect(sut.lastResult == .success(tiledCount: 1))
     }
 
     // MARK: - Stable Window Order Tests
 
-    func testWindowOrderRemainsStableAcrossFocusChanges() async {
+    @Test func windowOrderRemainsStableAcrossFocusChanges() async {
         // Given: Multiple windows in a specific order
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
@@ -590,10 +569,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
 
         // Then: Window order in layout input should be stable (not reordered by z-order)
         let newInputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
-        XCTAssertEqual(initialInputOrder, newInputOrder, "Window order should remain stable across focus changes")
+        #expect(initialInputOrder == newInputOrder, "Window order should remain stable across focus changes")
     }
 
-    func testNewWindowsAppendedToStableOrder() async {
+    @Test func newWindowsAppendedToStableOrder() async {
         // Given: One window
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -618,11 +597,11 @@ final class AutoTilingOrchestratorTests: XCTestCase {
 
         // Then: New window should be appended (window1 stays first)
         let inputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
-        XCTAssertEqual(inputOrder.first, window1.id, "Original window should remain first in order")
-        XCTAssertEqual(inputOrder.last, window2.id, "New window should be appended to order")
+        #expect(inputOrder.first == window1.id, "Original window should remain first in order")
+        #expect(inputOrder.last == window2.id, "New window should be appended to order")
     }
 
-    func testClosedWindowsRemovedFromStableOrder() async {
+    @Test func closedWindowsRemovedFromStableOrder() async {
         // Given: Two windows
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
@@ -647,13 +626,13 @@ final class AutoTilingOrchestratorTests: XCTestCase {
 
         // Then: Only window2 remains
         let inputOrder = mockLayoutEngine.lastInput?.windows.map { $0.id } ?? []
-        XCTAssertEqual(inputOrder.count, 1)
-        XCTAssertEqual(inputOrder.first, window2.id)
+        #expect(inputOrder.count == 1)
+        #expect(inputOrder.first == window2.id)
     }
 
     // MARK: - Non-Resizable Window Ring Buffer Tests
 
-    func testNonResizableWindowInRingButNotAccordionZOrder() async {
+    @Test func nonResizableWindowInRingButNotAccordionZOrder() async {
         // Given: Mix of resizable and non-resizable windows, tileable focused
         let tileableWindow1 = makeWindow(id: 1, isResizable: true)
         let tileableWindow2 = makeWindow(id: 2, isResizable: true)
@@ -677,15 +656,15 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         // Then: All 3 windows passed to layout engine (non-resizable in ring buffer)
-        XCTAssertEqual(mockLayoutEngine.lastInput?.windows.count, 3)
+        #expect(mockLayoutEngine.lastInput?.windows.count == 3)
 
         // And: Accordion z-order only raises tileable windows (non-resizable not in accordion z-order)
         let raisedWindowIDs = Set(mockAnimationService.raiseOrderCalls.flatMap { $0.map { $0.windowID } })
-        XCTAssertFalse(raisedWindowIDs.contains(nonResizableWindow.id),
+        #expect(!raisedWindowIDs.contains(nonResizableWindow.id),
             "Non-resizable window should not be in accordion z-order raises")
     }
 
-    func testNonResizableFocusedRaisesToTop() async {
+    @Test func nonResizableFocusedRaisesToTop() async {
         // Given: Mix of windows with non-resizable one focused
         let tileableWindow1 = makeWindow(id: 1, isResizable: true)
         let tileableWindow2 = makeWindow(id: 2, isResizable: true)
@@ -709,13 +688,13 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         // Then: Non-resizable window is raised to top (overlay behavior)
-        XCTAssertEqual(mockAnimationService.raiseOrderCalls.count, 1)
+        #expect(mockAnimationService.raiseOrderCalls.count == 1)
         let raisedWindows = mockAnimationService.raiseOrderCalls[0]
-        XCTAssertEqual(raisedWindows.count, 1)
-        XCTAssertEqual(raisedWindows[0].windowID, nonResizableWindow.id)
+        #expect(raisedWindows.count == 1)
+        #expect(raisedWindows[0].windowID == nonResizableWindow.id)
     }
 
-    func testNonResizableFocusedFreezesAccordion() async {
+    @Test func nonResizableFocusedFreezesAccordion() async {
         // Given: Start with tileable window 2 focused
         let tileableWindow1 = makeWindow(id: 1, isResizable: true)
         let tileableWindow2 = makeWindow(id: 2, isResizable: true)
@@ -738,9 +717,9 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         // Initial tile: layout engine should get tileableWindow2 as focused
-        XCTAssertEqual(mockLayoutEngine.lastInput?.focusedWindowID, tileableWindow2.id)
+        #expect(mockLayoutEngine.lastInput?.focusedWindowID == tileableWindow2.id)
 
-        // Wait for z-order suppression (200ms) to expire — use generous margin
+        // Wait for z-order suppression (200ms) to expire -- use generous margin
         try? await Task.sleep(nanoseconds: 350_000_000)
         mockLayoutEngine.reset()
         mockAnimationService.reset()
@@ -762,15 +741,15 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         // Wait for debounce and retile
         await waitForRetile()
 
-        // Then: Accordion freezes — layout engine receives tileableWindow2 (last tileable focus),
+        // Then: Accordion freezes -- layout engine receives tileableWindow2 (last tileable focus),
         // NOT the non-resizable window's ID
-        XCTAssertEqual(mockLayoutEngine.lastInput?.focusedWindowID, tileableWindow2.id,
+        #expect(mockLayoutEngine.lastInput?.focusedWindowID == tileableWindow2.id,
             "Accordion should freeze at last tileable window when non-resizable is focused")
     }
 
     // MARK: - Focus Event Suppression Tests
 
-    func testDuplicateFocusEventsIgnored() async {
+    @Test func duplicateFocusEventsIgnored() async {
         // Given: Orchestrator is running with focused window
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
@@ -798,13 +777,13 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
 
         // Then: Should have minimal retiles (debounced + duplicate ignored)
-        XCTAssertLessThanOrEqual(mockLayoutEngine.calculateCallCount, 1,
+        #expect(mockLayoutEngine.calculateCallCount <= 1,
             "Duplicate focus events for same window should be ignored")
     }
 
     // MARK: - Per-Container Architecture Tests
 
-    func testTwoMonitorsEachGetIndependentMonocleTiling() async {
+    @Test func twoMonitorsEachGetIndependentMonocleTiling() async {
         // Given: Two monitors with separate windows
         let monitor1 = MockMonitorService.createTestMonitor(
             id: 1,
@@ -846,28 +825,28 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await sut.start()
 
         // Then: Layout engine called once per monitor (monocle = 1 container per monitor)
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 2)
+        #expect(mockLayoutEngine.calculateCallCount == 2)
 
         let inputs = mockLayoutEngine.allInputs
-        XCTAssertEqual(inputs.count, 2)
+        #expect(inputs.count == 2)
 
         // Monitor 1 input should have 2 windows with monitor 1's container frame
         let m1Input = inputs.first(where: { $0.windows.count == 2 })
-        XCTAssertNotNil(m1Input, "Monitor 1 should have 2 windows")
-        XCTAssertTrue(m1Input?.windows.contains(where: { $0.id == win1.id }) ?? false)
-        XCTAssertTrue(m1Input?.windows.contains(where: { $0.id == win2.id }) ?? false)
+        #expect(m1Input != nil, "Monitor 1 should have 2 windows")
+        #expect(m1Input?.windows.contains(where: { $0.id == win1.id }) ?? false)
+        #expect(m1Input?.windows.contains(where: { $0.id == win2.id }) ?? false)
 
         // Monitor 2 input should have 1 window with monitor 2's container frame
         let m2Input = inputs.first(where: { $0.windows.count == 1 })
-        XCTAssertNotNil(m2Input, "Monitor 2 should have 1 window")
-        XCTAssertTrue(m2Input?.windows.contains(where: { $0.id == win3.id }) ?? false)
+        #expect(m2Input != nil, "Monitor 2 should have 1 window")
+        #expect(m2Input?.windows.contains(where: { $0.id == win3.id }) ?? false)
 
         // Container frames should be different (different monitor sizes)
-        XCTAssertNotEqual(m1Input?.containerFrame, m2Input?.containerFrame,
+        #expect(m1Input?.containerFrame != m2Input?.containerFrame,
             "Each monitor should have its own independent container frame")
     }
 
-    func testWindowAddedToCorrectMonitorContainer() async {
+    @Test func windowAddedToCorrectMonitorContainer() async {
         // Given: Two monitors, orchestrator running with one window on each
         let monitor1 = MockMonitorService.createTestMonitor(
             id: 1, name: "Monitor 1",
@@ -912,22 +891,22 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         let m2Inputs = mockLayoutEngine.allInputs.filter {
             $0.windows.contains(where: { $0.id == win2.id })
         }
-        XCTAssertFalse(m2Inputs.isEmpty, "Monitor 2 should have been tiled")
+        #expect(!m2Inputs.isEmpty, "Monitor 2 should have been tiled")
 
         let m2Input = m2Inputs.first(where: { $0.windows.contains(where: { $0.id == win3.id }) })
-        XCTAssertNotNil(m2Input, "New window should be in monitor 2's layout input")
+        #expect(m2Input != nil, "New window should be in monitor 2's layout input")
 
         // Monitor 1 should still have just 1 window
         let m1Input = mockLayoutEngine.allInputs.first(where: {
             $0.windows.contains(where: { $0.id == win1.id }) &&
             !$0.windows.contains(where: { $0.id == win3.id })
         })
-        XCTAssertNotNil(m1Input, "Monitor 1 should still have just its original window")
+        #expect(m1Input != nil, "Monitor 1 should still have just its original window")
     }
 
     // MARK: - Layout Switching Tests
 
-    func testSwitchLayoutTriggersRetile() async {
+    @Test func switchLayoutTriggersRetile() async {
         // Given: Orchestrator running with monocle layout
         let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         let window2 = makeWindow(id: 2, frame: CGRect(x: 1100, y: 100, width: 800, height: 600))
@@ -958,15 +937,15 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await waitForRetile()
 
         // Then: Layout engine was called with split halves container frames (2 containers)
-        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+        #expect(mockLayoutEngine.calculateCallCount >= 1)
 
         // Split halves produces 2 containers, so layout engine should be called twice
         // (once per container)
         let inputs = mockLayoutEngine.allInputs
-        XCTAssertEqual(inputs.count, 2, "Split halves should produce 2 container layout inputs")
+        #expect(inputs.count == 2, "Split halves should produce 2 container layout inputs")
     }
 
-    func testSwitchLayoutSameLayoutNoOp() async {
+    @Test func switchLayoutSameLayoutNoOp() async {
         // Given: Orchestrator running with monocle layout
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -987,12 +966,12 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
 
         // Then: No retile triggered
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
+        #expect(mockLayoutEngine.calculateCallCount == 0)
     }
 
     // MARK: - Window/Container Operation Tests
 
-    func testCycleWindowTriggersRetile() async {
+    @Test func cycleWindowTriggersRetile() async {
         // Given: Orchestrator running with 3 windows in monocle
         let window1 = makeWindow(id: 1)
         let window2 = makeWindow(id: 2)
@@ -1024,10 +1003,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await waitForRetile()
 
         // Then: Layout engine was called (retile triggered)
-        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+        #expect(mockLayoutEngine.calculateCallCount >= 1)
     }
 
-    func testMoveWindowToContainerTriggersRetile() async {
+    @Test func moveWindowToContainerTriggersRetile() async {
         // Given: Orchestrator running with split-halves layout
         let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         let window2 = makeWindow(id: 2, frame: CGRect(x: 1100, y: 100, width: 800, height: 600))
@@ -1066,10 +1045,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await waitForRetile()
 
         // Then: Retile triggered
-        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+        #expect(mockLayoutEngine.calculateCallCount >= 1)
     }
 
-    func testFocusContainerTriggersRetile() async {
+    @Test func focusContainerTriggersRetile() async {
         // Given: Orchestrator running with split-halves layout
         let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
         let window2 = makeWindow(id: 2, frame: CGRect(x: 1100, y: 100, width: 800, height: 600))
@@ -1108,10 +1087,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         await waitForRetile()
 
         // Then: Retile triggered
-        XCTAssertGreaterThanOrEqual(mockLayoutEngine.calculateCallCount, 1)
+        #expect(mockLayoutEngine.calculateCallCount >= 1)
     }
 
-    func testOperationsNoOpWithNoFocusedWindow() async {
+    @Test func operationsNoOpWithNoFocusedWindow() async {
         // Given: Orchestrator running but no focused window
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
@@ -1135,10 +1114,10 @@ final class AutoTilingOrchestratorTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 100_000_000)
 
         // Then: No retile triggered (all no-ops)
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 0)
+        #expect(mockLayoutEngine.calculateCallCount == 0)
     }
 
-    func testSwitchLayoutDoesNotAffectOtherMonitor() async {
+    @Test func switchLayoutDoesNotAffectOtherMonitor() async {
         // Given: Two monitors, orchestrator running
         let monitor1 = MockMonitorService.createTestMonitor(
             id: 1, name: "Monitor 1",
@@ -1165,7 +1144,7 @@ final class AutoTilingOrchestratorTests: XCTestCase {
 
         await sut.start()
         // Initial tile: 2 calls (1 container per monitor, each in monocle)
-        XCTAssertEqual(mockLayoutEngine.calculateCallCount, 2)
+        #expect(mockLayoutEngine.calculateCallCount == 2)
         mockLayoutEngine.reset()
         mockAnimationService.reset()
 
@@ -1183,11 +1162,11 @@ final class AutoTilingOrchestratorTests: XCTestCase {
 
         // Monitor 2 input: should still have 1 window, unchanged monocle container frame
         let m2Input = inputs.first(where: { $0.windows.contains(where: { $0.id == win2.id }) })
-        XCTAssertNotNil(m2Input, "Monitor 2 should still be tiled")
+        #expect(m2Input != nil, "Monitor 2 should still be tiled")
 
         // Monitor 1 should now have split containers (2 inputs for the 2 containers,
         // though only the non-empty ones get to the layout engine)
         let m1Inputs = inputs.filter { !$0.windows.contains(where: { $0.id == win2.id }) }
-        XCTAssertGreaterThanOrEqual(m1Inputs.count, 1, "Monitor 1 should have been retiled")
+        #expect(m1Inputs.count >= 1, "Monitor 1 should have been retiled")
     }
 }

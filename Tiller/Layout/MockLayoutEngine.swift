@@ -6,7 +6,7 @@
 import CoreGraphics
 
 /// Test mock for LayoutEngineProtocol that tracks calls and returns configurable results.
-final class MockLayoutEngine: LayoutEngineProtocol, @unchecked Sendable {
+nonisolated final class MockLayoutEngine: LayoutEngineProtocol, @unchecked Sendable {
 
     // MARK: - Call Tracking
 

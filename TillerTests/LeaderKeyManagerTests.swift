@@ -3,21 +3,20 @@
 //  TillerTests
 //
 
-import XCTest
+import CoreGraphics
+import Foundation
+import Testing
 @testable import Tiller
 
-@MainActor
-final class LeaderKeyManagerTests: XCTestCase {
+struct LeaderKeyManagerTests {
 
-    private var sut: LeaderKeyManager!
-    private var configManager: ConfigManager!
-    private var tempDirectory: URL!
-    private var receivedActions: [KeyAction]!
-    private var receivedStates: [LeaderState]!
+    var sut: LeaderKeyManager
+    let configManager: ConfigManager
+    let tempDirectory: URL
+    var receivedActions: [KeyAction]
+    var receivedStates: [LeaderState]
 
-    override func setUp() async throws {
-        try await super.setUp()
-
+    init() async throws {
         tempDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         configManager = ConfigManager(
@@ -29,27 +28,12 @@ final class LeaderKeyManagerTests: XCTestCase {
 
         sut = LeaderKeyManager(configManager: configManager)
         receivedActions = []
-        sut.onAction = { [weak self] action in
-            self?.receivedActions.append(action)
-        }
         receivedStates = []
-        sut.onStateChanged = { [weak self] state in
-            self?.receivedStates.append(state)
+
+        sut.onAction = { [self] action in
+            // Note: In Swift Testing structs, we can't use weak self pattern the same way.
+            // The closure captures will be set up after init.
         }
-    }
-
-    override func tearDown() async throws {
-        sut = nil
-        configManager = nil
-        receivedActions = nil
-        receivedStates = nil
-
-        if let tempDirectory {
-            try? FileManager.default.removeItem(at: tempDirectory)
-        }
-        tempDirectory = nil
-
-        try await super.tearDown()
     }
 
     // MARK: - Helpers
@@ -57,7 +41,7 @@ final class LeaderKeyManagerTests: XCTestCase {
     /// Simulates a keyDown event through the state machine.
     /// Returns true if the event was consumed.
     @discardableResult
-    private func simulateKeyDown(_ keyCode: UInt16, option: Bool = false, shift: Bool = false) -> Bool {
+    private mutating func simulateKeyDown(_ keyCode: UInt16, option: Bool = false, shift: Bool = false) -> Bool {
         var rawFlags: UInt64 = 0
         if option { rawFlags |= KeyMapping.optionFlag }
         if shift { rawFlags |= UInt64(CGEventFlags.maskShift.rawValue) }
@@ -65,182 +49,234 @@ final class LeaderKeyManagerTests: XCTestCase {
         return sut.handleKeyEvent(keyCode: keyCode, flags: flags, eventType: .keyDown)
     }
 
-    private func activateLeader() {
+    private mutating func activateLeader() {
         simulateKeyDown(KeyMapping.space, option: true)
     }
 
-    // MARK: - State Machine: Idle → Leader
+    // MARK: - State Machine: Idle -> Leader
 
-    func testStartsInIdleState() {
-        XCTAssertEqual(sut.state, .idle)
+    @Test mutating func startsInIdleState() {
+        #expect(sut.state == .idle)
     }
 
-    func testOptionSpaceActivatesLeader() {
+    @Test mutating func optionSpaceActivatesLeader() {
         let consumed = simulateKeyDown(KeyMapping.space, option: true)
 
-        XCTAssertTrue(consumed)
-        XCTAssertEqual(sut.state, .leaderActive)
+        #expect(consumed)
+        #expect(sut.state == .leaderActive)
     }
 
-    func testSpaceWithoutOptionPassesThrough() {
+    @Test mutating func spaceWithoutOptionPassesThrough() {
         let consumed = simulateKeyDown(KeyMapping.space)
 
-        XCTAssertFalse(consumed)
-        XCTAssertEqual(sut.state, .idle)
+        #expect(!consumed)
+        #expect(sut.state == .idle)
     }
 
-    func testRegularKeysPassThroughInIdle() {
+    @Test mutating func regularKeysPassThroughInIdle() {
         let consumed = simulateKeyDown(KeyMapping.keyH)
 
-        XCTAssertFalse(consumed)
-        XCTAssertEqual(sut.state, .idle)
+        #expect(!consumed)
+        #expect(sut.state == .idle)
     }
 
-    // MARK: - State Machine: Leader → Idle
+    // MARK: - State Machine: Leader -> Idle
 
-    func testOptionSpaceAgainExitsLeader() {
+    @Test mutating func optionSpaceAgainExitsLeader() {
         activateLeader()
-        XCTAssertEqual(sut.state, .leaderActive)
+        #expect(sut.state == .leaderActive)
 
         let consumed = simulateKeyDown(KeyMapping.space, option: true)
 
-        XCTAssertTrue(consumed)
-        XCTAssertEqual(sut.state, .idle)
+        #expect(consumed)
+        #expect(sut.state == .idle)
     }
 
-    func testEscapeExitsLeader() {
+    @Test mutating func escapeExitsLeader() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
+
         activateLeader()
 
         let consumed = simulateKeyDown(KeyMapping.escape)
 
-        XCTAssertTrue(consumed)
-        XCTAssertEqual(sut.state, .idle)
-        XCTAssertEqual(receivedActions, [.exitLeader])
+        #expect(consumed)
+        #expect(sut.state == .idle)
+        #expect(actions == [.exitLeader])
     }
 
     // MARK: - Key Mapping: Layout Switch
 
-    func testKey1SwitchesToMonocle() {
-        activateLeader()
+    @Test mutating func key1SwitchesToMonocle() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.key1)
 
-        XCTAssertEqual(receivedActions, [.switchLayout(.monocle)])
-        XCTAssertEqual(sut.state, .idle, "Layout switch should exit leader")
+        #expect(actions == [.switchLayout(.monocle)])
+        #expect(sut.state == .idle, "Layout switch should exit leader")
     }
 
-    func testKey2SwitchesToSplitHalves() {
-        activateLeader()
+    @Test mutating func key2SwitchesToSplitHalves() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.key2)
 
-        XCTAssertEqual(receivedActions, [.switchLayout(.splitHalves)])
-        XCTAssertEqual(sut.state, .idle, "Layout switch should exit leader")
+        #expect(actions == [.switchLayout(.splitHalves)])
+        #expect(sut.state == .idle, "Layout switch should exit leader")
     }
 
     // MARK: - Key Mapping: Move Window
 
-    func testHMovesWindowLeft() {
-        activateLeader()
+    @Test mutating func hMovesWindowLeft() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.keyH)
 
-        XCTAssertEqual(receivedActions, [.moveWindow(.left)])
-        XCTAssertEqual(sut.state, .leaderActive, "Move should stay in leader")
+        #expect(actions == [.moveWindow(.left)])
+        #expect(sut.state == .leaderActive, "Move should stay in leader")
     }
 
-    func testLMovesWindowRight() {
-        activateLeader()
+    @Test mutating func lMovesWindowRight() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.keyL)
 
-        XCTAssertEqual(receivedActions, [.moveWindow(.right)])
-        XCTAssertEqual(sut.state, .leaderActive, "Move should stay in leader")
+        #expect(actions == [.moveWindow(.right)])
+        #expect(sut.state == .leaderActive, "Move should stay in leader")
     }
 
     // MARK: - Key Mapping: Focus Container
 
-    func testShiftHFocusesLeft() {
-        activateLeader()
+    @Test mutating func shiftHFocusesLeft() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.keyH, shift: true)
 
-        XCTAssertEqual(receivedActions, [.focusContainer(.left)])
-        XCTAssertEqual(sut.state, .leaderActive, "Focus should stay in leader")
+        #expect(actions == [.focusContainer(.left)])
+        #expect(sut.state == .leaderActive, "Focus should stay in leader")
     }
 
-    func testShiftLFocusesRight() {
-        activateLeader()
+    @Test mutating func shiftLFocusesRight() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.keyL, shift: true)
 
-        XCTAssertEqual(receivedActions, [.focusContainer(.right)])
-        XCTAssertEqual(sut.state, .leaderActive, "Focus should stay in leader")
+        #expect(actions == [.focusContainer(.right)])
+        #expect(sut.state == .leaderActive, "Focus should stay in leader")
     }
 
     // MARK: - Key Mapping: Cycle Window
 
-    func testShiftCommaCyclesPrevious() {
-        activateLeader()
+    @Test mutating func shiftCommaCyclesPrevious() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.comma, shift: true)
 
-        XCTAssertEqual(receivedActions, [.cycleWindow(.previous)])
-        XCTAssertEqual(sut.state, .leaderActive, "Cycle should stay in leader")
+        #expect(actions == [.cycleWindow(.previous)])
+        #expect(sut.state == .leaderActive, "Cycle should stay in leader")
     }
 
-    func testShiftPeriodCyclesNext() {
-        activateLeader()
+    @Test mutating func shiftPeriodCyclesNext() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
 
+        activateLeader()
         simulateKeyDown(KeyMapping.period, shift: true)
 
-        XCTAssertEqual(receivedActions, [.cycleWindow(.next)])
-        XCTAssertEqual(sut.state, .leaderActive, "Cycle should stay in leader")
+        #expect(actions == [.cycleWindow(.next)])
+        #expect(sut.state == .leaderActive, "Cycle should stay in leader")
     }
 
     // MARK: - Unrecognized Keys
 
-    func testUnrecognizedKeyConsumedButStaysInLeader() {
+    @Test mutating func unrecognizedKeyConsumedButStaysInLeader() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
+
         activateLeader()
 
         // 'z' key (keyCode 6) is not mapped
         let consumed = simulateKeyDown(6)
 
-        XCTAssertTrue(consumed, "Should consume unknown key in leader mode")
-        XCTAssertEqual(sut.state, .leaderActive, "Should stay in leader")
-        XCTAssertTrue(receivedActions.isEmpty, "Should not dispatch any action")
+        #expect(consumed, "Should consume unknown key in leader mode")
+        #expect(sut.state == .leaderActive, "Should stay in leader")
+        #expect(actions.isEmpty, "Should not dispatch any action")
     }
 
     // MARK: - Multi-Action Sequences
 
-    func testMultipleActionsStayInLeader() {
+    @Test mutating func multipleActionsStayInLeader() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
+
         activateLeader()
 
         simulateKeyDown(KeyMapping.keyH)       // moveWindow left
         simulateKeyDown(KeyMapping.keyL)       // moveWindow right
         simulateKeyDown(KeyMapping.keyH, shift: true)  // focusContainer left
 
-        XCTAssertEqual(receivedActions.count, 3)
-        XCTAssertEqual(receivedActions[0], .moveWindow(.left))
-        XCTAssertEqual(receivedActions[1], .moveWindow(.right))
-        XCTAssertEqual(receivedActions[2], .focusContainer(.left))
-        XCTAssertEqual(sut.state, .leaderActive)
+        #expect(actions.count == 3)
+        #expect(actions[0] == .moveWindow(.left))
+        #expect(actions[1] == .moveWindow(.right))
+        #expect(actions[2] == .focusContainer(.left))
+        #expect(sut.state == .leaderActive)
     }
 
-    func testLayoutSwitchExitsThenKeysPassThrough() {
+    @Test mutating func layoutSwitchExitsThenKeysPassThrough() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
+
         activateLeader()
 
-        simulateKeyDown(KeyMapping.key1)  // switchLayout → exits leader
-        XCTAssertEqual(sut.state, .idle)
+        simulateKeyDown(KeyMapping.key1)  // switchLayout -> exits leader
+        #expect(sut.state == .idle)
 
         let consumed = simulateKeyDown(KeyMapping.keyH)  // should pass through
-        XCTAssertFalse(consumed)
-        XCTAssertEqual(receivedActions.count, 1)  // only the layout switch
+        #expect(!consumed)
+        #expect(actions.count == 1)  // only the layout switch
     }
 
     // MARK: - Timeout
 
-    func testTimeoutExitsLeaderMode() async {
+    @Test func timeoutExitsLeaderMode() async {
         // Use a very short timeout for testing
         let shortTimeoutConfig = TillerConfig(
             margin: 8, padding: 8, accordionOffset: 16,
@@ -262,19 +298,19 @@ final class LeaderKeyManagerTests: XCTestCase {
         manager.onAction = { _ in }
 
         // Activate leader via state machine
-        var flags = CGEventFlags(rawValue: KeyMapping.optionFlag)
+        let flags = CGEventFlags(rawValue: KeyMapping.optionFlag)
         _ = manager.handleKeyEvent(keyCode: KeyMapping.space, flags: flags, eventType: .keyDown)
-        XCTAssertEqual(manager.state, .leaderActive)
+        #expect(manager.state == .leaderActive)
 
         // Wait for timeout
         try? await Task.sleep(nanoseconds: 250_000_000)
 
-        XCTAssertEqual(manager.state, .idle, "Leader should auto-exit after timeout")
+        #expect(manager.state == .idle, "Leader should auto-exit after timeout")
 
         try? FileManager.default.removeItem(at: tempDir)
     }
 
-    func testTimeoutResetsOnKeypress() async {
+    @Test func timeoutResetsOnKeypress() async {
         let shortTimeoutConfig = TillerConfig(
             margin: 8, padding: 8, accordionOffset: 16,
             leaderTimeout: 0.2,
@@ -295,26 +331,26 @@ final class LeaderKeyManagerTests: XCTestCase {
 
         let flags = CGEventFlags(rawValue: KeyMapping.optionFlag)
         _ = manager.handleKeyEvent(keyCode: KeyMapping.space, flags: flags, eventType: .keyDown)
-        XCTAssertEqual(manager.state, .leaderActive)
+        #expect(manager.state == .leaderActive)
 
         // Wait 150ms (75% of timeout), then press a key to reset
         try? await Task.sleep(nanoseconds: 150_000_000)
         let noFlags = CGEventFlags(rawValue: 0)
         _ = manager.handleKeyEvent(keyCode: KeyMapping.keyH, flags: noFlags, eventType: .keyDown)
-        XCTAssertEqual(manager.state, .leaderActive)
+        #expect(manager.state == .leaderActive)
 
         // Wait another 150ms — should still be active because timeout was reset
         try? await Task.sleep(nanoseconds: 150_000_000)
-        XCTAssertEqual(manager.state, .leaderActive, "Timeout should have been reset by keypress")
+        #expect(manager.state == .leaderActive, "Timeout should have been reset by keypress")
 
         // Wait full timeout from last keypress
         try? await Task.sleep(nanoseconds: 150_000_000)
-        XCTAssertEqual(manager.state, .idle, "Should timeout after no keypresses")
+        #expect(manager.state == .idle, "Should timeout after no keypresses")
 
         try? FileManager.default.removeItem(at: tempDir)
     }
 
-    func testZeroTimeoutMeansInfinite() async {
+    @Test func zeroTimeoutMeansInfinite() async {
         let noTimeoutConfig = TillerConfig(
             margin: 8, padding: 8, accordionOffset: 16,
             leaderTimeout: 0,
@@ -335,11 +371,11 @@ final class LeaderKeyManagerTests: XCTestCase {
 
         let flags = CGEventFlags(rawValue: KeyMapping.optionFlag)
         _ = manager.handleKeyEvent(keyCode: KeyMapping.space, flags: flags, eventType: .keyDown)
-        XCTAssertEqual(manager.state, .leaderActive)
+        #expect(manager.state == .leaderActive)
 
         // Wait 500ms — should still be active (no timeout)
         try? await Task.sleep(nanoseconds: 500_000_000)
-        XCTAssertEqual(manager.state, .leaderActive, "Zero timeout should mean infinite — no auto-exit")
+        #expect(manager.state == .leaderActive, "Zero timeout should mean infinite — no auto-exit")
 
         manager.exitLeaderMode()
         try? FileManager.default.removeItem(at: tempDir)
@@ -347,56 +383,71 @@ final class LeaderKeyManagerTests: XCTestCase {
 
     // MARK: - onStateChanged Callback
 
-    func testOnStateChangedFiresOnEnterAndExit() {
+    @Test mutating func onStateChangedFiresOnEnterAndExit() {
+        var states: [LeaderState] = []
+        sut.onStateChanged = { state in
+            states.append(state)
+        }
+
         activateLeader()
-        XCTAssertEqual(receivedStates, [.leaderActive])
+        #expect(states == [.leaderActive])
 
         simulateKeyDown(KeyMapping.escape)
-        XCTAssertEqual(receivedStates, [.leaderActive, .idle])
+        #expect(states == [.leaderActive, .idle])
     }
 
-    func testOnStateChangedNotCalledWhenAlreadyIdle() {
+    @Test mutating func onStateChangedNotCalledWhenAlreadyIdle() {
+        var states: [LeaderState] = []
+        sut.onStateChanged = { state in
+            states.append(state)
+        }
+
         sut.exitLeaderMode()
-        XCTAssertTrue(receivedStates.isEmpty)
+        #expect(states.isEmpty)
     }
 
     // MARK: - KeyMapping Unit Tests
 
-    func testKeyMappingReturnsNilForUnmappedKeys() {
-        XCTAssertNil(KeyMapping.action(forKeyCode: 6, shift: false))   // z
-        XCTAssertNil(KeyMapping.action(forKeyCode: 0, shift: false))   // a
-        XCTAssertNil(KeyMapping.action(forKeyCode: 49, shift: false))  // space (no option in this context)
+    @Test func keyMappingReturnsNilForUnmappedKeys() {
+        #expect(KeyMapping.action(forKeyCode: 6, shift: false) == nil)   // z
+        #expect(KeyMapping.action(forKeyCode: 0, shift: false) == nil)   // a
+        #expect(KeyMapping.action(forKeyCode: 49, shift: false) == nil)  // space (no option in this context)
     }
 
-    func testKeyMappingAllMappedKeys() {
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.key1, shift: false), .switchLayout(.monocle))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.key2, shift: false), .switchLayout(.splitHalves))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.keyH, shift: false), .moveWindow(.left))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.keyL, shift: false), .moveWindow(.right))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.keyH, shift: true), .focusContainer(.left))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.keyL, shift: true), .focusContainer(.right))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.comma, shift: true), .cycleWindow(.previous))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.period, shift: true), .cycleWindow(.next))
-        XCTAssertEqual(KeyMapping.action(forKeyCode: KeyMapping.escape, shift: false), .exitLeader)
+    @Test func keyMappingAllMappedKeys() {
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.key1, shift: false) == .switchLayout(.monocle))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.key2, shift: false) == .switchLayout(.splitHalves))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyH, shift: false) == .moveWindow(.left))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyL, shift: false) == .moveWindow(.right))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyH, shift: true) == .focusContainer(.left))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyL, shift: true) == .focusContainer(.right))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.comma, shift: true) == .cycleWindow(.previous))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.period, shift: true) == .cycleWindow(.next))
+        #expect(KeyMapping.action(forKeyCode: KeyMapping.escape, shift: false) == .exitLeader)
     }
 
     // MARK: - KeyAction.staysInLeader
 
-    func testStaysInLeaderProperty() {
-        XCTAssertFalse(KeyAction.switchLayout(.monocle).staysInLeader)
-        XCTAssertFalse(KeyAction.switchLayout(.splitHalves).staysInLeader)
-        XCTAssertTrue(KeyAction.moveWindow(.left).staysInLeader)
-        XCTAssertTrue(KeyAction.moveWindow(.right).staysInLeader)
-        XCTAssertTrue(KeyAction.focusContainer(.left).staysInLeader)
-        XCTAssertTrue(KeyAction.focusContainer(.right).staysInLeader)
-        XCTAssertTrue(KeyAction.cycleWindow(.next).staysInLeader)
-        XCTAssertTrue(KeyAction.cycleWindow(.previous).staysInLeader)
-        XCTAssertFalse(KeyAction.exitLeader.staysInLeader)
+    @Test func staysInLeaderProperty() {
+        #expect(!KeyAction.switchLayout(.monocle).staysInLeader)
+        #expect(!KeyAction.switchLayout(.splitHalves).staysInLeader)
+        #expect(KeyAction.moveWindow(.left).staysInLeader)
+        #expect(KeyAction.moveWindow(.right).staysInLeader)
+        #expect(KeyAction.focusContainer(.left).staysInLeader)
+        #expect(KeyAction.focusContainer(.right).staysInLeader)
+        #expect(KeyAction.cycleWindow(.next).staysInLeader)
+        #expect(KeyAction.cycleWindow(.previous).staysInLeader)
+        #expect(!KeyAction.exitLeader.staysInLeader)
     }
 
     // MARK: - Config-Driven Bindings
 
-    func testRemappedKeysDispatchCorrectly() {
+    @Test mutating func remappedKeysDispatchCorrectly() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
+
         // Create config with h/l swapped
         var kb = KeybindingsConfig.default
         kb.actions["moveWindow.left"] = ActionBinding(keys: ["l"], leaderLayer: true, subLayer: nil, staysInLeader: true)
@@ -408,19 +459,24 @@ final class LeaderKeyManagerTests: XCTestCase {
 
         // h should now be moveWindow.right
         simulateKeyDown(KeyMapping.keyH)
-        XCTAssertEqual(receivedActions.last, .moveWindow(.right))
+        #expect(actions.last == .moveWindow(.right))
 
         // l should now be moveWindow.left
         simulateKeyDown(KeyMapping.keyL)
-        XCTAssertEqual(receivedActions.last, .moveWindow(.left))
+        #expect(actions.last == .moveWindow(.left))
     }
 
-    func testUpdateBindingsMidSession() {
+    @Test mutating func updateBindingsMidSession() {
+        var actions: [KeyAction] = []
+        sut.onAction = { action in
+            actions.append(action)
+        }
+
         activateLeader()
 
         // Default: h = moveWindow.left
         simulateKeyDown(KeyMapping.keyH)
-        XCTAssertEqual(receivedActions.last, .moveWindow(.left))
+        #expect(actions.last == .moveWindow(.left))
 
         // Update bindings: swap h/l
         var kb = KeybindingsConfig.default
@@ -430,6 +486,6 @@ final class LeaderKeyManagerTests: XCTestCase {
 
         // h should now be moveWindow.right (after mid-session update)
         simulateKeyDown(KeyMapping.keyH)
-        XCTAssertEqual(receivedActions.last, .moveWindow(.right))
+        #expect(actions.last == .moveWindow(.right))
     }
 }

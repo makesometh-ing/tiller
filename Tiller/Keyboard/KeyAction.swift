@@ -3,7 +3,7 @@
 //  Tiller
 //
 
-enum KeyAction: Equatable, Sendable {
+nonisolated enum KeyAction: Equatable, Sendable {
     case switchLayout(LayoutID)
     case moveWindow(MoveDirection)
     case focusContainer(MoveDirection)
