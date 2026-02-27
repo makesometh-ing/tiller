@@ -59,6 +59,7 @@ enum ConfigMigrator {
     private static func applyMigration(from version: Int, json: [String: Any]) -> [String: Any] {
         switch version {
         case 0: return migrateV0toV1(json)
+        case 1: return migrateV1toV2(json)
         default: return json
         }
     }
@@ -66,5 +67,22 @@ enum ConfigMigrator {
     private static func migrateV0toV1(_ json: [String: Any]) -> [String: Any] {
         // v0→v1: No schema changes beyond adding the version field (handled by caller).
         return json
+    }
+
+    private static func migrateV1toV2(_ json: [String: Any]) -> [String: Any] {
+        // v1→v2: Move `containerHighlightsEnabled` bool into `containerHighlights` struct.
+        var result = json
+        var highlights: [String: Any] = [:]
+
+        if let enabled = result.removeValue(forKey: "containerHighlightsEnabled") as? Bool {
+            highlights["enabled"] = enabled
+        }
+
+        // Only add the struct if we migrated a field; otherwise defaults apply at decode time
+        if !highlights.isEmpty {
+            result["containerHighlights"] = highlights
+        }
+
+        return result
     }
 }

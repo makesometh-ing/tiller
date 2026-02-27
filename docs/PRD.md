@@ -590,15 +590,21 @@ User Control of Floating Windows
 
   * **Container Highlights:** When leader mode is active, container boundaries are highlighted:
 
-    * Focused container: blue glow border (3px stroke with 15% fill)
+    * Focused container: border with outward glow effect (CALayer shadow-based)
 
-    * Other containers: subtle white border (1px, 15% opacity)
+    * Other containers: visible border (configurable width and color)
+
+    * Highlights render below the leader overlay panel (lower window level)
 
     * Highlights are click-through and non-activating
 
     * Highlights update in real-time as container focus changes during leader mode
 
-    * Configurable via `containerHighlightsEnabled` in config (default: `true`)
+    * Fully configurable via `containerHighlights` config section:
+      * `enabled` (bool, default: true)
+      * `activeBorderWidth` (default: 2), `activeBorderColor` (hex, default: "#007AFF")
+      * `activeGlowRadius` (default: 8), `activeGlowOpacity` (default: 0.6)
+      * `inactiveBorderWidth` (default: 1), `inactiveBorderColor` (hex, default: "#FFFFFF66")
 
   * A full command palette with grouped, visually structured commands is planned for a future milestone.
 

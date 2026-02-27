@@ -14,6 +14,10 @@ enum ConfigValidationError: Error, Equatable, Sendable {
     case invalidKeyName(actionID: String, key: String)
     case missingRequiredAction(String)
     case subLayerOnNonLeader(actionID: String)
+    case highlightBorderWidthOutOfRange(String, Double)
+    case highlightGlowRadiusOutOfRange(Double)
+    case highlightGlowOpacityOutOfRange(Double)
+    case invalidHexColor(String, String)
 
     var description: String {
         switch self {
@@ -33,6 +37,14 @@ enum ConfigValidationError: Error, Equatable, Sendable {
             return "Required action '\(actionID)' is missing from keybindings"
         case .subLayerOnNonLeader(let actionID):
             return "Action '\(actionID)' has subLayer set but leaderLayer is false"
+        case .highlightBorderWidthOutOfRange(let which, let value):
+            return "\(which) border width \(value) is out of range (0.5-10)"
+        case .highlightGlowRadiusOutOfRange(let value):
+            return "Glow radius \(value) is out of range (0-30)"
+        case .highlightGlowOpacityOutOfRange(let value):
+            return "Glow opacity \(value) is out of range (0-1)"
+        case .invalidHexColor(let field, let value):
+            return "Invalid hex color '\(value)' for \(field)"
         }
     }
 }
@@ -69,12 +81,45 @@ struct ConfigValidator {
             errors.append(.leaderTimeoutOutOfRange(config.leaderTimeout))
         }
 
+        errors.append(contentsOf: validateContainerHighlights(config.containerHighlights))
         errors.append(contentsOf: validateKeybindings(config.keybindings))
         return errors
     }
 
     static func isValid(_ config: TillerConfig) -> Bool {
         return validate(config).isEmpty
+    }
+
+    // MARK: - Container Highlight Validation
+
+    static func validateContainerHighlights(_ highlights: ContainerHighlightConfig) -> [ConfigValidationError] {
+        var errors: [ConfigValidationError] = []
+        if !TillerConfig.ValidationRange.borderWidth.contains(highlights.activeBorderWidth) {
+            errors.append(.highlightBorderWidthOutOfRange("Active", highlights.activeBorderWidth))
+        }
+        if !TillerConfig.ValidationRange.borderWidth.contains(highlights.inactiveBorderWidth) {
+            errors.append(.highlightBorderWidthOutOfRange("Inactive", highlights.inactiveBorderWidth))
+        }
+        if !TillerConfig.ValidationRange.glowRadius.contains(highlights.activeGlowRadius) {
+            errors.append(.highlightGlowRadiusOutOfRange(highlights.activeGlowRadius))
+        }
+        if !TillerConfig.ValidationRange.glowOpacity.contains(highlights.activeGlowOpacity) {
+            errors.append(.highlightGlowOpacityOutOfRange(highlights.activeGlowOpacity))
+        }
+        if !isValidHexColor(highlights.activeBorderColor) {
+            errors.append(.invalidHexColor("activeBorderColor", highlights.activeBorderColor))
+        }
+        if !isValidHexColor(highlights.inactiveBorderColor) {
+            errors.append(.invalidHexColor("inactiveBorderColor", highlights.inactiveBorderColor))
+        }
+        return errors
+    }
+
+    private static func isValidHexColor(_ hex: String) -> Bool {
+        var str = hex
+        if str.hasPrefix("#") { str.removeFirst() }
+        guard str.count == 6 || str.count == 8 else { return false }
+        return str.allSatisfy { $0.isHexDigit }
     }
 
     // MARK: - Keybinding Validation

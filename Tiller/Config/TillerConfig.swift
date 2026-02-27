@@ -5,6 +5,51 @@
 
 import Foundation
 
+// MARK: - Container Highlight Config
+
+struct ContainerHighlightConfig: Codable, Equatable, Sendable {
+    var enabled: Bool
+    var activeBorderWidth: Double
+    var activeBorderColor: String
+    var activeGlowRadius: Double
+    var activeGlowOpacity: Double
+    var inactiveBorderWidth: Double
+    var inactiveBorderColor: String
+
+    static let `default` = ContainerHighlightConfig(
+        enabled: true,
+        activeBorderWidth: 2,
+        activeBorderColor: "#007AFF",
+        activeGlowRadius: 8,
+        activeGlowOpacity: 0.6,
+        inactiveBorderWidth: 1,
+        inactiveBorderColor: "#FFFFFF66"
+    )
+
+    init(enabled: Bool = true, activeBorderWidth: Double = 2, activeBorderColor: String = "#007AFF",
+         activeGlowRadius: Double = 8, activeGlowOpacity: Double = 0.6,
+         inactiveBorderWidth: Double = 1, inactiveBorderColor: String = "#FFFFFF66") {
+        self.enabled = enabled
+        self.activeBorderWidth = activeBorderWidth
+        self.activeBorderColor = activeBorderColor
+        self.activeGlowRadius = activeGlowRadius
+        self.activeGlowOpacity = activeGlowOpacity
+        self.inactiveBorderWidth = inactiveBorderWidth
+        self.inactiveBorderColor = inactiveBorderColor
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        enabled = try c.decodeIfPresent(Bool.self, forKey: .enabled) ?? true
+        activeBorderWidth = try c.decodeIfPresent(Double.self, forKey: .activeBorderWidth) ?? 2
+        activeBorderColor = try c.decodeIfPresent(String.self, forKey: .activeBorderColor) ?? "#007AFF"
+        activeGlowRadius = try c.decodeIfPresent(Double.self, forKey: .activeGlowRadius) ?? 8
+        activeGlowOpacity = try c.decodeIfPresent(Double.self, forKey: .activeGlowOpacity) ?? 0.6
+        inactiveBorderWidth = try c.decodeIfPresent(Double.self, forKey: .inactiveBorderWidth) ?? 1
+        inactiveBorderColor = try c.decodeIfPresent(String.self, forKey: .inactiveBorderColor) ?? "#FFFFFF66"
+    }
+}
+
 // MARK: - Keybinding Types
 
 struct ActionBinding: Codable, Equatable, Sendable {
@@ -37,14 +82,14 @@ struct KeybindingsConfig: Codable, Equatable, Sendable {
 // MARK: - Config
 
 struct TillerConfig: Codable, Equatable, Sendable {
-    static let currentVersion = 1
+    static let currentVersion = 2
 
     var version: Int
     var margin: Int
     var padding: Int
     var accordionOffset: Int
     var leaderTimeout: Double = 5.0
-    var containerHighlightsEnabled: Bool = true
+    var containerHighlights: ContainerHighlightConfig = .default
     var floatingApps: [String]
     var logLocation: String?
     var keybindings: KeybindingsConfig
@@ -55,7 +100,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         padding: Int,
         accordionOffset: Int,
         leaderTimeout: Double = 5.0,
-        containerHighlightsEnabled: Bool = true,
+        containerHighlights: ContainerHighlightConfig = .default,
         floatingApps: [String],
         logLocation: String? = nil,
         keybindings: KeybindingsConfig = .default
@@ -65,7 +110,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         self.padding = padding
         self.accordionOffset = accordionOffset
         self.leaderTimeout = leaderTimeout
-        self.containerHighlightsEnabled = containerHighlightsEnabled
+        self.containerHighlights = containerHighlights
         self.floatingApps = floatingApps
         self.logLocation = logLocation
         self.keybindings = keybindings
@@ -78,7 +123,7 @@ struct TillerConfig: Codable, Equatable, Sendable {
         padding = try container.decode(Int.self, forKey: .padding)
         accordionOffset = try container.decode(Int.self, forKey: .accordionOffset)
         leaderTimeout = try container.decodeIfPresent(Double.self, forKey: .leaderTimeout) ?? 5.0
-        containerHighlightsEnabled = try container.decodeIfPresent(Bool.self, forKey: .containerHighlightsEnabled) ?? true
+        containerHighlights = try container.decodeIfPresent(ContainerHighlightConfig.self, forKey: .containerHighlights) ?? .default
         floatingApps = try container.decode([String].self, forKey: .floatingApps)
         logLocation = try container.decodeIfPresent(String.self, forKey: .logLocation)
         keybindings = try container.decodeIfPresent(KeybindingsConfig.self, forKey: .keybindings) ?? .default
@@ -106,5 +151,8 @@ struct TillerConfig: Codable, Equatable, Sendable {
         static let padding = 0...20
         static let accordionOffset = 4...24
         static let leaderTimeout = 0.0...30.0
+        static let borderWidth = 0.5...10.0
+        static let glowRadius = 0.0...30.0
+        static let glowOpacity = 0.0...1.0
     }
 }
