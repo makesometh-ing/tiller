@@ -127,7 +127,7 @@ struct TillerApp: App {
             HStack(spacing: 4) {
                 Image("MenuBarIcon")
                 Text(TillerMenuState.shared.statusText)
-                    .font(.custom("Menlo", size: 12))
+                    .font(.system(size: 12, design: .monospaced))
             }
             .help(TillerMenuState.shared.configErrorTooltip ?? "")
         }
