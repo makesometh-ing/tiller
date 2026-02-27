@@ -413,4 +413,101 @@ final class ConfigTests: XCTestCase {
         let offset = json.distance(from: json.startIndex, to: json.range(of: "!")!.lowerBound)
         XCTAssertEqual(ConfigManager.lineNumber(in: data, at: offset), 3)
     }
+
+    // MARK: - Version Migration
+
+    func testMigrationAddsVersionToPreVersioningConfig() {
+        let json = """
+        { "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let result = ConfigMigrator.migrate(Data(json.utf8))
+
+        XCTAssertTrue(result.didMigrate)
+
+        let migrated = try! JSONSerialization.jsonObject(with: result.data) as! [String: Any]
+        XCTAssertEqual(migrated["version"] as? Int, TillerConfig.currentVersion)
+    }
+
+    func testMigrationPreservesUserValues() {
+        let json = """
+        { "margin": 12, "padding": 14, "accordionOffset": 20, "leaderTimeout": 10, "floatingApps": ["com.test.app"] }
+        """
+        let result = ConfigMigrator.migrate(Data(json.utf8))
+
+        let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
+        XCTAssertEqual(config.margin, 12)
+        XCTAssertEqual(config.padding, 14)
+        XCTAssertEqual(config.accordionOffset, 20)
+        XCTAssertEqual(config.leaderTimeout, 10)
+        XCTAssertEqual(config.floatingApps, ["com.test.app"])
+    }
+
+    func testMigrationNoOpOnCurrentVersion() {
+        let json = """
+        { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let result = ConfigMigrator.migrate(Data(json.utf8))
+        XCTAssertFalse(result.didMigrate)
+    }
+
+    func testMigrationNoOpOnNewerVersion() {
+        let json = """
+        { "version": 99, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let result = ConfigMigrator.migrate(Data(json.utf8))
+        XCTAssertFalse(result.didMigrate)
+    }
+
+    func testMigrationHandlesInvalidJSON() {
+        let data = Data("not json".utf8)
+        let result = ConfigMigrator.migrate(data)
+        XCTAssertFalse(result.didMigrate)
+        XCTAssertEqual(result.data, data)
+    }
+
+    func testConfigDecodesVersionField() throws {
+        let json = """
+        { "version": 1, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(config.version, 1)
+    }
+
+    func testConfigMissingVersionDefaultsToZero() throws {
+        let json = """
+        { "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(config.version, 0)
+    }
+
+    func testDefaultConfigHasCurrentVersion() {
+        XCTAssertEqual(TillerConfig.default.version, TillerConfig.currentVersion)
+    }
+
+    func testMigrationWritesBackToDisk() async throws {
+        let manager = createConfigManager()
+
+        // Write a pre-versioning config
+        let configDir = (tempDirectory.path as NSString).appendingPathComponent(".config/tiller")
+        try FileManager.default.createDirectory(atPath: configDir, withIntermediateDirectories: true)
+
+        let json = """
+        { "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        """
+        try Data(json.utf8).write(to: URL(fileURLWithPath: manager.configFilePath))
+
+        // Load triggers migration
+        let result = manager.loadConfiguration()
+        if case .loaded(let config) = result {
+            XCTAssertEqual(config.version, TillerConfig.currentVersion)
+        } else {
+            XCTFail("Expected loaded result, got \(result)")
+        }
+
+        // Verify the file on disk was updated with version
+        let diskData = try Data(contentsOf: URL(fileURLWithPath: manager.configFilePath))
+        let diskJSON = try JSONSerialization.jsonObject(with: diskData) as! [String: Any]
+        XCTAssertEqual(diskJSON["version"] as? Int, TillerConfig.currentVersion)
+    }
 }
