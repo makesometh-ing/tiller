@@ -513,7 +513,7 @@ final class ConfigTests: XCTestCase {
     func testContainerHighlightConfigDecoding() throws {
         let json = """
         {
-            "version": 2, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
+            "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
             "containerHighlights": {
                 "enabled": true,
                 "activeBorderWidth": 3,
@@ -521,7 +521,8 @@ final class ConfigTests: XCTestCase {
                 "activeGlowRadius": 12,
                 "activeGlowOpacity": 0.8,
                 "inactiveBorderWidth": 2,
-                "inactiveBorderColor": "#FFFFFF80"
+                "inactiveBorderColor": "#FFFFFF80",
+                "cornerRadius": 10
             }
         }
         """
@@ -532,11 +533,12 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(config.containerHighlights.activeGlowOpacity, 0.8)
         XCTAssertEqual(config.containerHighlights.inactiveBorderWidth, 2)
         XCTAssertEqual(config.containerHighlights.inactiveBorderColor, "#FFFFFF80")
+        XCTAssertEqual(config.containerHighlights.cornerRadius, 10)
     }
 
     func testContainerHighlightConfigDefaultsWhenMissing() throws {
         let json = """
-        { "version": 2, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
+        { "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [] }
         """
         let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
         XCTAssertEqual(config.containerHighlights, ContainerHighlightConfig.default)
@@ -558,6 +560,59 @@ final class ConfigTests: XCTestCase {
         let errors = ConfigValidator.validate(config)
         XCTAssertTrue(errors.contains(where: {
             if case .invalidHexColor("activeBorderColor", _) = $0 { return true }
+            return false
+        }))
+    }
+
+    // MARK: - V2→V3 Migration (add cornerRadius)
+
+    func testMigrationV2ToV3AddsCornerRadius() {
+        let json = """
+        {
+            "version": 2, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
+            "containerHighlights": {
+                "enabled": true, "activeBorderWidth": 2, "activeBorderColor": "#007AFF",
+                "activeGlowRadius": 8, "activeGlowOpacity": 0.6,
+                "inactiveBorderWidth": 1, "inactiveBorderColor": "#FFFFFF66"
+            }
+        }
+        """
+        let result = ConfigMigrator.migrate(Data(json.utf8))
+        XCTAssertTrue(result.didMigrate)
+
+        let config = try! JSONDecoder().decode(TillerConfig.self, from: result.data)
+        XCTAssertEqual(config.version, TillerConfig.currentVersion)
+        XCTAssertEqual(config.containerHighlights.cornerRadius, 8)
+    }
+
+    func testCornerRadiusDefaultsWhenMissing() throws {
+        let json = """
+        {
+            "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
+            "containerHighlights": { "enabled": true }
+        }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(config.containerHighlights.cornerRadius, 8)
+    }
+
+    func testCornerRadiusDecodesCustomValue() throws {
+        let json = """
+        {
+            "version": 3, "margin": 8, "padding": 8, "accordionOffset": 16, "floatingApps": [],
+            "containerHighlights": { "cornerRadius": 12 }
+        }
+        """
+        let config = try JSONDecoder().decode(TillerConfig.self, from: Data(json.utf8))
+        XCTAssertEqual(config.containerHighlights.cornerRadius, 12)
+    }
+
+    func testCornerRadiusValidationRejectsOutOfRange() {
+        var config = TillerConfig.default
+        config.containerHighlights.cornerRadius = 25
+        let errors = ConfigValidator.validate(config)
+        XCTAssertTrue(errors.contains(where: {
+            if case .highlightCornerRadiusOutOfRange(25) = $0 { return true }
             return false
         }))
     }

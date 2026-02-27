@@ -60,6 +60,7 @@ enum ConfigMigrator {
         switch version {
         case 0: return migrateV0toV1(json)
         case 1: return migrateV1toV2(json)
+        case 2: return migrateV2toV3(json)
         default: return json
         }
     }
@@ -85,6 +86,16 @@ enum ConfigMigrator {
             "inactiveBorderColor": defaults.inactiveBorderColor,
         ] as [String: Any]
 
+        return result
+    }
+
+    private static func migrateV2toV3(_ json: [String: Any]) -> [String: Any] {
+        // v2→v3: Add cornerRadius to containerHighlights.
+        var result = json
+        if var highlights = result["containerHighlights"] as? [String: Any] {
+            highlights["cornerRadius"] = ContainerHighlightConfig.default.cornerRadius
+            result["containerHighlights"] = highlights
+        }
         return result
     }
 }

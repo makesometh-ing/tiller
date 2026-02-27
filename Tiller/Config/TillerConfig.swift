@@ -15,6 +15,7 @@ struct ContainerHighlightConfig: Codable, Equatable, Sendable {
     var activeGlowOpacity: Double
     var inactiveBorderWidth: Double
     var inactiveBorderColor: String
+    var cornerRadius: Double
 
     static let `default` = ContainerHighlightConfig(
         enabled: true,
@@ -23,12 +24,14 @@ struct ContainerHighlightConfig: Codable, Equatable, Sendable {
         activeGlowRadius: 8,
         activeGlowOpacity: 0.6,
         inactiveBorderWidth: 1,
-        inactiveBorderColor: "#FFFFFF66"
+        inactiveBorderColor: "#FFFFFF66",
+        cornerRadius: 8
     )
 
     init(enabled: Bool = true, activeBorderWidth: Double = 2, activeBorderColor: String = "#007AFF",
          activeGlowRadius: Double = 8, activeGlowOpacity: Double = 0.6,
-         inactiveBorderWidth: Double = 1, inactiveBorderColor: String = "#FFFFFF66") {
+         inactiveBorderWidth: Double = 1, inactiveBorderColor: String = "#FFFFFF66",
+         cornerRadius: Double = 8) {
         self.enabled = enabled
         self.activeBorderWidth = activeBorderWidth
         self.activeBorderColor = activeBorderColor
@@ -36,6 +39,7 @@ struct ContainerHighlightConfig: Codable, Equatable, Sendable {
         self.activeGlowOpacity = activeGlowOpacity
         self.inactiveBorderWidth = inactiveBorderWidth
         self.inactiveBorderColor = inactiveBorderColor
+        self.cornerRadius = cornerRadius
     }
 
     init(from decoder: Decoder) throws {
@@ -47,6 +51,7 @@ struct ContainerHighlightConfig: Codable, Equatable, Sendable {
         activeGlowOpacity = try c.decodeIfPresent(Double.self, forKey: .activeGlowOpacity) ?? 0.6
         inactiveBorderWidth = try c.decodeIfPresent(Double.self, forKey: .inactiveBorderWidth) ?? 1
         inactiveBorderColor = try c.decodeIfPresent(String.self, forKey: .inactiveBorderColor) ?? "#FFFFFF66"
+        cornerRadius = try c.decodeIfPresent(Double.self, forKey: .cornerRadius) ?? 8
     }
 }
 
@@ -82,7 +87,7 @@ struct KeybindingsConfig: Codable, Equatable, Sendable {
 // MARK: - Config
 
 struct TillerConfig: Codable, Equatable, Sendable {
-    static let currentVersion = 2
+    static let currentVersion = 3
 
     var version: Int
     var margin: Int
@@ -154,5 +159,6 @@ struct TillerConfig: Codable, Equatable, Sendable {
         static let borderWidth = 0.5...10.0
         static let glowRadius = 0.0...30.0
         static let glowOpacity = 0.0...1.0
+        static let cornerRadius = 0.0...20.0
     }
 }

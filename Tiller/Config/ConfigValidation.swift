@@ -18,6 +18,7 @@ enum ConfigValidationError: Error, Equatable, Sendable {
     case highlightGlowRadiusOutOfRange(Double)
     case highlightGlowOpacityOutOfRange(Double)
     case invalidHexColor(String, String)
+    case highlightCornerRadiusOutOfRange(Double)
 
     var description: String {
         switch self {
@@ -45,6 +46,8 @@ enum ConfigValidationError: Error, Equatable, Sendable {
             return "Glow opacity \(value) is out of range (0-1)"
         case .invalidHexColor(let field, let value):
             return "Invalid hex color '\(value)' for \(field)"
+        case .highlightCornerRadiusOutOfRange(let value):
+            return "Corner radius \(value) is out of range (0-20)"
         }
     }
 }
@@ -111,6 +114,9 @@ struct ConfigValidator {
         }
         if !isValidHexColor(highlights.inactiveBorderColor) {
             errors.append(.invalidHexColor("inactiveBorderColor", highlights.inactiveBorderColor))
+        }
+        if !TillerConfig.ValidationRange.cornerRadius.contains(highlights.cornerRadius) {
+            errors.append(.highlightCornerRadiusOutOfRange(highlights.cornerRadius))
         }
         return errors
     }
