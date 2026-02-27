@@ -574,7 +574,33 @@ User Control of Floating Windows
 
 * **Overlay Behavior:**
 
-  * Pressing the leader key shows a full command palette with commands grouped and visually structured.
+  * Pressing the leader key shows a floating hint bar above the dock on the active monitor.
+
+  * The hint bar contains two rows:
+
+    * **Top row:** Keybinding hints (cycle `< >`, move `h l`, focus `H L`, exit `esc`)
+
+    * **Bottom row:** Layout numbers (1–9) with the active layout highlighted
+
+  * The hint bar uses an ultra-thin material background with rounded corners.
+
+  * The bar animates in (slide up, 150ms ease-out) when leader mode activates and out (fade, 100ms ease-in) when leader mode exits.
+
+  * The hint bar is non-activating (does not steal focus from the current window) and ignores mouse events.
+
+  * **Container Highlights:** When leader mode is active, container boundaries are highlighted:
+
+    * Focused container: blue glow border (3px stroke with 15% fill)
+
+    * Other containers: subtle white border (1px, 15% opacity)
+
+    * Highlights are click-through and non-activating
+
+    * Highlights update in real-time as container focus changes during leader mode
+
+    * Configurable via `containerHighlightsEnabled` in config (default: `true`)
+
+  * A full command palette with grouped, visually structured commands is planned for a future milestone.
 
 ### Shortcut Assignment System
 
