@@ -83,10 +83,12 @@ Work is **NOT done** until the PR is merged into `main`.
 6. **Update Linear** — Close finished issues, update in-progress items with comments summarising what was done and what remains
 7. **File new issues** — Create Linear issues for discovered work, bugs, follow-ups. Link relations where relevant
 8. **Verify** — PR is merged into `main`, local `main` is up to date, Linear reflects actual state
-9. **Hand off** — Provide context for next session: what was done, what's next, any blockers
+9. **Deal with side effects**: Flaky tests, broken functionality, and side effects must be recorded in Linear for later triage
+10. **Hand off** — Provide context for next session: what was done, what's next, any blockers
 
 **CRITICAL RULES:**
 
+- NEVER start work until you've created an issue and started the issue with linear (Which should start and change branch)
 - Work is NOT complete until the PR is merged into `main`
 - NEVER stop before the PR is created and set to merge — that leaves work stranded on a branch
 - NEVER say "ready to push when you are" — YOU must push, create the PR, and merge

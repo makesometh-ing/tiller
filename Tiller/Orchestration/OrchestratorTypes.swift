@@ -12,7 +12,7 @@ struct OrchestratorConfig: Equatable, Sendable {
 
     static let `default` = OrchestratorConfig(
         debounceDelay: 0.05,
-        animationDuration: 0.15,
+        animationDuration: 0.05,
         animateOnInitialTile: false
     )
 }
