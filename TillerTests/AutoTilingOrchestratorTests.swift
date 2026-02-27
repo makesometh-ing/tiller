@@ -1343,4 +1343,79 @@ struct AutoTilingOrchestratorTests {
             }
         }
     }
+
+    // MARK: - Stale Focus Recovery Tests (TILLER-88)
+
+    @Test func leaderActionsWorkAfterFocusedWindowHidden() async {
+        // Given: Two windows, window1 focused
+        let window1 = makeWindow(id: 1)
+        let window2 = makeWindow(id: 2)
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id, appName: window1.appName, bundleID: window1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+
+        // Simulate window1 being hidden (Cmd+H): remove from visible windows, clear focus
+        mockWindowService.windows = [window2]
+        mockWindowService.focusedWindow = nil
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // Trigger retile (simulates what happens when hidden window disappears from CGWindowList)
+        mockWindowService.simulateWindowCloseSync(window1.id)
+        await waitForRetile(expectedCallCount: 2)
+
+        // When: User tries a leader action (e.g., move window) — should NOT return nil
+        let monitorID = sut.activeMonitorID()
+
+        // Then: A valid monitor is returned (focus recovered to window2)
+        #expect(monitorID != nil, "Should recover focus to remaining window after hide")
+    }
+
+    @Test func activeMonitorStateFallsBackWhenFocusedWindowStale() async {
+        // Given: Two windows in split halves, window1 focused
+        let window1 = makeWindow(id: 1)
+        let window2 = makeWindow(id: 2)
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = FocusedWindowInfo(
+            windowID: window1.id, appName: window1.appName, bundleID: window1.bundleID
+        )
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+
+        // Switch to split halves so we have two containers
+        sut.switchLayout(to: .splitHalves, on: MonitorID(rawValue: 1))
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // Simulate window1 hidden + retile: window1 removed from containers
+        mockWindowService.windows = [window2]
+        mockWindowService.focusedWindow = nil
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+        await sut.performTile()
+
+        // When: moveWindowToContainer is called (uses activeMonitorState internally)
+        // It should fall back to window2 instead of failing
+        sut.moveWindowToContainer(direction: .right)
+
+        // Then: No crash, and a retile was scheduled (action was processed)
+        #expect(sut.hasPendingRetile, "moveWindowToContainer should schedule a retile if it found a fallback window")
+    }
 }
