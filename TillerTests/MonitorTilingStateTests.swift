@@ -453,7 +453,8 @@ final class MonitorTilingStateTests: XCTestCase {
 
         XCTAssertEqual(state.containers[0].windowIDs, [wid(2)])
         XCTAssertEqual(state.containers[1].windowIDs, [wid(3), wid(1)])
-        XCTAssertEqual(state.focusedContainerID, right.id)
+        // Focus stays on source container
+        XCTAssertEqual(state.focusedContainerID, left.id)
     }
 
     func testMoveWindowLeft() {
@@ -476,7 +477,8 @@ final class MonitorTilingStateTests: XCTestCase {
 
         XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(2)])
         XCTAssertEqual(state.containers[1].windowIDs, [wid(3)])
-        XCTAssertEqual(state.focusedContainerID, left.id)
+        // Focus stays on source container
+        XCTAssertEqual(state.focusedContainerID, right.id)
     }
 
     func testMoveWindowAtBoundary() {
@@ -533,10 +535,40 @@ final class MonitorTilingStateTests: XCTestCase {
 
         state.moveWindow(from: wid(1), direction: .right)
 
-        // Left container becomes empty
+        // Left container becomes empty, focus stays on source
         XCTAssertTrue(state.containers[0].windowIDs.isEmpty)
         XCTAssertEqual(state.containers[1].windowIDs, [wid(2), wid(1)])
-        XCTAssertEqual(state.focusedContainerID, right.id)
+        XCTAssertEqual(state.focusedContainerID, left.id)
+    }
+
+    func testMoveWindowMovesSpecificWindowNotContainerFocus() {
+        // Regression test: moveWindow should move the specific windowID passed in,
+        // not the container's internal focusedWindowID (which may differ from OS focus).
+        let leftFrame = CGRect(x: 0, y: 0, width: 960, height: 1080)
+        let rightFrame = CGRect(x: 960, y: 0, width: 960, height: 1080)
+        let left = Container(
+            id: ContainerID(rawValue: 0), frame: leftFrame,
+            windowIDs: [wid(1), wid(2), wid(3)], focusedWindowID: wid(1)
+        )
+        let right = Container(
+            id: ContainerID(rawValue: 1), frame: rightFrame,
+            windowIDs: [], focusedWindowID: nil
+        )
+        var state = MonitorTilingState(
+            monitorID: monitorID, activeLayout: .splitHalves,
+            containers: [left, right], focusedContainerID: left.id
+        )
+
+        // Move wid(2) — NOT the container's focusedWindowID (wid(1))
+        state.moveWindow(from: wid(2), direction: .right)
+
+        // wid(2) should be in the right container, wid(1) and wid(3) remain in left
+        XCTAssertEqual(state.containers[0].windowIDs, [wid(1), wid(3)])
+        XCTAssertEqual(state.containers[1].windowIDs, [wid(2)])
+        // Container's internal focus should still be wid(1) (unchanged)
+        XCTAssertEqual(state.containers[0].focusedWindowID, wid(1))
+        // Focused container stays on source
+        XCTAssertEqual(state.focusedContainerID, left.id)
     }
 
     // MARK: - setFocusedContainer Tests
