@@ -116,6 +116,8 @@ final class LeaderKeyManager {
     func handleKeyEvent(keyCode: UInt16, flags: CGEventFlags, eventType: CGEventType) -> Bool {
         let isShift = flags.rawValue & UInt64(CGEventFlags.maskShift.rawValue) != 0
 
+        TillerLogger.debug("keyboard", "[LeaderKey] Event: keyCode=\(keyCode) flags=0x\(String(flags.rawValue, radix: 16)) type=\(eventType.rawValue) state=\(state) leaderKeyCode=\(resolver.leaderKeyCode) leaderMask=0x\(String(resolver.leaderModifierMask, radix: 16))")
+
         switch state {
         case .idle:
             return handleIdleKeyEvent(keyCode: keyCode, flags: flags, eventType: eventType)
