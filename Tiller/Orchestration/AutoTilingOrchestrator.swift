@@ -179,6 +179,9 @@ final class AutoTilingOrchestrator {
             containersNeedingZOrderRefresh.insert(dstContainer.id)
         }
 
+        // Set z-order guard before raise/activate to suppress spurious AX focus events
+        lastZOrderAdjustment = Date()
+
         // Activate the source container's next window so focus stays on source.
         // If the source emptied, moveWindow already shifted focusedContainerID
         // to the destination, so we activate that container's focused window.
