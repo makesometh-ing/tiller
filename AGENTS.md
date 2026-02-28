@@ -32,12 +32,29 @@ linear issue list -s backlog -s triage -s unstarted -A  # All actionable issues
 linear issue list -s started   # In-progress work
 linear issue list -A           # All assignees
 linear issue view              # Current branch's issue
+linear issue view -w           # Open current issue in browser
 linear issue start <ID>        # Start issue, create branch
-linear issue create            # Create new issue
+linear issue create            # Create new issue (interactive)
+linear issue create -t "Title" -d "Description"  # Create issue (non-interactive)
 linear issue update            # Update current issue
+linear issue comment add       # Add comment to current issue
+linear project list            # Active projects
+linear project view            # Project details
 ```
 
-For full workflow context and current issue state: `/prime`
+For current issue state: `/linear-prime`
+
+### Direct API (escape hatch)
+
+For queries the CLI doesn't cover, use the GraphQL API directly:
+
+```bash
+linear schema -o /tmp/linear-schema.graphql
+curl -s -X POST https://api.linear.app/graphql \
+  -H "Content-Type: application/json" \
+  -H "Authorization: $(linear auth token)" \
+  -d '{"query": "{ viewer { assignedIssues(first: 20) { nodes { identifier title state { name } priority } } } }"}'
+```
 
 ## Git Workflow
 
