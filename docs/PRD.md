@@ -273,7 +273,7 @@ These keybindings remain in leader mode after execution.
 
 * The menu bar UI shows no layout selected and displays a "D" indicator to denote a dynamic layout.
 
-* The resize increment value and unit selector (percent/pixels) are visible in the General settings tab of the config UI.
+* The resize increment value and unit selector (percent/pixels) are visible in the General section of the config UI.
 
 ### Container Display and Focus Mechanics
 
@@ -570,7 +570,7 @@ User Control of Floating Windows
 
   * The timeout resets on each keypress within the leader sequence (not a hard timer from initial activation).
 
-  * Configurable in the General settings tab.
+  * Configurable in the General section.
 
 * **Overlay Behavior:**
 
@@ -667,7 +667,7 @@ User Control of Floating Windows
 
 * Accessible only via menu bar icon (unless technical needs dictate Dock icon).
 
-* Opening displays a three-tab UI: **General**, **Key Bindings**, **About**.
+* Opening displays a sidebar-navigated settings window with four sections: **General**, **Appearance**, **Key Bindings**, **Floating Apps**.
 
 ### Live Configuration Editing
 
@@ -675,9 +675,9 @@ User Control of Floating Windows
 
 * **Manual file editing (current):** Edits to `~/.config/tiller/config.json` are not detected automatically. Users must click "Reload Config" in the menu bar to apply changes from disk. Invalid configs are rejected entirely and Tiller falls back to defaults with a visible error indicator (see Config File Management).
 
-### General Tab Contents
+### General Section
 
-The General settings tab contains:
+The General section contains app-wide toggles and leader key configuration:
 
 * Open at login (toggle)
 * Enable/disable Tiller tiling (toggle)
@@ -686,14 +686,36 @@ The General settings tab contains:
 * Leader key default binding (shortcut picker)
 * Leader timeout (slider/input, 0–30 seconds, default 5)
 * Resize increment value and unit selector (percent/pixels, default 5%)
+
+### Appearance Section
+
+The Appearance section controls visual layout and container styling:
+
+**Spacing:**
 * Margin (container outer gap): 0–20px (default 8px)
 * Padding (gap between containers): 0–20px (default 8px)
 * Accordion offset: 4–64px (default 32px)
+
+**Container settings:**
+* Container highlights enabled (toggle, default on)
+* Corner radius: 0–20pt (default 8pt) — applies to both active and inactive containers
+* Active border color (color well, default #007AFF)
+* Active border width (stepper, default 2pt)
+* Active glow radius (stepper, default 8pt) — glow applies to active container only
+* Active glow opacity (slider, 0–1, default 0.6)
+* Inactive border color (color well, default #FFFFFF66)
+* Inactive border width (stepper, default 1pt)
+
+**Animation:**
 * Animation duration: 150–300ms (default 200ms)
 
-### Key Bindings Tab
+### Floating Apps Section
 
-The Key Bindings tab provides a table of all actions with three columns per action:
+A list of applications that should always float (never be tiled). Each entry shows the app icon, app name, and bundle identifier. Users can add or remove entries.
+
+### Key Bindings Section
+
+The Key Bindings section provides a table of all actions with three columns per action:
 
 * **Leader layer toggle (checkbox):** When checked, the action requires the leader key to be pressed first. When unchecked, the key binding acts as a global direct hotkey accessible at any time.
 
@@ -714,7 +736,7 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
 * **Format:** JSON only.
 
-* **Keybinding schema:** Each action binding is an object with four properties that mirror the Key Bindings tab columns:
+* **Keybinding schema:** Each action binding is an object with four properties that mirror the Key Bindings section columns:
 
   ```json
   {
@@ -758,7 +780,7 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
 * **Default config creation:** On first launch, if no config file exists, Tiller writes a complete `config.json` with all default values. This serves as a documented reference for manual editing.
 
-* **Supported Settings:** See General and Key Bindings tabs for the full settings list. All settings enumerated in those tabs are serialized to the config file.
+* **Supported Settings:** See General, Appearance, Floating Apps, and Key Bindings sections for the full settings list. All settings enumerated in those sections are serialized to the config file.
 
 * **No file watching:** Tiller does not watch the config file for changes. Manual edits to `config.json` require using the "Reload Config" menu item to take effect (see Menubar UI Structure).
 
@@ -860,7 +882,7 @@ An action can be bound through leader mode OR as a direct hotkey, but not both s
 
 * Opening config editor presents an initial welcome/permission explanation once.
 
-* Users can access General, Key Bindings, and About tabs.
+* Users can navigate between General, Appearance, Key Bindings, and Floating Apps sections via a sidebar.
 
 ### Day-to-Day Window Management
 
