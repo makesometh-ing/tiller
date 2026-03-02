@@ -34,7 +34,7 @@ NEVER start work until you have a Linear issue and have started it:
 1. **Check the PRD** — Re-read the PRD in `docs/` to verify the issue captures all relevant requirements. If misaligned, notify the user and offer to update the issue before starting.
 2. **Create issue if needed** — If no issue exists, create one first:
    ```bash
-   linear issue create -t "Title" -d "Description"
+   linear issue create -t "Title" --description-file /tmp/desc.md --no-interactive
    ```
 3. **Start the issue** — This creates a branch and moves the issue to In Progress:
    ```bash
@@ -83,7 +83,7 @@ linear issue view              # Current branch's issue
 linear issue view -w           # Open current issue in browser
 linear issue start <ID>        # Start issue, create branch
 linear issue create            # Create new issue (interactive)
-linear issue create -t "Title" -d "Description"  # Non-interactive
+linear issue create -t "Title" --description-file /tmp/desc.md --no-interactive  # Non-interactive
 linear issue update            # Update current issue
 linear issue comment add       # Add comment to current issue
 linear project list            # Active projects

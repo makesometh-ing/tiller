@@ -45,7 +45,12 @@ Close finished issues. Update in-progress items with comments summarising what w
 
 ## Step 7: File New Issues
 
-Create Linear issues for discovered work, bugs, and follow-ups. Link relations where relevant.
+Create Linear issues for discovered work, bugs, and follow-ups. Link relations using the CLI:
+
+```bash
+linear issue relation add TILLER-94 blocks TILLER-95
+linear issue relation add TILLER-10 related TILLER-11
+```
 
 ## Step 8: Verify
 
