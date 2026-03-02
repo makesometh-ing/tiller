@@ -80,7 +80,7 @@ final class LeaderKeyManager {
 
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
+            place: .tailAppendEventTap,
             options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: LeaderKeyManager.eventTapCallback,
