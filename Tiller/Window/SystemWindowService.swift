@@ -66,6 +66,12 @@ final class SystemWindowService: WindowServiceProtocol {
             return nil
         }
 
+        // Skip AX query when Tiller itself is frontmost — it has no standard windows
+        // and the query always fails with -25212, spamming the debug log.
+        if frontApp.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            return nil
+        }
+
         let appElement = AXUIElementCreateApplication(frontApp.processIdentifier)
         var focusedWindowRef: CFTypeRef?
 
