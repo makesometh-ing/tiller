@@ -226,6 +226,18 @@ Strict Layout and Containment
 
   9. One fifth left, three fifths center, one fifth right
 
+* **Layout display names** use sentence case per phrase, separated by ` · `. The first word of each phrase is capitalized; all other words are lowercase. Examples:
+
+  * `Monocle`
+  * `Split halves`
+  * `Half left · Two right quarters`
+  * `Two left quarters · Half right`
+  * `One third · Two thirds`
+  * `Two thirds · One third`
+  * `Two fifths · Three fifths`
+  * `Three fifths · Two fifths`
+  * `One fifth · Three fifths · One fifth`
+
 ### Dynamic Container Resizing
 
 Users can resize containers dynamically beyond the nine built-in layouts using dedicated keybindings.
