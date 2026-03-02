@@ -77,3 +77,9 @@ android/
 flutter/
 
 # docs
+
+# Skill eval workspaces
+.claude/skills/*-workspace/
+
+# Environment variables
+.env
