@@ -20,11 +20,10 @@ Tiller writes debug logs to a file on each run. The log is replaced (not appende
 
 ## Reading Logs
 
-Read the current config to find the log path, then read the log:
-
-!`cat ~/.config/tiller/config.json 2>/dev/null | python3 -c "import sys,json; c=json.load(sys.stdin); print(c.get('logLocation', '~/.tiller/logs/tiller-debug.log'))" 2>/dev/null || echo "~/.tiller/logs/tiller-debug.log"`
-
-Then read the log file at that path using the Read tool.
+To find the log path:
+1. Use the Read tool to read `~/.config/tiller/config.json`
+2. Look for the `logLocation` key. If absent, the default path is `~/.tiller/logs/tiller-debug.log`
+3. Use the Read tool to read the log file at that path.
 
 ## Log Format
 

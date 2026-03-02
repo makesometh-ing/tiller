@@ -230,6 +230,10 @@ final class AutoTilingOrchestrator {
     }
 
     private func activeMonitorState() -> (MonitorID, MonitorTilingState, WindowID)? {
+        // State snapshot for debugging focus resolution
+        let liveQuery = windowDiscoveryManager.focusedWindow?.windowID
+        TillerLogger.debug("orchestration", "[Action] activeMonitorState: liveQuery=\(liveQuery.map { String($0.rawValue) } ?? "nil"), lastFocused=\(lastFocusedWindowID.map { String($0.rawValue) } ?? "nil"), monitors=\(monitorStates.count)")
+
         // After z-order adjustments, windowDiscoveryManager.focusedWindow may report a
         // spurious focus caused by raising windows in non-active containers. Prefer our
         // own tracking during that window so actions operate on the correct container.
@@ -239,28 +243,32 @@ final class AutoTilingOrchestrator {
            let lastFocused = lastFocusedWindowID {
             focusedWindowID = lastFocused
         } else {
-            focusedWindowID = windowDiscoveryManager.focusedWindow?.windowID ?? lastFocusedWindowID
+            focusedWindowID = liveQuery ?? lastFocusedWindowID
         }
-        guard let focusedWindowID else {
-            TillerLogger.debug("orchestration", "[Action] activeMonitorState: no focused window (live query nil, no lastFocusedWindowID)")
-            return nil
-        }
-        for (monitorID, state) in monitorStates {
-            if state.containerForWindow(focusedWindowID) != nil {
-                return (monitorID, state, focusedWindowID)
+
+        // Try to find the focused window in a container
+        if let focusedWindowID {
+            for (monitorID, state) in monitorStates {
+                if state.containerForWindow(focusedWindowID) != nil {
+                    return (monitorID, state, focusedWindowID)
+                }
             }
+            TillerLogger.debug("orchestration", "[Action] activeMonitorState: focused window \(focusedWindowID.rawValue) not in any container, trying fallback")
         }
-        // Focused window is stale (hidden/minimized/closed). Fall back to any container's focused window.
-        TillerLogger.debug("orchestration", "[Action] activeMonitorState: focused window \(focusedWindowID.rawValue) not in any container, trying fallback")
+
+        // Unified fallback for both nil focus (never set) and stale focus (window gone).
+        // Look up any container's focusedWindowID — always set by Container.addWindow()
+        // for the first window added.
         for (monitorID, state) in monitorStates {
             if let focusedCID = state.focusedContainerID,
                let container = state.containers.first(where: { $0.id == focusedCID }),
                let fallbackWindowID = container.focusedWindowID {
                 lastFocusedWindowID = fallbackWindowID
-                TillerLogger.debug("orchestration", "[Action] activeMonitorState: stale focus \(focusedWindowID.rawValue) → fallback to \(fallbackWindowID.rawValue)")
+                TillerLogger.debug("orchestration", "[Action] activeMonitorState: focus \(focusedWindowID.map { String($0.rawValue) } ?? "nil") → fallback to \(fallbackWindowID.rawValue)")
                 return (monitorID, state, fallbackWindowID)
             }
         }
+
         // Log why fallback failed
         let containerCounts = monitorStates.map { (id, state) in
             let windowCount = state.containers.flatMap { $0.windowIDs }.count
@@ -603,6 +611,20 @@ final class AutoTilingOrchestrator {
 
             if isNewState {
                 onLayoutChanged?(monitor.id, state.activeLayout)
+            }
+        }
+
+        // Seed lastFocusedWindowID if it was never set (no AX focus event received yet).
+        // Containers always have focusedWindowID set by addWindow(), so we can bootstrap from them.
+        if lastFocusedWindowID == nil {
+            if let seedWindow = monitorStates.values
+                .compactMap({ state in
+                    state.focusedContainerID.flatMap { cid in
+                        state.containers.first(where: { $0.id == cid })?.focusedWindowID
+                    }
+                }).first {
+                lastFocusedWindowID = seedWindow
+                TillerLogger.debug("orchestration", "[Orchestrator] Seeded lastFocusedWindowID from container: \(seedWindow.rawValue)")
             }
         }
 

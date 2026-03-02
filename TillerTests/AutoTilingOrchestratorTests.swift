@@ -1091,8 +1091,8 @@ struct AutoTilingOrchestratorTests {
         #expect(mockLayoutEngine.calculateCallCount >= 1)
     }
 
-    @Test func operationsNoOpWithNoFocusedWindow() async {
-        // Given: Orchestrator running but no focused window
+    @Test func operationsUseFallbackWithNoFocusedWindow() async {
+        // Given: Orchestrator running with a window but no AX focus event
         let window1 = makeWindow(id: 1)
         mockWindowService.windows = [window1]
         mockWindowService.focusedWindow = nil
@@ -1106,7 +1106,26 @@ struct AutoTilingOrchestratorTests {
         mockLayoutEngine.reset()
         mockAnimationService.reset()
 
-        // When: All three operations called with no focused window
+        // When: Operations called with no focused window — should use container fallback
+        sut.focusContainer(direction: .right)
+
+        // Wait for debounced retile
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Then: Retile triggered because container fallback found window1
+        #expect(mockLayoutEngine.calculateCallCount >= 1, "focusContainer should succeed via container fallback when focus is nil")
+    }
+
+    @Test func operationsNoOpWithEmptyContainers() async {
+        // Given: Orchestrator running with no windows at all
+        mockWindowService.windows = []
+        mockWindowService.focusedWindow = nil
+
+        await sut.start()
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // When: All three operations called with no windows
         sut.cycleWindow(direction: .next)
         sut.moveWindowToContainer(direction: .right)
         sut.focusContainer(direction: .right)
@@ -1114,7 +1133,7 @@ struct AutoTilingOrchestratorTests {
         // Wait briefly
         try? await Task.sleep(nanoseconds: 100_000_000)
 
-        // Then: No retile triggered (all no-ops)
+        // Then: No retile triggered (true no-op — no windows to fall back to)
         #expect(mockLayoutEngine.calculateCallCount == 0)
     }
 
@@ -1417,5 +1436,78 @@ struct AutoTilingOrchestratorTests {
 
         // Then: No crash, and a retile was scheduled (action was processed)
         #expect(sut.hasPendingRetile, "moveWindowToContainer should schedule a retile if it found a fallback window")
+    }
+
+    // MARK: - Cold-Start Regression Tests (TILLER-88/90/79)
+
+    @Test func actionsWorkWithoutAnyFocusEvent() async {
+        // Regression: After app launch, if no AX focus event fires (e.g., Tiller itself
+        // is frontmost), leader key actions should still work via container fallback.
+        let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let window2 = makeWindow(id: 2, frame: CGRect(x: 200, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = nil // No focus event ever
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        await sut.start()
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // All three action types should work via container fallback
+        sut.focusContainer(direction: .right)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        #expect(mockLayoutEngine.calculateCallCount >= 1, "focusContainer should work without any focus event")
+
+        mockLayoutEngine.reset()
+        sut.cycleWindow(direction: .next)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        #expect(mockLayoutEngine.calculateCallCount >= 1, "cycleWindow should work without any focus event")
+
+        mockLayoutEngine.reset()
+        sut.moveWindowToContainer(direction: .right)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+        #expect(mockLayoutEngine.calculateCallCount >= 1, "moveWindowToContainer should work without any focus event")
+    }
+
+    @Test func switchLayoutThenFocusContainerWithoutFocusEvent() async {
+        // Regression: The exact user-reported scenario from TILLER-88/90.
+        // User opens windows → leader+2 (split halves) → leader+Shift+L (focus right).
+        // No AX focus event fires during this sequence.
+        let window1 = makeWindow(id: 1, frame: CGRect(x: 100, y: 100, width: 800, height: 600))
+        let window2 = makeWindow(id: 2, frame: CGRect(x: 200, y: 100, width: 800, height: 600))
+        mockWindowService.windows = [window1, window2]
+        mockWindowService.focusedWindow = nil
+
+        let targetFrame = CGRect(x: 8, y: 33, width: 1904, height: 1039)
+        mockLayoutEngine.resultToReturn = LayoutResult(placements: [
+            WindowPlacement(windowID: window1.id, pid: window1.ownerPID, targetFrame: targetFrame),
+            WindowPlacement(windowID: window2.id, pid: window2.ownerPID, targetFrame: targetFrame)
+        ])
+
+        // Step 1: Start orchestrator (monocle layout, initial tile)
+        await sut.start()
+
+        // Step 2: Switch to split halves (this works because it uses activeMonitorID())
+        let monitorID = MonitorID(rawValue: 1)
+        sut.switchLayout(to: .splitHalves, on: monitorID)
+
+        // Wait for retile to complete
+        try? await Task.sleep(nanoseconds: 200_000_000)
+
+        mockLayoutEngine.reset()
+        mockAnimationService.reset()
+
+        // Step 3: Focus container right — this was the failing action
+        sut.focusContainer(direction: .right)
+
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        // Then: focusContainer succeeds (retile triggered)
+        #expect(mockLayoutEngine.calculateCallCount >= 1, "focusContainer should succeed after switchLayout even without any focus event")
     }
 }
