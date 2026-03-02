@@ -1,6 +1,6 @@
 ---
 name: paper-mockup
-description: "Create visual UI mockups for Tiller in Paper. Use whenever the user asks to design, mock up, sketch, or visualize any Tiller UI component — including the app icon, menu bar icon, status bar, dropdown menu, settings screen, leader key overlay, or container highlights. Also triggers on requests to explore visual directions, try a new look, or iterate on existing Tiller designs. This skill requires the Paper MCP server to be connected."
+description: "Create visual UI mockups for Tiller in Paper, and use existing mockups as visual references when implementing UI in SwiftUI. Use whenever the user asks to design, mock up, sketch, or visualize any Tiller UI component — including the app icon, menu bar icon, status bar, dropdown menu, settings screen, leader key overlay, or container highlights. Also triggers on requests to explore visual directions, try a new look, or iterate on existing Tiller designs. ALSO triggers in reverse: when the user asks to implement or build a UI component in SwiftUI, use this skill to check Paper for existing mockups and screenshot them as a visual guide for implementation. This skill requires the Paper MCP server to be connected."
 ---
 
 # Paper Mockup — Tiller UI Design
@@ -95,6 +95,20 @@ Use the appropriate size for each component type:
 For UI content and structure, always start with `docs/PRD.md` — it defines what each component contains and how it should behave. The PRD may not reflect the latest implementation decisions, so when the user corrects something, trust their direction over the PRD and flag that the PRD needs updating.
 
 `references/tiller-ui-specs.md` supplements the PRD with macOS-specific visual conventions that aren't in the product spec (icon sizes, keycap styling, color well rendering, etc.).
+
+## Using Mockups as Implementation References
+
+This skill works in both directions:
+
+**Design → Code**: When the user asks to implement a UI component in SwiftUI, check Paper for existing mockups before writing code:
+
+1. Call `get_basic_info` to list artboards — look for one matching the component being implemented.
+2. If found, `get_screenshot` the relevant artboard at 2x scale to see the visual target clearly.
+3. Use `get_tree_summary` and `get_computed_styles` to extract exact spacing, colors, font sizes, and layout details from the mockup.
+4. Reference these values in your SwiftUI implementation rather than guessing.
+5. If no mockup exists, offer to create one first — a quick visual reference prevents implementation guesswork.
+
+This ensures implementation matches the designed intent. The mockup is the source of truth for visual decisions; the PRD is the source of truth for behavior.
 
 ## Dark Mode
 
