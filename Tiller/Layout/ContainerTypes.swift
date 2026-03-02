@@ -16,7 +16,7 @@ nonisolated enum LayoutID: String, Sendable, Codable, Equatable, Hashable, CaseI
     var displayName: String {
         switch self {
         case .monocle: return "Monocle"
-        case .splitHalves: return "Split Halves"
+        case .splitHalves: return "Split halves"
         }
     }
 

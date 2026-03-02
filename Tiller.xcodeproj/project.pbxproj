@@ -135,7 +135,7 @@
 						CreatedOnToolsVersion = 26.2;
 						TestTargetID = BC8514562F210DCF00B4E20B;
 					};
-					};
+				};
 			};
 			buildConfigurationList = BC8514522F210DCF00B4E20B /* Build configuration list for PBXProject "Tiller" */;
 			developmentRegion = en;
