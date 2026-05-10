@@ -14,7 +14,7 @@ nonisolated enum LeaderState: Equatable, Sendable {
     case subLayerActive(key: String)
 }
 
-// MARK: - Key Mapping (static key codes for tests)
+// MARK: - Key Mapping
 
 nonisolated enum KeyMapping {
     static let space: UInt16 = 49
@@ -27,22 +27,6 @@ nonisolated enum KeyMapping {
     static let period: UInt16 = 47
 
     static let optionFlag: UInt64 = 0x80000
-
-    /// Legacy hardcoded lookup — kept for test compatibility. Production code uses KeybindingResolver.
-    static func action(forKeyCode keyCode: UInt16, shift: Bool) -> KeyAction? {
-        switch (keyCode, shift) {
-        case (key1, false): return .switchLayout(.monocle)
-        case (key2, false): return .switchLayout(.splitHalves)
-        case (keyH, false): return .moveWindow(.left)
-        case (keyL, false): return .moveWindow(.right)
-        case (keyH, true): return .focusContainer(.left)
-        case (keyL, true): return .focusContainer(.right)
-        case (comma, true): return .cycleWindow(.previous)
-        case (period, true): return .cycleWindow(.next)
-        case (escape, _): return .exitLeader
-        default: return nil
-        }
-    }
 }
 
 // MARK: - LeaderKeyManager

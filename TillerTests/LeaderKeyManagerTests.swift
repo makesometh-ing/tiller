@@ -406,26 +406,6 @@ struct LeaderKeyManagerTests {
         #expect(states.isEmpty)
     }
 
-    // MARK: - KeyMapping Unit Tests
-
-    @Test func keyMappingReturnsNilForUnmappedKeys() {
-        #expect(KeyMapping.action(forKeyCode: 6, shift: false) == nil)   // z
-        #expect(KeyMapping.action(forKeyCode: 0, shift: false) == nil)   // a
-        #expect(KeyMapping.action(forKeyCode: 49, shift: false) == nil)  // space (no option in this context)
-    }
-
-    @Test func keyMappingAllMappedKeys() {
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.key1, shift: false) == .switchLayout(.monocle))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.key2, shift: false) == .switchLayout(.splitHalves))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyH, shift: false) == .moveWindow(.left))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyL, shift: false) == .moveWindow(.right))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyH, shift: true) == .focusContainer(.left))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.keyL, shift: true) == .focusContainer(.right))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.comma, shift: true) == .cycleWindow(.previous))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.period, shift: true) == .cycleWindow(.next))
-        #expect(KeyMapping.action(forKeyCode: KeyMapping.escape, shift: false) == .exitLeader)
-    }
-
     // MARK: - KeyAction.staysInLeader
 
     @Test func staysInLeaderProperty() {
