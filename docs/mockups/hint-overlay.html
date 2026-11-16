@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --teal: #3fd6c4; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .mock { margin: 0 0 28px; }
+  .label { font: 600 14px/1.3 var(--font-sans, -apple-system); margin: 0 0 4px; }
+  .note { font: 13px/1.45 var(--font-sans, -apple-system); color: var(--muted-foreground, #999); margin: 0 0 10px; }
+  .desk {
+    position: relative; aspect-ratio: 16 / 10; border-radius: 12px; overflow: hidden;
+    background:
+      radial-gradient(120% 80% at 20% 15%, #7b5cff 0%, transparent 55%),
+      radial-gradient(90% 70% at 85% 20%, #ff7ab8 0%, transparent 50%),
+      radial-gradient(100% 90% at 60% 100%, #2a1e6b 0%, transparent 60%),
+      linear-gradient(160deg, #4a3bb8, #23194f);
+  }
+  .menubar { position: absolute; inset: 0 0 auto 0; height: 22px; background: rgba(20,14,40,.35);
+    backdrop-filter: blur(20px); color: #fff; font-size: 11px; display: flex; align-items: center; gap: 14px; padding: 0 12px; }
+  .menubar .right { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+  .tray { width: 15px; height: 11px; border: 1.5px solid #fff; border-radius: 2px; position: relative; }
+  .tray::after { content: ""; position: absolute; left: 4px; top: 0; bottom: 0; width: 1.5px; background: #fff; }
+  .win { position: absolute; border-radius: 9px; background: #1e1e24; box-shadow: 0 10px 30px rgba(0,0,0,.45);
+    border: 1px solid rgba(255,255,255,.08); overflow: hidden; }
+  .win .bar { height: 18px; background: #2a2a31; display: flex; gap: 5px; align-items: center; padding-left: 8px; }
+  .win .bar i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+  .win .bar i:nth-child(1) { background: #ff5f57; } .win .bar i:nth-child(2) { background: #febc2e; } .win .bar i:nth-child(3) { background: #28c840; }
+  .win .lines { padding: 12px; display: grid; gap: 7px; }
+  .win .lines b { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); display: block; }
+  .glass { z-index: 10; background: rgba(28, 26, 38, .62); backdrop-filter: blur(28px) saturate(170%);
+    border: 1px solid rgba(255,255,255,.14); box-shadow: 0 20px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08); color: #f4f4f6; }
+  .key { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 5px; font: 600 11px/1 ui-monospace, "SF Mono", monospace; color: #fff;
+    background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.18); box-shadow: 0 1px 0 rgba(0,0,0,.35); }
+  .muted { color: rgba(255,255,255,.55); }
+
+  /* A: centered panel */
+  .a { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 330px; border-radius: 18px; padding: 14px; }
+  .a .head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .a .head .right { margin-left: auto; display: flex; gap: 3px; }
+  .a .section { font-size: 10px; font-weight: 600; letter-spacing: .02em; color: rgba(255,255,255,.5); margin: 4px 2px 6px; }
+  .a .group { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.07); border-radius: 12px; padding: 8px; margin-bottom: 10px; }
+  .a .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+  .a .tile { text-align: center; font-size: 10px; color: rgba(255,255,255,.75); }
+  .a .tile .box { position: relative; height: 44px; border-radius: 9px; background: rgba(255,255,255,.07); border: 1.5px solid transparent;
+    display: flex; align-items: center; justify-content: center; margin-bottom: 4px; }
+  .a .tile.on .box { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(63,214,196,.25); }
+  .a .tile.on { color: #fff; font-weight: 600; }
+  .a .tile .key { position: absolute; top: 3px; left: 3px; min-width: 13px; height: 13px; font-size: 9px; border-radius: 4px; padding: 0 3px; }
+  .a .rows { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; }
+  .a .row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; padding: 4px 2px; }
+  .a .foot { display: flex; justify-content: center; gap: 6px; align-items: center; font-size: 10.5px; }
+
+  /* B: bottom bar */
+  .b { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); border-radius: 16px; padding: 8px 10px;
+    display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .b .item { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .b .item.on { color: var(--teal); }
+  .b .item.on svg rect.f { fill: var(--teal); }
+  .b .sep { width: 1px; height: 22px; background: rgba(255,255,255,.14); }
+  .b .badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; color: var(--teal); padding: 0 2px; }
+
+  /* C: top-right list */
+  .c { position: absolute; right: 10px; top: 30px; width: 196px; border-radius: 12px; padding: 6px; font-size: 11.5px; }
+  .c .hdr { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 6px; font-weight: 600; font-size: 11px; }
+  .c .grp { font-size: 9.5px; font-weight: 600; color: rgba(255,255,255,.45); padding: 6px 6px 3px; }
+  .c .row { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; }
+  .c .row.on { background: rgba(63,214,196,.18); }
+  .c .row .key { margin-left: auto; }
+  .c hr { border: 0; border-top: 1px solid rgba(255,255,255,.1); margin: 5px 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  // Mini layout icon. Each rect is [x, y, w, h] in a 32x20 box. f = focused container.
+  const L = {
+    full: [[0,0,32,20]],
+    vsplit: [[0,0,15.5,20],[16.5,0,15.5,20]],
+    left23: [[0,0,21,20],[22,0,10,20]],
+    right23: [[0,0,10,20],[11,0,21,20]],
+  };
+  const icon = (k, w = 26) => `<svg width="${w}" height="${w*20/32}" viewBox="0 0 32 20">${L[k].map((r,i) =>
+    `<rect class="${i===0?'f':''}" x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="2.2" fill="${i===0?'#6fa8ff':'#b48cff'}" opacity=".95"/>`).join('')}</svg>`;
+  const layouts = [['1','full','Full Screen'],['2','vsplit','Vertical Split'],['3','left23','Left ⅔'],['4','right23','Right ⅔']];
+  const focus = [['h','Previous window'],['l','Next window'],['k','Previous container'],['j','Next container']];
+  const current = 'vsplit';
+
+  // Desktop behind the overlay: vertical split, left container with a 3-window carousel.
+  const desk = (overlay) => `
+    <div class="desk">
+      <div class="menubar"><b></b><b>Finder</b><span>File</span><span>Edit</span><span>View</span>
+        <div class="right"><span class="tray"></span><span>Mon 16 Nov 12:40</span></div></div>
+      ${[[12,32,'46%'],[30,32,'46%'],[21,32,'46%']].map(([x,y,w],i) => `
+        <div class="win" style="left:${x}px;top:${y}px;width:calc(${w} - 18px);bottom:12px;${i===2?'z-index:2':''}">
+          <div class="bar"><i></i><i></i><i></i></div><div class="lines">${'<b></b>'.repeat(6)}</div></div>`).join('')}
+      <div class="win" style="left:calc(46% + 13px);top:32px;right:12px;bottom:12px">
+        <div class="bar"><i></i><i></i><i></i></div><div class="lines">${'<b></b>'.repeat(6)}</div></div>
+      ${overlay}
+    </div>`;
+
+  const A = `<div class="a glass">
+      <div class="head"><svg width="16" height="12" viewBox="0 0 32 20">${L.left23.map(r=>`<rect x="${r[0]}" y="${r[1]}" width="${r[2]}" height="${r[3]}" rx="3" fill="#fff"/>`).join('')}</svg>
+        Tiller<div class="right"><span class="key">⌃</span><span class="key">⌥</span><span class="key">Space</span></div></div>
+      <div class="section">Layouts</div>
+      <div class="group"><div class="tiles">${layouts.map(([k,ic,n]) =>
+        `<div class="tile ${ic===current?'on':''}"><div class="box"><span class="key">${k}</span>${icon(ic,30)}</div>${n}</div>`).join('')}</div></div>
+      <div class="section">Focus</div>
+      <div class="group"><div class="rows">${focus.map(([k,n]) => `<div class="row"><span class="key">${k}</span>${n}</div>`).join('')}</div></div>
+      <div class="foot muted"><span class="key">esc</span> Close</div>
+    </div>`;
+
+  const B = `<div class="b glass">
+      <span class="badge">TILLER</span><div class="sep"></div>
+      ${layouts.map(([k,ic,n]) => `<div class="item ${ic===current?'on':''}"><span class="key">${k}</span>${icon(ic,22)}</div>`).join('')}
+      <div class="sep"></div>
+      <div class="item"><span class="key">h</span><span class="key">l</span><span class="muted">Window</span></div>
+      <div class="item"><span class="key">k</span><span class="key">j</span><span class="muted">Container</span></div>
+      <div class="sep"></div>
+      <div class="item"><span class="key">esc</span></div>
+    </div>`;
+
+  const C = `<div class="c glass">
+      <div class="hdr"><span>Tiller</span><span class="muted">⌃⌥Space</span></div>
+      <div class="grp">LAYOUTS</div>
+      ${layouts.map(([k,ic,n]) => `<div class="row ${ic===current?'on':''}">${icon(ic,20)}<span>${n}</span><span class="key">${k}</span></div>`).join('')}
+      <hr>
+      <div class="grp">FOCUS</div>
+      ${focus.map(([k,n]) => `<div class="row"><span>${n}</span><span class="key">${k}</span></div>`).join('')}
+      <hr>
+      <div class="row muted"><span>Close</span><span class="key">esc</span></div>
+    </div>`;
+
+  document.getElementById('root').innerHTML = [
+    ['A. Centered panel', 'Grouped sections and layout tiles, in the style of the Alcove settings. The current layout has a teal ring. It covers the center of the screen while the layer is active.', A],
+    ['B. Bottom bar', 'One row near the Dock position. It covers the least area. The labels are short.', B],
+    ['C. Top-right list', 'A list below the Tiller menu bar icon, in the style of a native menu. Each row has a full label.', C],
+  ].map(([t, n, o]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n}</p>${desk(o)}</div>`).join('');
+</script>
+</body>
+</html>

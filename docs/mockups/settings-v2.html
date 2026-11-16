@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .mock { margin: 0 0 30px; }
+  .label { font: 600 14px/1.3 var(--font-sans, -apple-system); margin: 0 0 4px; }
+  .note { font: 13px/1.45 var(--font-sans, -apple-system); color: var(--muted-foreground, #999); margin: 0 0 10px; }
+  .tag { font: 600 11px/1 var(--font-sans, -apple-system); color: var(--muted-foreground, #999); margin: 8px 0 6px; }
+
+  .dark { --wall: linear-gradient(160deg, #4a3bb8, #23194f); --win: #232228; --side: #1d1c22; --group: #2c2b32; --line: rgba(255,255,255,.07);
+    --text: #f2f2f5; --muted: rgba(255,255,255,.5); --field: #3a3940; --field-text: #e8e8ec; --empty: #2f2e35; --empty-text: rgba(255,255,255,.42);
+    --sel: rgba(255,255,255,.08); --accent: #3fd6c4; --key: rgba(255,255,255,.1); --key-text: #d8d8de; --btn: #3a3940; }
+  .light { --wall: linear-gradient(160deg, #e9e4ff, #cfc6f2); --win: #f6f6f8; --side: #ececf0; --group: #ffffff; --line: rgba(0,0,0,.07);
+    --text: #1d1d22; --muted: rgba(0,0,0,.5); --field: #e4e4e8; --field-text: #2a2a30; --empty: #f0f0f3; --empty-text: rgba(0,0,0,.4);
+    --sel: rgba(0,0,0,.06); --accent: #0f9e8e; --key: rgba(0,0,0,.07); --key-text: #3a3a40; --btn: #ffffff; }
+
+  .desk { width: 712px; padding: 22px 0; border-radius: 12px; background: var(--wall); display: flex; justify-content: center; }
+  .win { width: 640px; height: 640px; border-radius: 12px; overflow: hidden; background: var(--win); color: var(--text); display: flex;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); border: 1px solid var(--line); font-size: 12px; position: relative; }
+  .lights { position: absolute; left: 14px; top: 14px; display: flex; gap: 7px; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+
+  .side { width: 172px; background: var(--side); padding: 44px 8px 10px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); }
+  .nav { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; }
+  .nav.on { background: var(--sel); }
+  .ico { width: 20px; height: 20px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; }
+  .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .title { font-size: 15px; font-weight: 700; padding: 13px 20px 8px; }
+  .content { padding: 4px 20px 20px; overflow: hidden; }
+  .sec { font-size: 12px; font-weight: 700; margin: 12px 2px 6px; display: flex; align-items: center; gap: 6px; }
+  .sec .sub { font-weight: 400; color: var(--muted); }
+  .group { background: var(--group); border-radius: 9px; border: 1px solid var(--line); }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; min-height: 22px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .help { color: var(--muted); font-size: 10.5px; padding: 0 10px 8px; margin-top: -3px; }
+
+  /* Shortcut recorder, after Rectangle Pro: a field with the keys, and a clear button. */
+  .rec { display: flex; align-items: center; gap: 5px; }
+  .field { width: 150px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 11.5px; font-weight: 600;
+    background: var(--field); color: var(--field-text); letter-spacing: .04em; }
+  .field.empty { background: var(--empty); color: var(--empty-text); font-weight: 500; letter-spacing: 0; }
+  .field.live { background: var(--empty); color: var(--accent); box-shadow: 0 0 0 2px var(--accent); font-weight: 500; letter-spacing: 0; }
+  .x { width: 15px; height: 15px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 11px; }
+  .field.small { width: 46px; }
+  .key { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 5px;
+    background: var(--key); color: var(--key-text); font-size: 10.5px; font-weight: 500; }
+  .field.caps { background: transparent; gap: 3px; justify-content: flex-end; }
+
+  .tabs { display: flex; justify-content: center; gap: 4px; padding: 34px 0 8px; border-bottom: 1px solid var(--line); background: var(--side); }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 10px; border-radius: 7px; font-size: 10.5px; color: var(--muted); }
+  .tab.on { background: var(--sel); color: var(--text); }
+  .tab .ico { width: 22px; height: 22px; }
+
+  .hero { display: flex; align-items: center; gap: 10px; padding: 12px; }
+  .hero .big { display: flex; gap: 5px; }
+  .hero .big .key { min-width: 28px; height: 28px; font-size: 13px; border-radius: 7px; padding: 0 8px; }
+  .hero .txt { flex: 1; min-width: 0; }
+  .hero .txt b { display: block; font-size: 13px; margin-bottom: 2px; }
+  .hero .txt span { color: var(--muted); font-size: 11px; }
+  .btn { padding: 4px 10px; border-radius: 6px; background: var(--btn); border: 1px solid var(--line); font-size: 11.5px; font-weight: 500; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+  .grid2 .row { border-top: 1px solid var(--line); }
+  .grid2 .row:nth-child(-n+2) { border-top: 0; }
+
+  .cols { display: flex; gap: 8px; align-items: center; }
+  .colhead { display: flex; justify-content: flex-end; gap: 8px; padding: 0 10px 4px; font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .02em; }
+  .colhead span { width: 125px; text-align: center; }
+  .f2 { width: 104px; }
+  .link { color: var(--accent); font-size: 11.5px; font-weight: 500; }
+  .sub2 { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+  .seg { display: inline-flex; background: var(--field); border-radius: 7px; padding: 2px; font-size: 11px; }
+  .seg span { padding: 3px 12px; border-radius: 5px; color: var(--muted); }
+  .seg span.on { background: var(--btn); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.2); font-weight: 600; }
+  .toggle { width: 30px; height: 17px; border-radius: 9px; position: relative; display: inline-block; }
+  .toggle i { position: absolute; top: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; }
+  .menu { width: 230px; border-radius: 10px; padding: 5px; font-size: 12.5px; color: var(--text); background: var(--menu); backdrop-filter: blur(20px);
+    border: 1px solid var(--line); box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+  .menu .mi { padding: 4px 9px; border-radius: 5px; display: flex; align-items: center; gap: 7px; }
+  .menu .mi.hl { background: #2b74e8; color: #fff; }
+  .menu .sepm { height: 1px; background: var(--line); margin: 4px 6px; }
+  .menu .dim { color: var(--muted); }
+  .menu .sc { margin-left: auto; color: var(--muted); }
+  .dark { --menu: rgba(40,39,46,.92); } .light { --menu: rgba(246,246,248,.94); }
+  .menubar { height: 22px; display: flex; justify-content: flex-end; align-items: center; gap: 12px; padding: 0 14px; font-size: 11px; color: #fff; background: rgba(20,14,40,.35); }
+  .row2 { display: flex; gap: 18px; align-items: flex-start; justify-content: center; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const icon = (bg, glyph) => `<span class="ico" style="background:${bg}">${glyph}</span>`;
+  const nav = [['General', '#8e8e93', '⚙'], ['Shortcuts', '#636366', '⌘']];
+  const sidebar = on => `<div class="side">${nav.map(([n, c, g]) => `<div class="nav ${n === on ? 'on' : ''}">${icon(c, g)}${n}</div>`).join('')}
+      <div style="flex:1"></div><div class="nav">${icon('#8e8e93', 'i')}About</div></div>`;
+  const lights = `<div class="lights"><i></i><i></i><i></i></div>`;
+  const x = `<span class="x">✕</span>`, noX = `<span class="x" style="visibility:hidden">✕</span>`;
+  const field = (keys, cls = '') => keys === null ? `<div class="rec"><div class="field empty ${cls}">Record</div>${noX}</div>`
+    : keys === 'live' ? `<div class="rec"><div class="field live ${cls}">Press keys…</div>${x}</div>`
+    : `<div class="rec"><div class="field ${cls}">${keys}</div>${x}</div>`;
+  const toggle = on => `<span class="toggle" style="background:${on ? 'var(--accent)' : 'var(--field)'}"><i style="${on ? 'right' : 'left'}:2px"></i></span>`;
+
+  // Each action: name, key in leader key mode, global shortcut (null = not set).
+  const sections = [
+    ['Screen', [['Full screen layout', '1', 'Hyper 1'], ['Vertical split layout', '2', 'Hyper 2'], ['Left two-thirds layout', '3', null], ['Right two-thirds layout', '4', null]]],
+    ['Container', [['Focus previous container', 'K', null], ['Focus next container', 'J', 'live'], ['Switch carousel mode', 'V', null]]],
+    ['Window', [['Focus previous window', 'H', '⌃⌥ ←'], ['Focus next window', 'L', '⌃⌥ →'], ['Float or tile', 'F', null]]],
+  ];
+  const leader = `<div class="sec">Leader key</div><div class="group"><div class="row"><span>Leader key</span>${field('Hyper L')}</div>
+      <div class="help">Press the leader key, then the key in the "Leader key mode" column. A global shortcut works at any time, without the leader key.</div></div>`;
+
+  // Variant 1: two fields in each row, with column headings over each group.
+  const v1rows = sections.map(([t, rows]) => `<div class="sec">${t}</div>
+      <div class="colhead"><span>Leader key mode</span><span>Global shortcut</span></div>
+      <div class="group">${rows.map(([n, k, g]) => `<div class="row"><span>${n}</span><div class="cols">${field(k, 'f2')}${field(g, 'f2')}</div></div>`).join('')}</div>`).join('');
+  const v1 = `<div class="win">${lights}${sidebar('Shortcuts')}<div class="main"><div class="title">Shortcuts</div><div class="content">${leader}${v1rows}</div></div></div>`;
+
+  // Variant 2: the leader key mode field, and an "Add global shortcut" link that becomes a second field.
+  const v2rows = sections.map(([t, rows]) => `<div class="sec">${t}</div><div class="group">${rows.map(([n, k, g]) =>
+      `<div class="row"><span>${n}${g === null ? '<span class="sub2"><span class="link">+ Global shortcut</span></span>' : `<span class="sub2">Global: ${g === 'live' ? '<span class="link">Press keys…</span>' : g}</span>`}</span>${field(k)}</div>`).join('')}</div>`).join('');
+  const v2 = `<div class="win">${lights}${sidebar('Shortcuts')}<div class="main"><div class="title">Shortcuts</div><div class="content">${leader}${v2rows}</div></div></div>`;
+
+  // Variant 3: a segmented control switches the page between the two kinds of shortcut.
+  const v3rows = sections.map(([t, rows]) => `<div class="sec">${t}</div><div class="group">${rows.map(([n, k, g]) =>
+      `<div class="row"><span>${n}</span>${field(g)}</div>`).join('')}</div>`).join('');
+  const v3 = `<div class="win">${lights}${sidebar('Shortcuts')}<div class="main"><div class="title" style="display:flex;justify-content:space-between;align-items:center">Shortcuts
+      <span class="seg"><span>Leader key mode</span><span class="on">Global</span></span></div><div class="content">${leader}${v3rows}</div></div></div>`;
+
+  // General page: open at login, off by default.
+  const general = `<div class="win" style="height:330px">${lights}${sidebar('General')}<div class="main"><div class="title">General</div><div class="content">
+      <div class="sec">App</div><div class="group"><div class="row"><span>Open at login</span>${toggle(false)}</div>
+      <div class="row"><span>Enable Tiller</span>${toggle(true)}</div>
+      <div class="help">When Tiller is off, the leader key and the global shortcuts pass to the focused app. Windows stay where they are.</div></div></div></div></div>`;
+
+  // Menu bar menus: three ways to show the on/off state.
+  const menus = [
+    `<div class="menu"><div class="mi">✓ Tiller enabled</div><div class="sepm"></div><div class="mi dim">Leader key: Hyper L</div><div class="sepm"></div>
+      <div class="mi">Settings…<span class="sc">⌘,</span></div><div class="sepm"></div><div class="mi">Quit Tiller<span class="sc">⌘Q</span></div></div>`,
+    `<div class="menu"><div class="mi" style="justify-content:space-between"><b>Tiller</b>${toggle(true)}</div><div class="sepm"></div><div class="mi dim">Leader key: Hyper L</div><div class="sepm"></div>
+      <div class="mi">Settings…<span class="sc">⌘,</span></div><div class="sepm"></div><div class="mi">Quit Tiller<span class="sc">⌘Q</span></div></div>`,
+    `<div class="menu"><div class="mi">Disable Tiller<span class="sc">Hyper ⎋</span></div><div class="sepm"></div><div class="mi dim">Leader key: Hyper L</div><div class="sepm"></div>
+      <div class="mi">Settings…<span class="sc">⌘,</span></div><div class="sepm"></div><div class="mi">Quit Tiller<span class="sc">⌘Q</span></div></div>`,
+  ];
+  const menuNotes = ['Menu 1: a check mark item, as in many macOS menus.', 'Menu 2: a switch in the first row, as in Control Center.', 'Menu 3: one item that says the action. It changes to "Enable Tiller" when Tiller is off. The item can have a global shortcut.'];
+
+  const variants = [
+    ['Variant 1: two fields in each row', 'Each action has a field for leader key mode and a field for a global shortcut. Column headings are over each group. The fields are narrower.', v1],
+    ['Variant 2: global shortcut under the action name', 'The row has one field for leader key mode. The global shortcut is shown under the action name. "+ Global shortcut" records one.', v2],
+    ['Variant 3: a switch between the two kinds', 'A segmented control at the top shows the leader key mode keys or the global shortcuts. Each page has one field in each row. The Global page is shown.', v3],
+  ];
+  const both = w => `<p class="tag">Dark</p><div class="desk dark">${w}</div><p class="tag">Light</p><div class="desk light">${w}</div>`;
+  document.getElementById('root').innerHTML =
+    variants.map(([t, n, w]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n}</p>${both(w)}</div>`).join('') +
+    `<div class="mock"><p class="label">General page</p><p class="note">"Open at login" is off by default. "Enable Tiller" is the same setting as the menu bar item.</p>${both(general)}</div>` +
+    `<div class="mock"><p class="label">Menu bar menu</p><p class="note">${menuNotes.join(' ')}</p>` +
+    ['dark', 'light'].map(t => `<p class="tag">${t === 'dark' ? 'Dark' : 'Light'}</p><div class="desk ${t}" style="flex-direction:column;padding:0 0 18px"><div class="menubar"><span>▦</span><span>Mon 16 Nov 17:40</span></div>
+      <div class="row2" style="margin-top:8px">${menus.map((m, i) => `<div><p class="tag" style="color:#fff;margin:0 0 6px">Menu ${i + 1}</p>${m}</div>`).join('')}</div></div>`).join('') + `</div>`;
+</script>
+</body>
+</html>

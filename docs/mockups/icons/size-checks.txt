@@ -1,0 +1,40 @@
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-a/app-icon-1024.png
+  pixelWidth: 1024
+  pixelHeight: 1024
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-a/menubar-18.png
+  pixelWidth: 18
+  pixelHeight: 18
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-a/menubar-36.png
+  pixelWidth: 36
+  pixelHeight: 36
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-b/app-icon-1024.png
+  pixelWidth: 1024
+  pixelHeight: 1024
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-b/menubar-18.png
+  pixelWidth: 18
+  pixelHeight: 18
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-b/menubar-36.png
+  pixelWidth: 36
+  pixelHeight: 36
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-c/app-icon-1024.png
+  pixelWidth: 1024
+  pixelHeight: 1024
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-c/menubar-18.png
+  pixelWidth: 18
+  pixelHeight: 18
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/variant-c/menubar-36.png
+  pixelWidth: 36
+  pixelHeight: 36
+  hasAlpha: yes
+/Users/gregory.orton/Root/Personal/MakeSomething/Code/tiller/docs/mockups/icons/preview.png
+  pixelWidth: 1104
+  pixelHeight: 648
+  hasAlpha: no

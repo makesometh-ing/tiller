@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+
+# Swift Package Manager and Xcode
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.profraw
+
+# Build output from scripts/build.sh
+build/
+
+# Proof bundles are thrown away after review
+Tests/Proof/
+
+# Editors and local tools
+.vscode/
+.idea/
+*.swp
+.claude/settings.local.json
+
+# Secrets
+.env
+.env.*

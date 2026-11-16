@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .mock { margin: 0 0 30px; }
+  .label { font: 600 14px/1.3 var(--font-sans, -apple-system); margin: 0 0 4px; }
+  .note { font: 13px/1.45 var(--font-sans, -apple-system); color: var(--muted-foreground, #999); margin: 0 0 10px; }
+  .tag { font: 600 11px/1 var(--font-sans, -apple-system); color: var(--muted-foreground, #999); margin: 2px 0 6px; }
+  .dark {
+    --wall: radial-gradient(120% 80% at 20% 15%, #7b5cff 0%, transparent 55%), radial-gradient(90% 70% at 85% 20%, #ff7ab8 0%, transparent 50%), linear-gradient(160deg, #4a3bb8, #23194f);
+    --win: #1e1e24; --win-bar: #2a2a31; --glass: rgba(30,28,40,.74); --glass-border: rgba(255,255,255,.16); --text: #f4f4f6; --muted: rgba(255,255,255,.55);
+    --key-bg: rgba(255,255,255,.13); --key-border: rgba(255,255,255,.22); --accent: #3fd6c4; --chip: #2bb8a8; --chip-other: #5b5b66;
+    --tint: rgba(63,214,196,.15); --edge: rgba(63,214,196,.95); --section: rgba(255,255,255,.4);
+  }
+  .light {
+    --wall: radial-gradient(120% 80% at 20% 15%, #c9bcff 0%, transparent 55%), radial-gradient(90% 70% at 85% 20%, #ffd0e6 0%, transparent 50%), linear-gradient(160deg, #e9e4ff, #cfc6f2);
+    --win: #ffffff; --win-bar: #f3f3f6; --glass: rgba(255,255,255,.78); --glass-border: rgba(0,0,0,.1); --text: #1d1d22; --muted: rgba(0,0,0,.5);
+    --key-bg: rgba(0,0,0,.06); --key-border: rgba(0,0,0,.15); --accent: #0f9e8e; --chip: #0f9e8e; --chip-other: #8e8e99;
+    --tint: rgba(15,158,142,.12); --edge: rgba(15,158,142,.9); --section: rgba(0,0,0,.4);
+  }
+  .desk { position: relative; width: 712px; height: 300px; border-radius: 12px; overflow: hidden; background: var(--wall); color: var(--text); }
+  .win { position: absolute; border-radius: 9px; background: var(--win); border: 1px solid var(--glass-border); overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+  .win .bar { height: 20px; background: var(--win-bar); }
+  .cont { position: absolute; border-radius: 10px; box-sizing: border-box; background: var(--tint); border: 2px solid var(--edge); z-index: 5; }
+  .abs { position: absolute; z-index: 10; }
+  .glass { background: var(--glass); backdrop-filter: blur(24px) saturate(170%); border: 1px solid var(--glass-border); box-shadow: 0 8px 28px rgba(0,0,0,.25); color: var(--text); }
+  .key { display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 4px;
+    font: 600 9px/1 ui-monospace, "SF Mono", monospace; color: var(--text); background: var(--key-bg); border: 1px solid var(--key-border); }
+  .muted { color: var(--muted); }
+  .sep { width: 1px; align-self: stretch; background: var(--key-border); margin: 2px 0; }
+  .kbar { display: flex; align-items: center; gap: 9px; padding: 6px 9px 6px 7px; border-radius: 12px; font-size: 10px; white-space: nowrap; }
+  .grip { width: 6px; height: 14px; background-image: radial-gradient(var(--muted) 1px, transparent 1.2px); background-size: 3px 3.5px; }
+  .brand { color: var(--accent); font-size: 9px; font-weight: 700; letter-spacing: .05em; }
+  .it { display: flex; align-items: center; gap: 3px; }
+  .sec { display: flex; flex-direction: column; gap: 3px; }
+  .sec .h { font-size: 7.5px; font-weight: 700; letter-spacing: .08em; color: var(--section); }
+  .sec .row { display: flex; gap: 7px; align-items: center; }
+  .gi { display: flex; align-items: center; gap: 4px; }
+  .gi svg { color: var(--muted); }
+  .chip { display: flex; align-items: center; gap: 5px; padding: 3px 4px 3px 7px; border-radius: 99px; color: #fff; font-size: 10px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.3); white-space: nowrap; }
+  .chip .k { display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 15px; border-radius: 4px; font: 600 9px/1 ui-monospace, monospace;
+    background: rgba(255,255,255,.2); border: 1px solid rgba(255,255,255,.5); color: #fff; }
+  .chip .n { opacity: .75; font-weight: 800; }
+  .help { border-radius: 12px; padding: 10px 12px; font-size: 10px; width: 260px; }
+  .help .h { font-size: 7.5px; font-weight: 700; letter-spacing: .08em; color: var(--section); margin: 8px 0 4px; }
+  .help .h:first-child { margin-top: 0; }
+  .help .r { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .help .r .d { color: var(--muted); margin-left: auto; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const k = (...x) => x.map(v => `<span class="key">${v}</span>`).join('');
+  const stack = `<svg width="12" height="10" viewBox="0 0 12 10" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="0.7" width="8.3" height="6" rx="1.3"/><path d="M0.7 3.5v4.5a1.3 1.3 0 0 0 1.3 1.3h6.5"/></svg>`;
+  const icons = {
+    screen: `<svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.6" y="0.6" width="11.8" height="7.6" rx="1.4"/><path d="M4.5 10.4h4"/></svg>`,
+    container: `<svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.6" y="0.6" width="5" height="9.8" rx="1.2"/><rect x="7.4" y="0.6" width="5" height="9.8" rx="1.2"/></svg>`,
+    window: `<svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.6" y="0.6" width="11.8" height="9.8" rx="1.6"/><path d="M0.6 3.2h11.8"/></svg>`,
+    app: `<svg width="11" height="11" viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="0.6" y="0.6" width="9.8" height="9.8" rx="2.6"/></svg>`,
+  };
+  // Icon-only chips: the mode icon, the window count and the v key.
+  const chips = `
+    <div class="abs" style="left:182px;top:22px;transform:translate(-50%,-50%)"><div class="chip" style="background:var(--chip)"><span class="n">1</span>⇆ ${stack} 3 <span class="k">v</span></div></div>
+    <div class="abs" style="left:532px;top:22px;transform:translate(-50%,-50%)"><div class="chip" style="background:var(--chip-other)"><span class="n">2</span>⇅ ${stack} 2 <span class="k">v</span></div></div>`;
+  const scene = inner => `<div class="win" style="left:10px;top:22px;width:344px;height:270px"><div class="bar"></div></div>
+    <div class="win" style="left:360px;top:22px;width:342px;height:270px"><div class="bar"></div></div>
+    <div class="cont" style="left:10px;top:22px;width:344px;height:270px"></div>
+    <div class="cont" style="left:360px;top:22px;width:342px;height:270px;background:transparent;border-color:var(--key-border)"></div>${chips}${inner}`;
+
+  const bar1 = `<div class="kbar glass"><span class="grip"></span><span class="brand">TILLER</span><div class="sep"></div>
+    <div class="sec"><span class="h">SCREEN</span><div class="row"><span class="it">${k('1','2','3','4')}<span class="muted">Layout</span></span></div></div><div class="sep"></div>
+    <div class="sec"><span class="h">CONTAINER</span><div class="row"><span class="it">${k('k','j')}<span class="muted">Focus</span></span><span class="it">${k('v')}<span class="muted">Mode</span></span></div></div><div class="sep"></div>
+    <div class="sec"><span class="h">WINDOW</span><div class="row"><span class="it">${k('h','l')}<span class="muted">Focus</span></span><span class="it">${k('f')}<span class="muted">Float</span></span></div></div><div class="sep"></div>
+    <div class="sec"><span class="h">APP</span><div class="row"><span class="it">${k('r')}<span class="muted">Raise</span></span></div></div><div class="sep"></div>
+    <span class="it">${k('?')}</span>${k('esc')}</div>`;
+  const bar2 = `<div class="kbar glass"><span class="grip"></span><span class="brand">TILLER</span><div class="sep"></div>
+    <span class="it">${k('1','2','3','4')}<span class="muted">Layout</span></span>
+    <span class="it">${k('h','l')}<span class="muted">Window</span></span>
+    <span class="it">${k('k','j')}<span class="muted">Container</span></span><div class="sep"></div>
+    <span class="it">${k('?')}<span class="muted">All keys</span></span>${k('esc')}</div>`;
+  const help = `<div class="help glass">
+    <div class="h">SCREEN</div><div class="r">${k('1','2','3','4')}<span>Layout</span><span class="d">Full, split, ⅔ left, ⅔ right</span></div>
+    <div class="h">CONTAINER</div><div class="r">${k('k','j')}<span>Focus</span><span class="d">Previous, next</span></div><div class="r">${k('v')}<span>Mode</span><span class="d">Horizontal ⇆ vertical</span></div>
+    <div class="h">WINDOW</div><div class="r">${k('h','l')}<span>Focus</span><span class="d">Previous, next</span></div><div class="r">${k('f')}<span>Float</span><span class="d">Float or tile</span></div>
+    <div class="h">APP</div><div class="r">${k('r')}<span>Raise</span><span class="d">Floating windows to the front</span></div></div>`;
+  const bar3 = `<div class="kbar glass"><span class="grip"></span><span class="brand">TILLER</span><div class="sep"></div>
+    <span class="gi" title="Screen">${icons.screen}${k('1','2','3','4')}</span><div class="sep"></div>
+    <span class="gi" title="Container">${icons.container}${k('k','j')}<span class="muted">Focus</span>${k('v')}<span class="muted">Mode</span></span><div class="sep"></div>
+    <span class="gi" title="Window">${icons.window}${k('h','l')}<span class="muted">Focus</span>${k('f')}<span class="muted">Float</span></span><div class="sep"></div>
+    <span class="gi" title="App">${icons.app}${k('r')}<span class="muted">Raise</span></span><div class="sep"></div>
+    ${k('?')}${k('esc')}</div>`;
+
+  // The desk is a small copy of a real screen, so the bar is drawn at 85 % to keep the same proportions.
+  const at = (html, bottom = 12) => `<div class="abs" style="left:50%;bottom:${bottom}px;transform:translateX(-50%) scale(.85);transform-origin:bottom center">${html}</div>`;
+  const variants = [
+    ['Variant 1: sections with headings', 'The key bar shows all keys in sections. A small heading over each section says what the keys act on: screen, container, window or app. `?` opens the full list with descriptions.', at(bar1)],
+    ['Variant 2: short bar and a `?` list', 'The key bar shows only the layout and focus keys. `?` opens the full list, grouped by what each key acts on. The list is shown open here.', at(bar2) + `<div class="abs" style="left:50%;bottom:58px;transform:translateX(-50%)">${help}</div>`],
+    ['Variant 3: sections with icons', 'Each section starts with an icon for what the keys act on: screen, container, window or app. The icons have a tooltip. `?` opens the full list.', at(bar3)],
+  ];
+  document.getElementById('root').innerHTML = variants.map(([t, n, o]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n} All variants use the chip with only the mode icon.</p>
+    <p class="tag">Dark</p><div class="desk dark">${scene(o)}</div><p class="tag" style="margin-top:8px">Light</p><div class="desk light">${scene(o)}</div></div>`).join('');
+</script>
+</body>
+</html>

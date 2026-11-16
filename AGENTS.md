@@ -1,0 +1,55 @@
+# Tiller
+
+Tiller is a tiling window manager for macOS. It is a menu bar app.
+
+## Requirements that apply to all work
+
+- A task is marked done only with a proof bundle: logs, screenshots, screen recordings or test output. Proof bundles are stored in `Tests/Proof/<task>/`. Git ignores this folder, because proof bundles are thrown away after review.
+- Before UI is built, make at least 3 mockups for approval. Show each mockup in the light and the dark appearance. The look must match the quality of `docs/references/ui-alcove-settings.png`.
+- SIP stays enabled. Use the Accessibility API and permissions. Don't move windows off-screen.
+- Latency and visible jank aren't acceptable. Measure the latency of each action.
+- Work in vertical slices. Each slice is real working software that can be tested.
+- The workspace is a singleton per screen. Each screen has exactly one workspace with its own layout. The workspace state is stored with the display UUID as the key.
+
+## Requirements
+
+- `docs/PRD.md` describes the decisions and the behaviour as they are now.
+- `docs/requirements-as-written.md` contains the owner's requirements word for word.
+- `GLOSSARY.md` defines the words for Tiller. Use these words in code, docs and UI text.
+- `docs/adr/` contains the decisions that are hard to change, with the reasons.
+- `docs/issues/README.md` lists the work left for v1, as one issue for each file.
+- `docs/issues/tickets.jsonl` lists the done work and the open issues in build order. Update it when an issue is done or added.
+- `docs/work/README.md` lists each feature and bug with its status. Add a file to `docs/work/` for each new feature or bug, and update its status in the index.
+- `docs/references/requirements-infographic.png` and `docs/diagrams_drawing_tiller.tldraw` define the glossary, the container layouts and the carousel rules.
+
+## Commands
+
+- `scripts/test.sh`: unit tests. Xcode isn't used.
+- `scripts/build.sh`: builds `build/Tiller.app`, `build/TillerTestWindows.app` and `build/tiller-proof`, signed with the Apple Development certificate. A stable signature keeps the Accessibility permission after each rebuild.
+- `build/tiller-proof --out Tests/Proof/<task>`: the end-to-end test. It manages only the test windows. `--apps <bundle id,...>` adds other apps. `--steps 2,leader,esc` runs other steps. `--leader hyper+l` and `--keys focusNextWindow=hyper+n` set the shortcuts for the run. Proof runs use their own defaults domain, so your saved shortcuts don't change. `--appearance light|dark` sets the system appearance for the run and restores it.
+- Tiller writes its log to `~/Library/Logs/Tiller/tiller.log`.
+
+## UI
+
+- All UI follows the system light or dark appearance. A setting for light, dark or system comes later.
+- Colors, materials, fonts and spacing are read from one theme type, so that themes can be added later.
+- Key caps are flat: a rounded square with a solid fill, without a border, and the key in the system sans font. Letters are upper case.
+- The leader key overlay has a key bar: draggable, at the bottom of the screen by default. The keys are in sections with a heading that says what they act on: screen, container, window and app (variant 1 in `docs/mockups/leader-mode-v4.html`). `?` opens the full key list with descriptions. Both read their keys from `KeyGuide` in `Sources/Tiller/Overlay/OverlayViews.swift`.
+
+- In leader key mode, each container has a teal tint and a solid chip on its top edge, over the border. The chip of the focused container is teal. The other chips are grey. The chip shows the container number, the carousel mode icon (⇆ or ⇅), the window count and the `v` key. A tooltip on the key shows what the key does.
+- `v` in leader key mode switches the carousel mode of the focused container between horizontal and vertical.
+- In leader key mode, each window has a small translucent pill at its bottom-right corner: app icon, app name, Tiled or Floating, and the `p` and `f` keys. A window behind the focused window in a carousel shows only its app icon, in its visible edge.
+
+- The settings window is variant 1 in `docs/mockups/settings.html`: a sidebar with colored icons, as in the CleanShot settings, and shortcut fields with a clear button, as in Rectangle Pro. The references are in `docs/references/`.
+- The leader key and every key in leader key mode can be recorded in the settings. Each chord can use Hyper (⌃⌥⇧⌘ together). A key without modifiers in leader key mode also matches while modifiers are still held.
+
+## Window behavior
+
+- Window kinds are decided by the window rule in `Sources/TillerCore/WindowTraits.swift`:
+  - tiled: subrole `AXStandardWindow`, the size can be set, the parent is the app, not modal.
+  - floating: other windows at window layer 0. Tiller doesn't move, resize or focus them.
+  - ignored: minimized, not on screen, above window layer 0, or subrole `AXUnknown`.
+- A new floating window doesn't cause a re-layout or a focus change.
+- Focus stays on the tiled window. The floating windows of an app stay behind its focused window. `r` in leader key mode raises the floating windows of the focused app and gives the front one focus.
+- `f` in leader key mode floats the focused tiled window and returns it to its frame before Tiller first tiled it. `f` on that window again puts it back in the focused container.
+- Peek (`p`) fills the workspace with the focused window. `p` again, or a focus change to another tiled window, returns it to its container.

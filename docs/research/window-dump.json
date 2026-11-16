@@ -1,0 +1,505 @@
+[
+  {
+    "app": "Finder",
+    "bundleID": "com.apple.finder",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      765,
+      186,
+      973,
+      541
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 8005
+  },
+  {
+    "app": "Finder",
+    "bundleID": "com.apple.finder",
+    "buttons": [],
+    "focused": false,
+    "frame": [
+      0,
+      0,
+      1800,
+      1169
+    ],
+    "main": false,
+    "minimized": false,
+    "modal": false,
+    "onScreen": false,
+    "positionSettable": false,
+    "role": "AXScrollArea",
+    "sizeSettable": false,
+    "title": ""
+  },
+  {
+    "app": "Dia",
+    "bundleID": "company.thebrowser.dia",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 5331
+  },
+  {
+    "app": "tldraw office",
+    "bundleID": "com.tldraw.desktop",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 7372
+  },
+  {
+    "app": "tldraw office",
+    "bundleID": "com.tldraw.desktop",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      180,
+      39,
+      180,
+      1055
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": false,
+    "minimized": true,
+    "modal": false,
+    "onScreen": false,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 7309
+  },
+  {
+    "app": "tldraw office",
+    "bundleID": "com.tldraw.desktop",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      0,
+      39,
+      180,
+      1055
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": false,
+    "minimized": true,
+    "modal": false,
+    "onScreen": false,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 5575
+  },
+  {
+    "app": "tldraw office",
+    "bundleID": "com.tldraw.desktop",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": false,
+    "minimized": true,
+    "modal": false,
+    "onScreen": false,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 5574
+  },
+  {
+    "app": "App Store",
+    "bundleID": "com.apple.AppStore",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": true,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 6420
+  },
+  {
+    "app": "Rex Beta",
+    "bundleID": "com.superlogical.rex",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 7045
+  },
+  {
+    "app": "Spotify",
+    "bundleID": "com.spotify.client",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": false,
+    "minimized": true,
+    "modal": false,
+    "onScreen": false,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 7074
+  },
+  {
+    "app": "T3 Code (Beta)",
+    "bundleID": "com.t3tools.t3code",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 7158
+  },
+  {
+    "app": "‎WhatsApp",
+    "bundleID": "net.whatsapp.WhatsApp",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 8115
+  },
+  {
+    "app": "Xcode",
+    "bundleID": "com.apple.dt.Xcode",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton"
+    ],
+    "focused": false,
+    "frame": [
+      660,
+      153,
+      480,
+      632
+    ],
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": false,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 8392
+  },
+  {
+    "app": "Slack",
+    "bundleID": "com.tinyspeck.slackmacgap",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      7,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 8076
+  },
+  {
+    "app": "Fastmail",
+    "bundleID": "com.fastmail.mac.Fastmail",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 8161
+  },
+  {
+    "app": "ChatGPT",
+    "bundleID": "com.openai.codex",
+    "buttons": [],
+    "focused": false,
+    "frame": [
+      992,
+      -54,
+      1138,
+      2229
+    ],
+    "layer": 3,
+    "main": false,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": false,
+    "subrole": "AXDialog",
+    "title": "<redacted>",
+    "windowID": 8304
+  },
+  {
+    "app": "ChatGPT",
+    "bundleID": "com.openai.codex",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton",
+      "AXFullScreenButton"
+    ],
+    "focused": false,
+    "frame": [
+      8,
+      47,
+      1784,
+      1040
+    ],
+    "fullScreenButtonEnabled": true,
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": true,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 8303
+  },
+  {
+    "app": "WeChat",
+    "bundleID": "com.tencent.xinWeChat",
+    "buttons": [
+      "AXCloseButton",
+      "AXMinimizeButton",
+      "AXZoomButton"
+    ],
+    "focused": false,
+    "frame": [
+      760,
+      338,
+      280,
+      380
+    ],
+    "layer": 0,
+    "main": true,
+    "minimized": false,
+    "modal": false,
+    "onScreen": true,
+    "positionSettable": true,
+    "role": "AXWindow",
+    "sizeSettable": false,
+    "subrole": "AXStandardWindow",
+    "title": "<redacted>",
+    "windowID": 8377
+  }
+]

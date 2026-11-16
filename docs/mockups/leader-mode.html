@@ -1,0 +1,119 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --teal: #3fd6c4; --blue: #6fa8ff; --purple: #b48cff; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .mock { margin: 0 0 28px; }
+  .label { font: 600 14px/1.3 var(--font-sans, -apple-system); margin: 0 0 4px; }
+  .note { font: 13px/1.45 var(--font-sans, -apple-system); color: var(--muted-foreground, #999); margin: 0 0 10px; }
+  .desk { position: relative; width: 712px; height: 445px; border-radius: 12px; overflow: hidden;
+    background:
+      radial-gradient(120% 80% at 20% 15%, #7b5cff 0%, transparent 55%),
+      radial-gradient(90% 70% at 85% 20%, #ff7ab8 0%, transparent 50%),
+      radial-gradient(100% 90% at 60% 100%, #2a1e6b 0%, transparent 60%),
+      linear-gradient(160deg, #4a3bb8, #23194f); }
+  .menubar { position: absolute; inset: 0 0 auto 0; height: 22px; background: rgba(20,14,40,.35); backdrop-filter: blur(20px);
+    color: #fff; font-size: 11px; display: flex; align-items: center; gap: 14px; padding: 0 12px; z-index: 1; }
+  .menubar .right { margin-left: auto; }
+  .win { position: absolute; border-radius: 9px; background: #1e1e24; box-shadow: 0 8px 24px rgba(0,0,0,.5);
+    border: 1px solid rgba(255,255,255,.09); overflow: hidden; }
+  .win .bar { height: 20px; background: #2a2a31; display: flex; gap: 5px; align-items: center; padding-left: 8px;
+    font-size: 10px; color: rgba(255,255,255,.6); }
+  .win .bar i { width: 7px; height: 7px; border-radius: 50%; display: block; }
+  .win .bar i:nth-child(1) { background: #ff5f57; } .win .bar i:nth-child(2) { background: #febc2e; } .win .bar i:nth-child(3) { background: #28c840; }
+  .win .bar span { margin-left: 10px; }
+  .win .body { padding: 12px; display: grid; gap: 7px; }
+  .win .body b { height: 6px; border-radius: 3px; background: rgba(255,255,255,.08); display: block; }
+  .win .body b:nth-child(3n) { width: 60%; }
+  .glass { background: rgba(28, 26, 38, .66); backdrop-filter: blur(24px) saturate(170%); border: 1px solid rgba(255,255,255,.16);
+    box-shadow: 0 12px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.08); color: #f4f4f6; }
+  .key { display: inline-flex; align-items: center; justify-content: center; min-width: 15px; height: 15px; padding: 0 4px;
+    border-radius: 4px; font: 600 9.5px/1 ui-monospace, "SF Mono", monospace; color: #fff;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.2); }
+  .muted { color: rgba(255,255,255,.55); }
+  .abs { position: absolute; z-index: 20; }
+  .btn { display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px; border-radius: 7px; font-size: 10px;
+    background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.12); color: #fff; }
+  .btn.on { background: rgba(63,214,196,.22); border-color: rgba(63,214,196,.6); }
+  .status { display: flex; align-items: center; gap: 6px; padding: 4px 5px 4px 9px; border-radius: 10px; font-size: 10.5px; white-space: nowrap; }
+  .status .app { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .status .t { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+  .hint { display: flex; align-items: center; gap: 9px; padding: 6px 9px; border-radius: 13px; font-size: 10px; white-space: nowrap; }
+  .hint .sep { width: 1px; height: 16px; background: rgba(255,255,255,.15); }
+  .hint .it { display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  // Vertical split. Left container: horizontal carousel, 3 windows. Right container: vertical carousel, 2 windows.
+  const S = 14;
+  const C = [
+    { n: 1, x: 8, y: 30, w: 344, h: 407, mode: 'Horizontal carousel', glyph: '⇆', count: 3, color: '--blue',
+      wins: [ {x: 8, w: 316, t: 'Notion — Roadmap'}, {x: 36, w: 316, t: 'Slack — #design'},
+              {x: 22, w: 316, t: 'Safari — Apple Developer', f: true, app: '#3b82f6'} ] },
+    { n: 2, x: 360, y: 30, w: 344, h: 407, mode: 'Vertical carousel', glyph: '⇅', count: 2, color: '--purple', vertical: true,
+      wins: [ {y: 44, h: 393, t: 'Terminal — zsh'}, {y: 30, h: 393, t: 'WeChat — Chris', f: true, app: '#22c55e'} ] },
+  ];
+  const winHTML = (c, w) => {
+    const x = w.x ?? c.x, y = w.y ?? c.y, width = w.w ?? c.w, height = w.h ?? c.h;
+    return `<div class="win" style="left:${x}px;top:${y}px;width:${width}px;height:${height}px;z-index:${w.f ? 3 : 2};${w.f ? '' : 'background:#34343f;border-color:rgba(255,255,255,.18)'}">
+      <div class="bar"><i></i><i></i><i></i><span>${w.t}</span></div><div class="body">${'<b></b>'.repeat(9)}</div></div>`;
+  };
+  const focused = c => { const w = c.wins.find(w => w.f); return { ...w, x: w.x ?? c.x, y: w.y ?? c.y, w: w.w ?? c.w, h: w.h ?? c.h }; };
+  const status = (w, cls = '') => `<div class="status glass ${cls}"><span class="app" style="background:${w.app}"></span>
+      <span class="t">${w.t}</span><span class="btn">⤢ Peek <span class="key">p</span></span><span class="btn">◳ Float <span class="key">f</span></span></div>`;
+  const hintBar = `<div class="hint glass">
+      <b style="color:var(--teal);font-size:9.5px;letter-spacing:.05em">TILLER</b><div class="sep"></div>
+      <div class="it"><span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key">4</span><span class="muted">Layout</span></div>
+      <div class="it"><span class="key">h</span><span class="key">l</span><span class="muted">Window</span></div>
+      <div class="it"><span class="key">k</span><span class="key">j</span><span class="muted">Container</span></div>
+      <div class="it"><span class="key">p</span><span class="muted">Peek</span></div>
+      <div class="it"><span class="key">f</span><span class="muted">Float</span></div>
+      <div class="sep"></div><span class="key">esc</span></div>`;
+  const desk = overlay => `<div class="desk"><div class="menubar"><b>Safari</b><span>File</span><span>Edit</span><span>View</span>
+      <span class="right">Mon 16 Nov 12:40</span></div>${C.map(c => c.wins.map(w => winHTML(c, w)).join('')).join('')}${overlay}</div>`;
+
+  // A: tinted containers. Mode chip at the top-left corner. Status line below the title bar of the focused window.
+  const A = C.map(c => {
+    const f = focused(c);
+    return `<div class="abs" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px;border-radius:10px;
+        background:rgba(63,214,196,${c.n === 1 ? .13 : .06});border:2px solid rgba(63,214,196,${c.n === 1 ? .95 : .45});box-sizing:border-box"></div>
+      <div class="abs" style="right:${712 - c.x - c.w + 8}px;top:${c.y + 28}px"><span class="chip glass">${c.n} · ${c.glyph} ${c.mode} · ${c.count}</span></div>
+      <div class="abs" style="left:${f.x + 10}px;top:${f.y + 62}px">${status(f)}</div>`;
+  }).join('') + `<div class="abs" style="left:50%;bottom:10px;transform:translateX(-50%)">${hintBar}</div>`;
+
+  // B: outlines in the container colors from the infographic. Mode chip on the top edge. Status line at the bottom of the focused window.
+  const B = C.map(c => {
+    const f = focused(c);
+    return `<div class="abs" style="left:${c.x - 2}px;top:${c.y - 2}px;width:${c.w + 4}px;height:${c.h + 4}px;border-radius:12px;
+        border:2px dashed var(${c.color});box-shadow:0 0 0 1px rgba(0,0,0,.3), 0 0 24px var(${c.color});box-sizing:border-box"></div>
+      <div class="abs" style="left:${c.x + c.w / 2}px;top:${c.y - 1}px;transform:translate(-50%,-50%)">
+        <span class="chip" style="background:var(${c.color});color:#10101a">${c.glyph} ${c.mode} · ${c.count}</span></div>
+      <div class="abs" style="left:${f.x + f.w / 2}px;top:${f.y + f.h - 40}px;transform:translateX(-50%)">${status(f)}</div>`;
+  }).join('') + `<div class="abs" style="left:50%;top:48%;transform:translate(-50%,-50%)">${hintBar}</div>`;
+
+  // C: the screen is dimmed. Each container shows a large number, its mode and the status line in its center.
+  const Cc = `<div class="abs" style="inset:0;background:rgba(8,6,20,.55)"></div>` + C.map(c => {
+    const f = focused(c);
+    return `<div class="abs" style="left:${c.x}px;top:${c.y}px;width:${c.w}px;height:${c.h}px;border-radius:10px;
+        border:1.5px solid rgba(255,255,255,${c.n === 1 ? .9 : .35});box-sizing:border-box;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+        <div class="glass" style="width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;
+          font-weight:700;font-size:32px;line-height:1;${c.n === 1 ? 'border-color:var(--teal);color:var(--teal)' : ''}">${c.n}</div>
+        <div class="muted" style="font-size:11px;font-weight:600;color:#fff">${c.glyph} ${c.mode} · ${c.count} windows</div>
+        ${status(f)}
+      </div>`;
+  }).join('') + `<div class="abs" style="left:50%;bottom:10px;transform:translateX(-50%)">${hintBar}</div>`;
+
+  document.getElementById('root').innerHTML = [
+    ['A. Tinted containers', 'Each container gets a teal tint and edge. The focused container is brighter. The mode chip is in the top-right corner. The status line is below the title bar of the focused window. The key hints are in one bar at the bottom.', A],
+    ['B. Colored outlines', 'Each container gets a dashed outline in its color from the infographic. The mode chip is on the top edge. The status line is at the bottom of the focused window. The key hints are in the center of the screen.', B],
+    ['C. Dimmed screen with container numbers', 'The screen is dimmed. Each container shows a large number, its mode and the status line in its center. The numbers can be used later to jump to a container.', Cc],
+  ].map(([t, n, o]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n}</p>${desk(o)}</div>`).join('');
+</script>
+</body>
+</html>
