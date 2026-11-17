@@ -15,6 +15,7 @@ Each action ends leader key mode.
 The behaviour is described in [PRD.md, section 6 "Leader key mode"](../PRD.md#6-leader-key-mode) and [section 11 "Settings window and menu bar menu"](../PRD.md#11-settings-window-and-menu-bar-menu).
 
 - Make 3 mockups of the Shortcuts page with the "Exit leader key mode" column, in the light and the dark appearance, for approval.
+- Mockups: [exit-leader-key-mode.html](../mockups/exit-leader-key-mode.html).
 
 ## Acceptance criteria
 

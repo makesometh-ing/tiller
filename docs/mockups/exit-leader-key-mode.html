@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; background: #f4f4f6; color: #1d1d22; }
+  @media (prefers-color-scheme: dark) { body { background: #161619; color: #eee; } }
+  .mock { margin: 0 0 34px; }
+  .label { font: 600 14px/1.3 -apple-system; margin: 0 0 4px; }
+  .note { font: 13px/1.45 -apple-system; color: #888; margin: 0 0 10px; max-width: 1460px; }
+  .tag { font: 600 11px/1 -apple-system; color: #888; margin: 0 0 6px; }
+  .pair { display: flex; gap: 24px; flex-wrap: wrap; }
+
+  .dark { --wall: linear-gradient(160deg, #4a3bb8, #23194f); --win: #232228; --side: #1d1c22; --group: #2c2b32; --line: rgba(255,255,255,.07);
+    --text: #f2f2f5; --muted: rgba(255,255,255,.5); --field: #3a3940; --field-text: #e8e8ec; --sel: rgba(255,255,255,.08); --accent: #3fd6c4;
+    --box: #3a3940; --box-line: rgba(255,255,255,.18); --tip: #3a3940; }
+  .light { --wall: linear-gradient(160deg, #e9e4ff, #cfc6f2); --win: #f6f6f8; --side: #ececf0; --group: #ffffff; --line: rgba(0,0,0,.07);
+    --text: #1d1d22; --muted: rgba(0,0,0,.5); --field: #e4e4e8; --field-text: #2a2a30; --sel: rgba(0,0,0,.06); --accent: #0f9e8e;
+    --box: #ffffff; --box-line: rgba(0,0,0,.25); --tip: #ffffff; }
+
+  .desk { width: 712px; padding: 22px 0; border-radius: 12px; background: var(--wall); display: flex; justify-content: center; }
+  .win { width: 660px; border-radius: 12px; overflow: hidden; background: var(--win); color: var(--text); display: flex;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); border: 1px solid var(--line); font-size: 12px; position: relative; }
+  .lights { position: absolute; left: 14px; top: 14px; display: flex; gap: 7px; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .side { width: 172px; background: var(--side); padding: 44px 8px 10px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); }
+  .nav { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; }
+  .nav.on { background: var(--sel); }
+  .ico { width: 20px; height: 20px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; background: #8e8e93; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .title { font-size: 15px; font-weight: 700; padding: 13px 20px 8px; }
+  .content { padding: 4px 20px 20px; }
+  .sec { font-size: 12px; font-weight: 700; margin: 12px 2px 6px; display: flex; align-items: flex-end; justify-content: space-between; }
+  .sec .colh { font-size: 10px; font-weight: 600; color: var(--muted); width: 62px; text-align: center; }
+  .group { background: var(--group); border-radius: 9px; border: 1px solid var(--line); }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 5px 10px; min-height: 22px; gap: 8px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .name { flex: 1; min-width: 0; }
+  .sub { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+  .help { color: var(--muted); font-size: 10.5px; padding: 6px 2px 0; line-height: 1.4; }
+  .rec { display: flex; align-items: center; gap: 5px; }
+  .field { width: 120px; height: 22px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11.5px; font-weight: 600;
+    background: var(--field); color: var(--field-text); letter-spacing: .04em; }
+  .x { width: 15px; color: var(--muted); font-size: 11px; text-align: center; }
+
+  /* Checkbox, as an NSButton checkbox. */
+  .cb { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--box-line); background: var(--box); display: inline-flex;
+    align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; flex: none; }
+  .cb.on { background: var(--accent); border-color: var(--accent); }
+  .cb.dis { opacity: .45; }
+  .cbcol { width: 62px; display: flex; justify-content: center; }
+  .inline { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+  .inline.dis { opacity: .55; }
+
+  /* Variant 2: a small toggle button after the field. */
+  .stay { height: 22px; padding: 0 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600;
+    background: transparent; color: var(--muted); border: 1px solid var(--line); flex: none; width: 52px; justify-content: center; }
+  .stay.on { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .stay.dis { opacity: .45; }
+  .tip { position: absolute; padding: 5px 8px; border-radius: 6px; background: var(--tip); color: var(--text); font-size: 10.5px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.3); border: 1px solid var(--line); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const lights = `<div class="lights"><i></i><i></i><i></i></div>`;
+  const sidebar = `<div class="side"><div class="nav">${'<span class="ico">⚙</span>'}General</div><div class="nav on"><span class="ico" style="background:#636366">⌘</span>Shortcuts</div>
+      <div style="flex:1"></div><div class="nav"><span class="ico">i</span>About</div></div>`;
+  const field = k => `<div class="rec"><div class="field">${k}</div><span class="x">✕</span></div>`;
+
+  // Each action: name, key, exit leader key mode after the action (true, false or 'fixed' for always).
+  const sections = [
+    ['Screen', [['Full screen layout', '1', true], ['Vertical split layout', '2', true], ['Left two-thirds layout', '3', true], ['Right two-thirds layout', '4', true]]],
+    ['Container', [['Focus previous container', 'K', false], ['Focus next container', 'J', false], ['Switch carousel mode', 'V', true]]],
+    ['Window', [['Focus previous window', 'H', false], ['Focus next window', 'L', false], ['Move to previous container', '⇧ K', false], ['Move to next container', '⇧ J', false],
+      ['Float or tile', 'F', true], ['Peek', 'P', true]]],
+    ['App', [['Raise floating windows', 'R', true]]],
+    ['Tiller', [['Turn Tiller off', 'Q', 'fixed']]],
+  ];
+  const leader = `<div class="sec">Leader key</div><div class="group"><div class="row"><span class="name">Leader key</span>${field('⌃⌥⇧⌘ L')}</div></div>`;
+  const cb = v => `<span class="cb ${v ? 'on' : ''} ${v === 'fixed' ? 'dis' : ''}">${v ? '✓' : ''}</span>`;
+  const page = (rows, help) => `<div class="win">${lights}${sidebar}<div class="main"><div class="title">Shortcuts</div><div class="content">${leader}${rows}
+      <div class="help">${help}</div></div></div></div>`;
+
+  // Variant 1: a checkbox column with the heading "Exit after" over each group.
+  const v1 = page(sections.map(([t, rows]) => `<div class="sec"><span>${t}</span><span class="colh">Exit after</span></div><div class="group">${rows.map(([n, k, e]) =>
+      `<div class="row"><span class="name">${n}</span>${field(k)}<span class="cbcol">${cb(e)}</span></div>`).join('')}</div>`).join(''),
+    'A checked action ends leader key mode. With an action unchecked, press more keys, then <b>Esc</b> or the leader key to end leader key mode. <b>Q</b> always ends leader key mode.');
+
+  // Variant 2: a "Stay" button after each field. On (teal) = leader key mode continues after the action.
+  const stay = e => `<span class="stay ${e === false ? 'on' : ''} ${e === 'fixed' ? 'dis' : ''}">${e === false ? '● ' : ''}Stay</span>`;
+  const v2 = page(sections.map(([t, rows]) => `<div class="sec"><span>${t}</span></div><div class="group">${rows.map(([n, k, e]) =>
+      `<div class="row"><span class="name">${n}</span>${field(k)}${stay(e)}</div>`).join('')}</div>`).join(''),
+    'With <b>Stay</b> on, leader key mode continues after the action. Press more keys, then <b>Esc</b> or the leader key to end leader key mode. <b>Q</b> always ends leader key mode.');
+
+  // Variant 3: a checkbox with text under each action name.
+  const v3 = page(sections.map(([t, rows]) => `<div class="sec"><span>${t}</span></div><div class="group">${rows.map(([n, k, e]) =>
+      `<div class="row"><span class="name">${n}<span class="inline ${e === 'fixed' ? 'dis' : ''}">${cb(e)}Exit leader key mode after action</span></span>${field(k)}</div>`).join('')}</div>`).join(''),
+    'With the box unchecked, press more keys, then <b>Esc</b> or the leader key to end leader key mode. <b>Q</b> always ends leader key mode.');
+
+  const variants = [
+    ['Variant 1: "Exit after" checkbox column', 'A checkbox column at the right of each group, with the heading "Exit after". The checkbox of Q is checked and disabled. Short heading; the help line under the page says what it does.', v1],
+    ['Variant 2: "Stay" button after each field', 'A small button after each field. Teal "Stay" means leader key mode continues after the action. Only the 6 move and focus actions are teal by default, so the page shows which keys can be pressed in a row. The setting is the inverse of "exit".', v2],
+    ['Variant 3: checkbox under each action name', 'A checkbox with the full text "Exit leader key mode after action" under each action name. The text is clear without help. The rows are taller, and the page is longer.', v3],
+  ];
+  // window.ONLY = [variant index, 'dark' or 'light'] renders one window without the page frame.
+  if (window.ONLY) { const [i, t] = window.ONLY; document.getElementById('root').innerHTML = `<div class="desk ${t}" style="width:auto">${variants[i][2]}</div>`; }
+  else document.getElementById('root').innerHTML = variants.map(([t, n, w]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n}</p>
+      <div class="pair"><div><p class="tag">Dark</p><div class="desk dark">${w}</div></div><div><p class="tag">Light</p><div class="desk light">${w}</div></div></div></div>`).join('');
+</script>
+</body>
+</html>
