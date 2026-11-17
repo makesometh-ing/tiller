@@ -448,3 +448,13 @@ Answer to "Which license do you want for the source on GitHub: MIT, Apache 2.0 o
 
 > this one
 
+
+## 18. Container tint, carousel focus and staying in leader key mode
+
+On a screen recording of Tiller in use:
+
+> I don't want the tint over the active container, just the highlighted border is good enough.
+
+> when I get to a certain point in the ring buffer (I can't tell if it's the end of the ring buffer or some other bug) the layout gets all messed up and it's just 3 cascaded windows and the carousel messes up (it's the end of the video)
+
+> also, I think as part of the config, we need to decide if a shortcut should exit leader key mode or stay in leader key mode. for switch windows in the container and moving between containers, and moving windows between containers, I think it should stay in leader key mode by default, but there should be a column "exit leader key mode" with a checkbox for each action. what do you think?

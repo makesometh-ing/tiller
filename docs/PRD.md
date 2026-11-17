@@ -83,6 +83,7 @@ Planned for v1:
 - `P`: peek. See section 7 "Windows".
 - `⇧J` and `⇧K` move the focused window to the next or previous container. The moved window becomes the focused window of its new carousel. Focus stays in the old container, on the next window of its carousel.
 - Leader key mode ends 10 seconds after the last key press. It doesn't end while the key list is open.
+- Each action has an "Exit leader key mode" setting. When it is off, leader key mode continues after the action and the overlay is updated. Off by default for `H`, `L`, `J`, `K`, `⇧J` and `⇧K`. On by default for the other actions. `Q` always ends leader key mode.
 - Leader key mode ends on an app switch, a mouse click and a screen lock.
 - When the event tap doesn't start, the menu bar menu shows the failure. Tiller starts the event tap again every second until it starts.
 - Key names are read from the current keyboard layout. They are read again when the keyboard layout changes. Chords are stored as key codes. A saved chord stays on the same key after a keyboard layout change.
@@ -163,6 +164,7 @@ Planned for v1, with mockups in [settings-v2.html](mockups/settings-v2.html), [g
 - Global shortcuts: each action except the leader key has a global shortcut. A global shortcut does its action without the leader key. The focused app doesn't receive it. Global shortcuts are empty by default, except the shortcut to turn Tiller on and off.
 - A global shortcut can't be the same chord as the leader key or as another global shortcut.
 - Shortcuts page: a segmented control at the top of the page shows the action keys ("Leader key mode") or the global shortcuts ("Global").
+- Shortcuts page: an "Exit leader key mode" checkbox column next to the "Leader key mode" fields. See section 6 "Leader key mode".
 - General page: "Open at login", off by default. The switch shows the state from macOS. A change in System Settings is shown in the switch.
 - General page: the workspace margin, the container margin and the carousel spacing. See section 5 "Layouts and carousels".
 - The global shortcut to turn Tiller on and off can be recorded. Its default is `⌃⌥⌘ T`.
