@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set by the proof runner `leader` step. The overlay is then reported after it is shown.
     private var reportOverlay = false
     private var controller: Controller!
+    private var focusObserver: FocusObserver!
     private var statusItem: NSStatusItem!
     private var permissionItem: NSMenuItem!
     private var trustTimer: Timer?
@@ -29,7 +30,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let only = args.firstIndex(of: "--only-bundle-ids").flatMap { i in
             i + 1 < args.count ? Set(args[i + 1].split(separator: ",").map(String.init)) : nil
         }
-        controller = Controller(ax: AXWindows(onlyBundleIDs: only))
+        let ax = AXWindows(onlyBundleIDs: only)
+        controller = Controller(ax: ax)
+        focusObserver = FocusObserver(ax: ax) { [weak self] in
+            guard let self, store.enabled else { return }
+            controller.focusChanged(clicked: leader.lastMouseDown)
+        }
         Log.write("launch pid=\(getpid()) proof=\(proofMode) only=\(only.map { $0.sorted().joined(separator: ",") } ?? "all")")
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
@@ -188,6 +194,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let started = leader.start()
+        focusObserver.start()
         permissionItem.title = started ? "Leader key: \(store.shortcuts.leader.map { $0.labels.joined(separator: " ") } ?? "none")" : "Event tap failed to start"
         Log.write(started ? "event tap started" : "event tap failed to start")
         if started && proofMode {

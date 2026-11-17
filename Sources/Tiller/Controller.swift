@@ -13,6 +13,9 @@ final class Controller {
     private var untiledFrames: [WindowID: CGRect] = [:]
     /// Called on `queue` after each action when set.
     var onReport: ((ActionReport) -> Void)?
+    /// The time of Tiller's last focus call. Read and written on `queue`.
+    private var lastFocusCall = DispatchTime(uptimeNanoseconds: 0)
+    private var focusRetryScheduled = false
 
     init(ax: AXWindows) { self.ax = ax }
 
@@ -25,6 +28,53 @@ final class Controller {
         }
     }
 
+    /// Call on the main thread after a focus change notification. `clicked` is the time of the last mouse down.
+    func focusChanged(clicked: DispatchTime?) {
+        let notified = DispatchTime.now()
+        queue.async { self.syncFocus(notified: notified, clicked: clicked) }
+    }
+
+    /// Makes the system focused window the focused window of its carousel and its container, and sets the frames
+    /// of the carousel, as `H`, `L`, `J` and `K` do. A focus change made by Tiller doesn't change the workspace,
+    /// because the window that gets focus is already the focused window of the workspace.
+    private func syncFocus(notified: DispatchTime, clicked: DispatchTime?) {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier != getpid(),
+              let focused = ax.focusedWindowID(),
+              !workspaces.values.contains(where: { $0.focusedWindow == focused }),
+              let uuid = workspaces.first(where: { $0.value.contains(focused) })?.key else { return }
+        // Some apps apply Tiller's focus call late. Until then, the system focused window is the window that had focus before.
+        // A focus change without a click after Tiller's last focus call is read again 1 second after that call.
+        let settled = lastFocusCall + 1.0
+        if clicked.map({ $0 < lastFocusCall }) ?? true, DispatchTime.now() < settled {
+            guard !focusRetryScheduled else { return }
+            focusRetryScheduled = true
+            queue.asyncAfter(deadline: settled) {
+                self.focusRetryScheduled = false
+                self.syncFocus(notified: notified, clicked: clicked)
+            }
+            return
+        }
+        let refs = Dictionary(ax.windows().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        guard var ws = workspaces[uuid] else { return }
+        Self.removeClosed(&ws, refs: refs)
+        let before = ws.windowFrames()
+        ws.focus(window: focused)
+        workspaces[uuid] = ws
+        let changed = ws.windowFrames().filter { before[$0.key] != $0.value }
+        ax.setFrames(changed, refs: refs)
+        // The latency is measured from the click when the click is less than 1 second before the notification.
+        let click = clicked.flatMap { $0 <= notified && notified.uptimeNanoseconds - $0.uptimeNanoseconds < 1_000_000_000 ? $0 : nil }
+        let ms = { (t: DispatchTime) in Double(DispatchTime.now().uptimeNanoseconds - t.uptimeNanoseconds) / 1e6 }
+        let latencyMs = ms(click ?? notified)
+        lastFocusChange = (latencyMs, changed.count)
+        Log.write(String(format: "action=focus-change trigger=%@ screen=%@ layout=%@ container=%d moved=%d notificationMs=%.2f latencyMs=%.2f",
+                         click == nil ? "other" : "click", uuid, ws.layout.rawValue, ws.focusedContainerIndex + 1, changed.count,
+                         click.map { Double(notified.uptimeNanoseconds - $0.uptimeNanoseconds) / 1e6 } ?? 0, latencyMs))
+    }
+
+    /// The latency and the moved window count of the last arrangement after a focus change. The proof runner reads it. Read and written on `queue`.
+    private var lastFocusChange: (latencyMs: Double, moved: Int)?
+
     /// Call on the main thread. `expectedFocused` is the system focused window when nil.
     func reportCurrentState(action: String, latencyMs: Double = 0, expectedFocused: WindowID? = nil) {
         guard onReport != nil else { return }
@@ -35,7 +85,11 @@ final class Controller {
             let focused = self.ax.focusedWindowID()
             guard let screen = Self.screen(of: focused, refs: refs, screens: screens) ?? mouseScreen,
                   let ws = self.workspaces[screen.uuid] else { return }
-            self.onReport?(self.report(action, ws, refs: refs, latencyMs: latencyMs, moved: 0, expectedFocused: expectedFocused ?? focused))
+            // After a click, the report gives the latency of the arrangement that the click caused.
+            let change = action.hasPrefix("click:") ? self.lastFocusChange : nil
+            self.lastFocusChange = nil
+            self.onReport?(self.report(action, ws, refs: refs, latencyMs: change?.latencyMs ?? latencyMs, moved: change?.moved ?? 0,
+                                       expectedFocused: expectedFocused ?? focused))
         }
     }
 
@@ -62,12 +116,13 @@ final class Controller {
             let order = AXWindows.frontToBackFrames()
             var target: (id: WindowID, point: CGPoint)?
             if let id, let frame = order.first(where: { $0.id == id })?.frame {
-                // The visible point nearest to the center of the window.
+                // The visible point nearest to the center of the window, 8 points or more from the edge of a window in front.
+                // A click near the edge of the focused window resizes that window.
                 var best = CGFloat.infinity
-                for x in stride(from: frame.minX + 3, to: frame.maxX - 3, by: 6) {
-                    for y in stride(from: frame.minY + 3, to: frame.maxY - 3, by: 6) {
+                for x in stride(from: frame.minX + 8, to: frame.maxX - 8, by: 2) {
+                    for y in stride(from: frame.minY + 8, to: frame.maxY - 8, by: 6) {
                         let d = hypot(x - frame.midX, y - frame.midY)
-                        if d < best, !isCovered(CGRect(x: x, y: y, width: 1, height: 1), window: id, frontToBack: order) {
+                        if d < best, !isCovered(CGRect(x: x - 8, y: y - 8, width: 16, height: 16), window: id, frontToBack: order) {
                             best = d
                             target = (id, CGPoint(x: x, y: y))
                         }
@@ -249,6 +304,7 @@ final class Controller {
             // Raised back to front, so that the front floating window stays in front and gets focus.
             let floating = windows.filter { $0.pid == pid && !isTiled($0) }.reversed()
             ax.raise(Array(floating))
+            lastFocusCall = .now()
             expectedFocused = floating.last?.id ?? focused
             note = "raised=\(floating.count)"
         }
@@ -263,6 +319,7 @@ final class Controller {
         if case .raiseFloating = action {
         } else if let id = expectedFocused, let ref = refs[id], id != focused || changed[id] != nil {
             axResult = ax.focus(ref)
+            lastFocusCall = .now()
             raised = id
         }
 

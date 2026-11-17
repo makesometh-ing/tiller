@@ -101,12 +101,16 @@ Planned for v1:
 - When a window gets focus, all windows of its app are brought in front of the windows of other apps. The floating windows of that app stay behind the focused window. `R` raises them and gives the front one focus. With the Accessibility API, the focused window of an app is always the top window of that app. A floating window can be above the focused window only when the floating window has focus.
 - To give a window focus, Tiller sets `AXMain` on the window, raises it with `AXRaise`, sets `AXFrontmost` on its app and calls `NSRunningApplication.activate()`. Some apps, for example Dia, return success for `AXFrontmost` and stay inactive. `activate()` makes them active. Without the all-windows option, only the main window of the app comes forward.
 - `F` floats the focused tiled window. The window is returned to its frame from before Tiller first tiled it. `F` again puts it back in the focused container.
+- A click on a tiled window behind the focused window of a carousel gives the clicked window focus. It becomes the focused window of the carousel, as with `H` and `L`. The windows of the carousel are arranged again. A click on a window in another container also makes that container the focused container. This applies in leader key mode and out of leader key mode.
+- Focus changes are read from the Accessibility notification for a focused window change of each app, and from the app activation notification of `NSWorkspace`. Each focus change by the user is handled in the same way as a click, for example ⌘Tab to an app whose focused window is behind another window of its carousel.
+- A focus change made by Tiller doesn't cause a second arrangement. The window that gets focus is already the focused window of the workspace.
+- Some apps apply Tiller's focus call late. Until then, the system focused window is the window that had focus before. A focus change in the second after Tiller's last focus call, without a click after that call, is read again 1 second after that call.
+- The log line `action=focus-change` gives the time from the click to the notification and from the click to the new frames.
 - A Finder window with native tabs is one window on the screen. The window server contains one window for each tab, at the same frame. Only the window of the selected tab is on the screen. The Accessibility API returns only that window. A tab switch changes the window id of the visible window.
 
 Planned for v1:
 
 - A new tiled window is put into the focused container, after the focused window. It becomes the focused window.
-- A click on a tiled window behind the focused window of a carousel gives the clicked window focus. It becomes the focused window of the carousel, as with `H` and `L`. The windows of the carousel are arranged again. A click on a window in another container also makes that container the focused container. This applies in leader key mode and out of leader key mode.
 - A closed window is removed from its container at once. The other windows of the carousel are arranged again.
 - A minimized window, or a window of a hidden app, is removed from its carousel. Its container and its position in the ring order are recorded. When the window is shown again, it is put back into the same container, at the same position in the ring order, as the focused window of that container. If that container doesn't exist, the window is put into the focused container.
 - Each native tab group is one window in its carousel. When the visible window id changes at the same frame, the new id replaces the old id in the carousel. A new tab doesn't add a window to the carousel. A closed tab doesn't remove the window of the group from the carousel while another tab of the group is open.
@@ -312,6 +316,8 @@ Window titles are added only when "Include window titles in logs" is on.
 | Layout, with WeChat windows | 77 to 141 ms |
 | Key bar shown | 0.5 to 1.4 ms |
 | Containers and pills shown | 18 to 30 ms |
+| Overlay hidden after a click in leader key mode | 0.8 to 1.8 ms |
+| Click on a window behind the focused window to the new frames, test windows | 29 to 55 ms |
 
 - WeChat takes 23 to 80 ms to resize one window. A move without a resize takes 1 to 3 ms.
 

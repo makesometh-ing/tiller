@@ -49,13 +49,13 @@ final class AXWindows {
 
     init(onlyBundleIDs: Set<String>?) { self.onlyBundleIDs = onlyBundleIDs }
 
-    private func managedApps() -> [NSRunningApplication] {
-        NSWorkspace.shared.runningApplications.filter { app in
-            app.activationPolicy == .regular && !app.isHidden
-                && app.processIdentifier != getpid()
-                && (onlyBundleIDs.map { $0.contains(app.bundleIdentifier ?? "") } ?? true)
-        }
+    func isManaged(_ app: NSRunningApplication) -> Bool {
+        app.activationPolicy == .regular && !app.isHidden
+            && app.processIdentifier != getpid()
+            && (onlyBundleIDs.map { $0.contains(app.bundleIdentifier ?? "") } ?? true)
     }
+
+    private func managedApps() -> [NSRunningApplication] { NSWorkspace.shared.runningApplications.filter(isManaged) }
 
     /// Tiled and floating windows, front to back. Ignored windows aren't returned.
     func windows() -> [WindowRef] {
