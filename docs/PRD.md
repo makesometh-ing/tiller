@@ -154,7 +154,10 @@ After v1: a setting for light, dark or system, and themes.
 
 - "Settings…" (⌘,) in the Tiller menu opens the settings window, in front of the other apps. Mockup: variant 1 in [settings.html](mockups/settings.html).
 - Layout: a sidebar with colored icons, as in the CleanShot settings (`docs/references/ui-cleanshot-settings-*.png`). Pages: General, Shortcuts and About. A Permissions page is planned, see section 4 "Platform and build".
-- Shortcuts page, as variant 1 in [exit-leader-key-mode.html](mockups/exit-leader-key-mode.html): a "Global shortcuts" group with the leader key field, the "Turn Tiller on and off" field and "Show the key bar". Then one group for each section of the key bar, with one field for each action and an "Exit after" checkbox column. The checkbox of "Turn Tiller off" is checked and disabled.
+- Shortcuts page, as variant 3 in [settings-v2.html](mockups/settings-v2.html) with variant 1 in [exit-leader-key-mode.html](mockups/exit-leader-key-mode.html): a segmented control in the title row with "Leader key mode" and "Global". It has the theme accent color, as "Show Tiller in". Under it, a "Global shortcuts" group with the leader key field, the "Turn Tiller on and off" field and "Show the key bar". Then one group for each section of the key bar, with one field for each action.
+- With "Leader key mode", each field is the key in leader key mode, with an "Exit after" checkbox column. The checkbox of "Turn Tiller off" is checked and disabled. With "Global", each field is the global shortcut of the action, without the checkbox column.
+- Global shortcuts: each action has a global shortcut. A global shortcut does its action without the leader key, in every app and also in leader key mode. The focused app doesn't receive it. Leader key mode doesn't start or end, except that the "Turn Tiller off" shortcut ends it. Global shortcuts are empty by default.
+- The leader key, the shortcut to turn Tiller on and off and the global shortcuts can't have the same chord. A field that receives a chord in use shows "Used by" and the other shortcut for 2 seconds, and doesn't save the chord. A global shortcut needs a modifier, so that typed text still reaches the apps. A field that receives a key without a modifier shows "Add a modifier".
 - Shortcut field, as in Rectangle Pro (`docs/references/ui-rectanglepro-shortcut-*.png`): the keys in a grey field with a clear button. A click starts recording. The field shows "Press keys…" with a teal edge. The next key press is saved. `Esc` cancels the recording.
 - Each chord can use Hyper. A chord can have only one action.
 - Shortcuts are saved in the Tiller defaults.
@@ -168,9 +171,6 @@ After v1: a setting for light, dark or system, and themes.
 
 Planned for v1, with mockups in [settings-v2.html](mockups/settings-v2.html), [general-page.html](mockups/general-page.html) and [menu-bar-menu-v2.html](mockups/menu-bar-menu-v2.html):
 
-- Global shortcuts: each action except the leader key has a global shortcut. A global shortcut does its action without the leader key. The focused app doesn't receive it. Global shortcuts are empty by default, except the shortcut to turn Tiller on and off.
-- A global shortcut can't be the same chord as the leader key or as another global shortcut.
-- Shortcuts page: a segmented control at the top of the page shows the action keys ("Leader key mode") or the global shortcuts ("Global").
 - General page: "Open at login", off by default. The switch shows the state from macOS. A change in System Settings is shown in the switch.
 - General page: the workspace margin, the container margin and the carousel spacing. See section 5 "Layouts and carousels".
 
@@ -251,6 +251,7 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
 - `leader.start`: the chord of the leader key.
 - `leader.end`: the reason: `action` (an action with "Exit after" on), `esc`, `leader` (the leader key again), `click` or `toggle`. A click also gives the click point and the time from the click to the tap callback.
 - `leader.key`: the chord and the action id, or `keyList`, `esc`, `leader` or `unbound`.
+- `global.key`: the chord and the action id of a global shortcut.
 
 #### action
 
@@ -282,7 +283,7 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
 
 #### settings
 
-- `settings.changed`: the setting and the new value: `showKeyBar`, `showIn`, `leader`, `toggle`, `key.<action id>` or `exitAfter.<action id>`. Chords are logged as text, for example `ctrl+opt+shift+cmd+l`.
+- `settings.changed`: the setting and the new value: `showKeyBar`, `showIn`, `leader`, `toggle`, `key.<action id>`, `global.<action id>` or `exitAfter.<action id>`. A chord that a shortcut field doesn't save is logged with the setting `refused`, the field and the shortcut that uses the chord. Chords are logged as text, for example `ctrl+opt+shift+cmd+l`.
 - `diagnostics.exported`: the path of the zip and the time of the export.
 
 #### display
@@ -332,6 +333,7 @@ Planned for v1:
 ## 15. Proof and test tools
 
 - `build/tiller-proof` runs the end-to-end test. In proof mode, Tiller manages only the windows of the apps in `--only-bundle-ids`. Proof runs use the defaults domain `com.tiller.Tiller.proof`. It is emptied when a proof run starts Tiller. A proof run doesn't change the settings or the key bar position in the Tiller defaults.
+- `--global <action id>=<spec>,...` sets global shortcuts for a proof run. A `global:<chord>` step posts the chord without the leader key. Only the action sends the report. `shortcuts-mode:leader` and `shortcuts-mode:global` switch the Shortcuts page. `record:global:<action id>` starts the recording of a global shortcut field.
 - A `click:` proof step posts a mouse down and a mouse up at the visible point of a window nearest to its center. `click:next` and `click:previous` click the windows after and before the focused window in the focused carousel. `click:container<n>` clicks the focused window of container n. `click:floating` clicks the front floating window.
 - `Tiller --dump-windows <path>` writes the attributes and the kind of every window.
 - `Tiller --focus-test <bundle id> <window id> <method> <path>` tests one focus method.

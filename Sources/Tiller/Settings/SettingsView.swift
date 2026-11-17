@@ -6,7 +6,37 @@ import TillerCore
 enum RecordTarget: Equatable {
     case leader
     case toggle
+    /// The key of an action in leader key mode.
     case action(ActionID)
+    /// The global shortcut of an action.
+    case global(ActionID)
+
+    /// Keys in leader key mode aren't global shortcuts, so they return nil.
+    var globalSlot: GlobalSlot? {
+        switch self {
+        case .leader: .leader
+        case .toggle: .toggle
+        case .global(let id): .action(id)
+        case .action: nil
+        }
+    }
+}
+
+extension GlobalSlot {
+    var title: String {
+        switch self {
+        case .leader: "Leader key"
+        case .toggle: "Turn Tiller on and off"
+        case .action(let id): id.title
+        }
+    }
+}
+
+/// The action shortcuts that the Shortcuts page shows: the keys in leader key mode or the global shortcuts.
+enum ShortcutsMode: String, CaseIterable, Identifiable {
+    case leader, global
+    var id: String { rawValue }
+    var title: String { self == .leader ? "Leader key mode" : "Global" }
 }
 
 /// State of the settings window. Read and written on the main thread.
@@ -15,6 +45,9 @@ final class SettingsModel: ObservableObject {
     let leaderKey: LeaderKey
     @Published var page: SettingsPage = .general
     @Published private(set) var recording: RecordTarget?
+    @Published var shortcutsMode: ShortcutsMode = .leader
+    /// A field that didn't save the recorded chord, and the text that the field shows for 2 seconds.
+    @Published private(set) var refused: (target: RecordTarget, text: String)?
 
     init(store: ShortcutStore, leaderKey: LeaderKey) {
         self.store = store
@@ -35,6 +68,7 @@ final class SettingsModel: ObservableObject {
         case .leader: store.setLeader(nil)
         case .toggle: store.setToggle(nil)
         case .action(let id): store.set(nil, for: id)
+        case .global(let id): store.setGlobal(nil, for: id)
         }
     }
 
@@ -46,10 +80,19 @@ final class SettingsModel: ObservableObject {
     private func finish(_ target: RecordTarget, _ chord: KeyChord?) {
         recording = nil
         guard let chord else { return }
+        if let slot = target.globalSlot, let owner = store.shortcuts.conflict(chord, for: slot) {
+            refused = (target, owner == slot ? "Add a modifier" : "Used by \(owner.title)")
+            Log.event(.settingsChanged, ["setting": "refused", "field": .string(slot.title), "value": .string(chord.spec), "usedBy": .string(owner.title)])
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+                if self?.refused?.target == target { self?.refused = nil }
+            }
+            return
+        }
         switch target {
         case .leader: store.setLeader(chord)
         case .toggle: store.setToggle(chord)
         case .action(let id): store.set(chord, for: id)
+        case .global(let id): store.setGlobal(chord, for: id)
         }
     }
 }
@@ -77,7 +120,17 @@ struct SettingsView: View {
             sidebar
             Divider()
             VStack(alignment: .leading, spacing: 0) {
-                Text(model.page.title).font(.system(size: 15, weight: .bold)).padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 8)
+                HStack {
+                    Text(model.page.title).font(.system(size: 15, weight: .bold))
+                    Spacer()
+                    if model.page == .shortcuts {
+                        Picker("Shortcuts", selection: $model.shortcutsMode) {
+                            ForEach(ShortcutsMode.allCases) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented).labelsHidden().fixedSize().tint(Theme.current.accent)
+                    }
+                }
+                .frame(height: 22).padding(.horizontal, 22).padding(.top, 14).padding(.bottom, 8)
                 ScrollView {
                     Group {
                         switch model.page {
@@ -162,11 +215,12 @@ struct ShortcutField: View {
     var body: some View {
         let theme = Theme.current
         let recording = model.recording == target
+        let refused = model.refused.flatMap { $0.target == target ? $0.text : nil }
         HStack(spacing: 6) {
             Button { recording ? model.cancel() : model.record(target) } label: {
-                Text(recording ? "Press keys…" : chord.map { $0.labels.joined(separator: " ") } ?? "Record shortcut")
-                    .font(.system(size: 12, weight: chord == nil || recording ? .regular : .semibold))
-                    .foregroundStyle(recording ? theme.accent : (chord == nil ? Color.secondary : Color.primary))
+                Text(recording ? "Press keys…" : refused ?? chord.map { $0.labels.joined(separator: " ") } ?? "Record shortcut")
+                    .font(.system(size: 12, weight: chord == nil || recording || refused != nil ? .regular : .semibold))
+                    .foregroundStyle(recording ? theme.accent : refused != nil ? Color.red : (chord == nil ? Color.secondary : Color.primary))
                     .frame(width: 160, height: 24)
                     .background(chord == nil || recording ? Color.primary.opacity(0.05) : Color.primary.opacity(0.11), in: RoundedRectangle(cornerRadius: 6))
                     .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(recording ? theme.accent : .clear, lineWidth: 2))
@@ -274,29 +328,38 @@ struct ShortcutsPage: View {
                     Toggle("Show the key bar", isOn: $store.showKeyBar).toggleStyle(.switch).labelsHidden().tint(Theme.current.accent)
                 }
             }
+            let leaderMode = model.shortcutsMode == .leader
             ForEach(KeyGuide.sections(shortcuts), id: \.title) { section in
                 HStack(alignment: .lastTextBaseline) {
                     SettingsHeader(text: section.title.capitalized)
                     Spacer()
-                    Text("Exit after").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
-                        .frame(width: Self.checkboxColumn).padding(.trailing, 12)
+                    if leaderMode {
+                        Text("Exit after").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                            .frame(width: Self.checkboxColumn).padding(.trailing, 12)
+                    }
                 }
                 SettingsGroup {
                     let ids = section.entries.flatMap(\.actions)
                     ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                         SettingsRow(title: id.title, showsDivider: index < ids.count - 1) {
-                            ShortcutField(model: model, target: .action(id), chord: shortcuts.actions[id], accessibilityName: id.title)
-                            Toggle("Exit leader key mode after \(id.title)", isOn: Binding(
-                                get: { store.shortcuts.exits(after: id) }, set: { store.setExitAfter($0, for: id) }))
-                                .toggleStyle(.checkbox).labelsHidden().tint(Theme.current.accent)
-                                .disabled(id == .turnOff)
-                                .help(id == .turnOff ? "Turn Tiller off always exits leader key mode" : "Exit leader key mode after this action")
-                                .frame(width: Self.checkboxColumn)
+                            if leaderMode {
+                                ShortcutField(model: model, target: .action(id), chord: shortcuts.actions[id], accessibilityName: id.title)
+                                Toggle("Exit leader key mode after \(id.title)", isOn: Binding(
+                                    get: { store.shortcuts.exits(after: id) }, set: { store.setExitAfter($0, for: id) }))
+                                    .toggleStyle(.checkbox).labelsHidden().tint(Theme.current.accent)
+                                    .disabled(id == .turnOff)
+                                    .help(id == .turnOff ? "Turn Tiller off always exits leader key mode" : "Exit leader key mode after this action")
+                                    .frame(width: Self.checkboxColumn)
+                            } else {
+                                ShortcutField(model: model, target: .global(id), chord: shortcuts.global[id], accessibilityName: "Global shortcut for \(id.title)")
+                            }
                         }
                     }
                 }
             }
-            HelpText(text: "A checked action ends leader key mode. With an action unchecked, press more keys, then Esc or the leader key to end leader key mode. Turn Tiller off always ends leader key mode.")
+            HelpText(text: leaderMode
+                     ? "A checked action ends leader key mode. With an action unchecked, press more keys, then Esc or the leader key to end leader key mode. Turn Tiller off always ends leader key mode."
+                     : "A global shortcut does its action in every app, without the leader key. It needs a modifier. Each chord can have only one global shortcut.")
                 .padding(.horizontal, -12)
         }
     }

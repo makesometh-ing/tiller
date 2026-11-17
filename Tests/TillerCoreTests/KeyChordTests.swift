@@ -120,3 +120,36 @@ import Testing
     #expect(old.toggle == KeyChord(spec: "ctrl+opt+cmd+t"))
     #expect(old.exitAfter.isEmpty)
 }
+
+@Test func globalShortcutsAreEmptyByDefaultAndMatchOnlyTheExactChord() {
+    var s = Shortcuts.standard
+    #expect(s.global.isEmpty)
+    s.global[.focusNextWindow] = KeyChord(spec: "hyper+y")
+    #expect(s.globalAction(keyCode: 16, modifiers: .hyper) == .focusNextWindow)
+    #expect(s.globalAction(keyCode: 16, modifiers: []) == nil)
+    #expect(s.globalAction(keyCode: 16, modifiers: [.control, .option]) == nil)
+}
+
+@Test func aGlobalShortcutCantUseTheChordOfAnotherGlobalShortcut() {
+    var s = Shortcuts.standard
+    s.global[.focusNextWindow] = KeyChord(spec: "hyper+y")
+    let leader = s.leader!, toggle = s.toggle!
+    #expect(s.conflict(KeyChord(spec: "hyper+y")!, for: .action(.focusPreviousWindow)) == .action(.focusNextWindow))
+    #expect(s.conflict(leader, for: .action(.focusPreviousWindow)) == .leader)
+    #expect(s.conflict(toggle, for: .action(.focusPreviousWindow)) == .toggle)
+    #expect(s.conflict(KeyChord(spec: "hyper+y")!, for: .leader) == .action(.focusNextWindow))
+    #expect(s.conflict(KeyChord(spec: "hyper+y")!, for: .action(.focusNextWindow)) == nil)
+    #expect(s.conflict(KeyChord(spec: "ctrl+opt+shift+u")!, for: .action(.focusPreviousWindow)) == nil)
+    // A global shortcut without a modifier would take each typed key.
+    #expect(s.conflict(KeyChord(spec: "u")!, for: .action(.focusPreviousWindow)) == .action(.focusPreviousWindow))
+}
+
+@Test func globalShortcutsAreSavedAndReadAgain() throws {
+    var s = Shortcuts.standard
+    s.global[.layoutFullScreen] = KeyChord(spec: "hyper+1")
+    let read = try JSONDecoder().decode(Shortcuts.self, from: JSONEncoder().encode(s))
+    #expect(read.global == [.layoutFullScreen: KeyChord(spec: "hyper+1")!])
+    // Shortcuts saved before global shortcuts existed don't contain the key.
+    let old = try JSONDecoder().decode(Shortcuts.self, from: Data(#"{"actions":[]}"#.utf8))
+    #expect(old.global.isEmpty)
+}

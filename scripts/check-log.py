@@ -22,6 +22,7 @@ EVENTS = {
     "leader.start": ("keys", {"reason", "chord"}),
     "leader.end": ("keys", {"reason"}),
     "leader.key": ("keys", {"chord", "action"}),
+    "global.key": ("keys", {"chord", "action"}),
     "action.done": ("action", {"action", "moved", "totalMs"}),
     "action.slow": ("action", {"action", "moved", "totalMs"}),
     "action.focus": ("action", {"action", "order", "systemFocusedBefore", "systemFocusedAfter"}),

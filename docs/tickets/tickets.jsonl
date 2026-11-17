@@ -37,7 +37,7 @@
 {"id": "F12", "title": "Peek: the P key", "type": "feature", "status": "todo", "priority": "P1", "order": 12, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F12-peek.md"}
 {"id": "F21", "title": "Open at login", "type": "feature", "status": "todo", "priority": "P2", "order": 13, "depends_on": ["F32"], "blocked_by": [], "file": "docs/tickets/F21-open-at-login.md"}
 {"id": "F32", "title": "Show Tiller in the menu bar, the Dock or both", "type": "feature", "status": "done", "priority": "P1", "depends_on": [], "blocked_by": [], "file": "docs/tickets/F32-menu-bar-and-dock.md"}
-{"id": "F20", "title": "Global shortcuts: a second shortcut for each action", "type": "feature", "status": "todo", "priority": "P2", "order": 14, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F20-global-shortcuts.md"}
+{"id": "F20", "title": "Global shortcuts: a second shortcut for each action", "type": "feature", "status": "done", "priority": "P2", "depends_on": [], "blocked_by": [], "file": "docs/tickets/F20-global-shortcuts.md"}
 {"id": "F22", "title": "Enable and disable Tiller from the menu bar", "type": "feature", "status": "done", "priority": "P1", "depends_on": ["F32"], "blocked_by": [], "file": "docs/tickets/F22-enable-disable.md"}
 {"id": "F30", "title": "Spacing settings", "type": "feature", "status": "todo", "priority": "P2", "order": 15, "depends_on": ["F21"], "blocked_by": ["Approval of 3 spacing settings mockups"], "file": "docs/tickets/F30-spacing-settings.md"}
 {"id": "F27", "title": "Multiple screens", "type": "feature", "status": "todo", "priority": "P2", "order": 16, "depends_on": ["F13", "F28"], "blocked_by": [], "file": "docs/tickets/F27-multiple-screens.md"}

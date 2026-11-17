@@ -269,6 +269,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.exportDiagnostics(to: dir) { url in
                     self.controller.reportCurrentState(action: "export-diagnostics zip=\(url?.lastPathComponent ?? "failed")")
                 }
+            case _ where key.hasPrefix("shortcuts-mode:"):
+                // The same change as a click on the segmented control of the Shortcuts page.
+                self.settings.model.shortcutsMode = ShortcutsMode(rawValue: String(key.dropFirst("shortcuts-mode:".count))) ?? .leader
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "shortcuts-mode:\(self.settings.model.shortcutsMode.rawValue)") }
+            case _ where key.hasPrefix("global:"):
+                // A global shortcut. The action sends the report. Without an action, the proof runner fails the step.
+                guard let chord = KeyChord(spec: String(key.dropFirst("global:".count))) else { return }
+                Self.post(chord)
             case "move-bar":
                 self.overlay.moveBar(dx: 120, dy: 60)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "move-bar") }
@@ -288,7 +296,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case _ where key.hasPrefix("record:"):
                 // The same call as a click on the shortcut field.
                 let name = String(key.dropFirst("record:".count))
-                self.settings.model.record(name == "leader" ? .leader : name == "toggle" ? .toggle : .action(ActionID(rawValue: name)!))
+                let target: RecordTarget = name == "leader" ? .leader : name == "toggle" ? .toggle
+                    : name.hasPrefix("global:") ? .global(ActionID(rawValue: String(name.dropFirst("global:".count)))!) : .action(ActionID(rawValue: name)!)
+                self.settings.model.record(target)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "recording:\(name)") }
             case _ where key.hasPrefix("exit-after:"):
                 // The same change as a click on the "Exit after" checkbox of the action.
@@ -299,7 +309,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // A key press without the leader key, for example the chord for a field that records.
                 guard let chord = KeyChord(spec: String(key.split(separator: ":", maxSplits: 1)[1])) else { return }
                 Self.post(chord)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "chord:\(chord.spec) leader=\(self.store.shortcuts.leader?.spec ?? "none") toggle=\(self.store.shortcuts.toggle?.spec ?? "none") layer=\(self.leader.isLayerActive) enabled=\(self.store.enabled)") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "chord:\(chord.spec) leader=\(self.store.shortcuts.leader?.spec ?? "none") toggle=\(self.store.shortcuts.toggle?.spec ?? "none") global=[\(self.store.shortcuts.global.map { "\($0.key.rawValue)=\($0.value.spec)" }.sorted().joined(separator: ","))] refused=\(self.settings.model.refused?.text ?? "none") layer=\(self.leader.isLayerActive) enabled=\(self.store.enabled)") }
             default:
                 guard let chord = KeyChord(spec: key) else { return }
                 // A key after a `leader` step goes to the layer that the `leader` step started.

@@ -80,6 +80,8 @@ var tillerArgs = ["--proof", "--only-bundle-ids", managed]
 /// `--leader <spec>` and `--keys <action id>=<spec>,...` set the shortcuts of Tiller for the run.
 if let leader = option("--leader") { tillerArgs += ["--leader", leader] }
 if let keys = option("--keys") { tillerArgs += ["--keys", keys] }
+/// `--global <action id>=<spec>,...` sets global shortcuts for the run.
+if let global = option("--global") { tillerArgs += ["--global", global] }
 run("/usr/bin/open", [build.appending(path: "Tiller.app").path, "--args"] + tillerArgs)
 let deadline = Date().addingTimeInterval(15)
 while !ready && Date() < deadline { wait(0.1) }

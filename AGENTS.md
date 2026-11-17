@@ -25,7 +25,7 @@ Tiller is a tiling window manager for macOS. It is a menu bar app.
 
 - `scripts/test.sh`: unit tests. Xcode isn't used.
 - `scripts/build.sh`: builds `build/Tiller.app`, `build/TillerTestWindows.app` and `build/tiller-proof`, signed with the Apple Development certificate. The signature is the same after each rebuild. The Accessibility permission is then kept.
-- `build/tiller-proof --out Tests/Proof/<task>`: the end-to-end test. It manages only the test windows. `--apps <bundle id,...>` adds other apps. `--steps 2,leader,esc` runs other steps. `--leader hyper+l` and `--keys focusNextWindow=hyper+n` set the shortcuts for the run. Proof runs use their own defaults domain. Your saved settings and key bar position don't change. `--appearance light|dark` sets the system appearance for the run and restores it.
+- `build/tiller-proof --out Tests/Proof/<task>`: the end-to-end test. It manages only the test windows. `--apps <bundle id,...>` adds other apps. `--steps 2,leader,esc` runs other steps. `--leader hyper+l`, `--keys focusNextWindow=hyper+n` and `--global focusNextWindow=hyper+y` set the shortcuts for the run. Proof runs use their own defaults domain. Your saved settings and key bar position don't change. `--appearance light|dark` sets the system appearance for the run and restores it.
 - Tiller writes its log to `~/Library/Logs/Tiller/tiller.jsonl`, one JSON object for each line, and to the unified log, subsystem `com.tiller.Tiller`. `scripts/check-log.py <file>` checks the lines. "Export Diagnostics…" in the menu bar menu writes the diagnostics zip to the Desktop. `--steps export-diagnostics:<dir>` writes it in a proof run.
 
 ## UI
@@ -40,7 +40,7 @@ Tiller is a tiling window manager for macOS. It is a menu bar app.
 - In leader key mode, each window has a small translucent pill at its bottom-right corner: app icon, app name, Tiled or Floating, and the `p` and `f` keys. The pill of a window behind the focused window in a carousel shows only the app icon. The app icon is shown in the visible edge of the window.
 
 - The settings window is variant 1 in `docs/mockups/settings.html`: a sidebar with colored icons, as in the CleanShot settings, and shortcut fields with a clear button, as in Rectangle Pro. The references are in `docs/references/`.
-- The leader key, the shortcut to turn Tiller on and off, and every key in leader key mode can be recorded in the settings. Each action in leader key mode has an "Exit after" checkbox (variant 1 in `docs/mockups/exit-leader-key-mode.html`). Each chord can use Hyper (⌃⌥⇧⌘ together). A key without modifiers in leader key mode also matches while modifiers are still held.
+- The leader key, the shortcut to turn Tiller on and off, every key in leader key mode and the global shortcut of each action can be recorded in the settings. A segmented control on the Shortcuts page switches between "Leader key mode" and "Global" (variant 3 in `docs/mockups/settings-v2.html`). Each action in leader key mode has an "Exit after" checkbox (variant 1 in `docs/mockups/exit-leader-key-mode.html`). Each chord can use Hyper (⌃⌥⇧⌘ together). A key without modifiers in leader key mode also matches while modifiers are still held.
 
 ## Window behavior
 

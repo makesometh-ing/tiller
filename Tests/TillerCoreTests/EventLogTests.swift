@@ -34,7 +34,7 @@ import Testing
     // The event name starts with a word of its category, or with `app`, `tap` or `leader`.
     for name in LogEventName.allCases {
         let prefix = String(name.rawValue.split(separator: ".")[0])
-        let expected: [String: LogCategory] = ["app": .lifecycle, "tap": .lifecycle, "leader": .keys, "diagnostics": .settings]
+        let expected: [String: LogCategory] = ["app": .lifecycle, "tap": .lifecycle, "leader": .keys, "global": .keys, "diagnostics": .settings]
         #expect(name.category == expected[prefix] ?? LogCategory(rawValue: prefix), "\(name.rawValue)")
     }
 }

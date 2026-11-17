@@ -21,6 +21,7 @@ public enum LogEventName: String, CaseIterable, Sendable {
     case leaderStart = "leader.start"
     case leaderEnd = "leader.end"
     case leaderKey = "leader.key"
+    case globalKey = "global.key"
     case actionDone = "action.done"
     case actionSlow = "action.slow"
     case actionFocus = "action.focus"
@@ -38,7 +39,7 @@ public enum LogEventName: String, CaseIterable, Sendable {
     public var category: LogCategory {
         switch self {
         case .appLaunch, .appEnabled, .appDisabled, .appTerminate, .tapStarted, .tapDisabled: .lifecycle
-        case .leaderStart, .leaderEnd, .leaderKey: .keys
+        case .leaderStart, .leaderEnd, .leaderKey, .globalKey: .keys
         case .actionDone, .actionSlow, .actionFocus: .action
         case .windowClassified, .windowFrameMismatch, .windowClosed: .window
         case .axError, .axCall: .ax

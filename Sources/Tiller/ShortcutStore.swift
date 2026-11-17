@@ -54,6 +54,7 @@ final class ShortcutStore: ObservableObject {
 
     /// `--proof` uses its own defaults domain, so that a proof run doesn't change your settings. The domain is emptied at launch.
     /// `--leader <spec>` and `--keys <action id>=<spec>,...` replace saved shortcuts for one launch.
+    /// `--global <action id>=<spec>,...` sets global shortcuts for one launch.
     init(arguments: [String]) {
         let proof = arguments.contains("--proof")
         defaults = proof ? UserDefaults(suiteName: "com.tiller.Tiller.proof")! : .standard
@@ -67,6 +68,11 @@ final class ShortcutStore: ObservableObject {
             let parts = pair.split(separator: "=").map(String.init)
             guard parts.count == 2, let id = ActionID(rawValue: parts[0]) else { continue }
             shortcuts.set(KeyChord(spec: parts[1]), for: id)
+        }
+        for pair in (value("--global") ?? "").split(separator: ",") {
+            let parts = pair.split(separator: "=").map(String.init)
+            guard parts.count == 2, let id = ActionID(rawValue: parts[0]) else { continue }
+            shortcuts.global[id] = KeyChord(spec: parts[1])
         }
         self.shortcuts = shortcuts
         showKeyBar = defaults.object(forKey: Self.showKeyBarKey) as? Bool ?? true
@@ -89,6 +95,11 @@ final class ShortcutStore: ObservableObject {
         save("toggle", .string(chord?.spec ?? "none"))
     }
 
+    func setGlobal(_ chord: KeyChord?, for action: ActionID) {
+        shortcuts.global[action] = chord
+        save("global.\(action.rawValue)", .string(chord?.spec ?? "none"))
+    }
+
     func setExitAfter(_ exits: Bool, for action: ActionID) {
         shortcuts.exitAfter[action] = exits
         save("exitAfter.\(action.rawValue)", .bool(exits))
@@ -106,6 +117,7 @@ final class ShortcutStore: ObservableObject {
             "leader": .string(shortcuts.leader?.spec ?? "none"),
             "toggle": .string(shortcuts.toggle?.spec ?? "none"),
             "keys": .object(Dictionary(uniqueKeysWithValues: shortcuts.actions.map { ($0.key.rawValue, .string($0.value.spec)) })),
+            "global": .object(Dictionary(uniqueKeysWithValues: shortcuts.global.map { ($0.key.rawValue, .string($0.value.spec)) })),
             "exitAfter": .object(Dictionary(uniqueKeysWithValues: ActionID.allCases.map { ($0.rawValue, .bool(shortcuts.exits(after: $0))) })),
             "showKeyBar": .bool(showKeyBar),
             "showIn": .string(showIn.rawValue),

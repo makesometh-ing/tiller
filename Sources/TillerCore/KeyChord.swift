@@ -102,7 +102,14 @@ public enum ActionID: String, Codable, CaseIterable, Sendable {
     }
 }
 
-/// The leader key and the key of each action in leader key mode.
+/// A shortcut that works in every app.
+public enum GlobalSlot: Hashable, Sendable {
+    case leader
+    case toggle
+    case action(ActionID)
+}
+
+/// The leader key, the key of each action in leader key mode, and the global shortcuts.
 public struct Shortcuts: Codable, Equatable, Sendable {
     public var leader: KeyChord?
     /// Turns Tiller off and on, in every app and also while Tiller is off.
@@ -112,6 +119,8 @@ public struct Shortcuts: Codable, Equatable, Sendable {
     public var cleared: Set<ActionID> = []
     /// The "Exit after" setting of each action that was changed on the Shortcuts page.
     public var exitAfter: [ActionID: Bool] = [:]
+    /// The global shortcut of each action. A global shortcut does its action without the leader key. Empty by default.
+    public var global: [ActionID: KeyChord] = [:]
 
     public init(leader: KeyChord?, toggle: KeyChord?, actions: [ActionID: KeyChord]) {
         self.leader = leader
@@ -119,7 +128,7 @@ public struct Shortcuts: Codable, Equatable, Sendable {
         self.actions = actions
     }
 
-    enum CodingKeys: CodingKey { case leader, toggle, actions, cleared, exitAfter }
+    enum CodingKeys: CodingKey { case leader, toggle, actions, cleared, exitAfter, global }
 
     /// A cleared `toggle` is written as null. Saved shortcuts without the `toggle` key get the standard toggle chord.
     public func encode(to encoder: Encoder) throws {
@@ -129,6 +138,7 @@ public struct Shortcuts: Codable, Equatable, Sendable {
         try c.encode(actions, forKey: .actions)
         try c.encode(cleared, forKey: .cleared)
         try c.encode(exitAfter, forKey: .exitAfter)
+        try c.encode(global, forKey: .global)
     }
 
     /// Saved shortcuts don't contain the actions that were added after the save. Each of these actions gets its standard chord,
@@ -140,6 +150,7 @@ public struct Shortcuts: Codable, Equatable, Sendable {
         cleared = try c.decodeIfPresent(Set<ActionID>.self, forKey: .cleared) ?? []
         toggle = c.contains(.toggle) ? try c.decodeIfPresent(KeyChord.self, forKey: .toggle) : Self.standard.toggle
         exitAfter = try c.decodeIfPresent([ActionID: Bool].self, forKey: .exitAfter) ?? [:]
+        global = try c.decodeIfPresent([ActionID: KeyChord].self, forKey: .global) ?? [:]
         for (id, chord) in Self.standard.actions where actions[id] == nil && !cleared.contains(id) && !actions.values.contains(chord) {
             actions[id] = chord
         }
@@ -173,6 +184,27 @@ public struct Shortcuts: Codable, Equatable, Sendable {
         let pressed = KeyChord(keyCode: keyCode, modifiers: modifiers)
         if let exact = actions.first(where: { $0.value == pressed })?.key { return exact }
         return actions.first(where: { $0.value.keyCode == keyCode && $0.value.modifiers.isEmpty })?.key
+    }
+
+    /// The action of a global shortcut. Only an exact chord matches.
+    public func globalAction(keyCode: UInt16, modifiers: Modifiers) -> ActionID? {
+        let pressed = KeyChord(keyCode: keyCode, modifiers: modifiers)
+        return global.first { $0.value == pressed }?.key
+    }
+
+    /// The leader key, the shortcut to turn Tiller on and off, or the global shortcut that has `chord`.
+    public func globalSlot(of chord: KeyChord) -> GlobalSlot? {
+        if leader == chord { return .leader }
+        if toggle == chord { return .toggle }
+        return global.first { $0.value == chord }.map { .action($0.key) }
+    }
+
+    /// Why `chord` can't be saved in `slot`, or nil when it can. The leader key, the shortcut to turn Tiller on and off
+    /// and the global shortcuts work in every app, so each chord can have only one of them.
+    /// A global shortcut needs a modifier, so that typed text still reaches the apps.
+    public func conflict(_ chord: KeyChord, for slot: GlobalSlot) -> GlobalSlot? {
+        if case .action = slot, chord.modifiers.isEmpty { return slot }
+        return globalSlot(of: chord).flatMap { $0 == slot ? nil : $0 }
     }
 
     /// Sets the chord of an action. Another action with the same chord loses its chord, so that one chord has one action.

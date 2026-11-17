@@ -139,6 +139,15 @@ final class LeaderKey {
             return nil
         }
         guard isEnabled() else { return pass }
+        if let id = shortcuts.globalAction(keyCode: UInt16(code), modifiers: modifiers) {
+            // A global shortcut does its action in every app, also in leader key mode. Leader key mode doesn't change, except for `turnOff`.
+            stoppedKeyUps.insert(code)
+            guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else { return nil }
+            Log.event(.globalKey, ["chord": .string(KeyChord(keyCode: UInt16(code), modifiers: modifiers).spec), "action": .string(id.rawValue)])
+            if id == .turnOff { setLayer(false, reason: "action", ["action": .string(id.rawValue)]) }
+            onAction(id.action, .now())
+            return nil
+        }
         let isLeader = shortcuts.isLeader(keyCode: UInt16(code), modifiers: modifiers)
         guard isLayerActive || isLeader else { return pass }
 
