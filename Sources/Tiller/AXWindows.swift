@@ -158,12 +158,23 @@ final class AXWindows {
     /// Raises the windows. The last window gets focus.
     func raise(_ refs: [WindowRef]) {
         for ref in refs { AXUIElementPerformAction(ref.element, kAXRaiseAction as CFString) }
-        if let last = refs.last { last.app.set(kAXFrontmostAttribute, kCFBooleanTrue) }
+        if let last = refs.last { Self.activate(last) }
     }
 
-    func focus(_ ref: WindowRef) {
-        ref.element.set(kAXMainAttribute, kCFBooleanTrue)
-        AXUIElementPerformAction(ref.element, kAXRaiseAction as CFString)
-        ref.app.set(kAXFrontmostAttribute, kCFBooleanTrue)
+    /// Returns the results of the calls, for the log.
+    @discardableResult
+    func focus(_ ref: WindowRef) -> String {
+        let main = ref.element.set(kAXMainAttribute, kCFBooleanTrue)
+        let raise = AXUIElementPerformAction(ref.element, kAXRaiseAction as CFString)
+        let (front, activated) = Self.activate(ref)
+        return "main=\(main.rawValue) raise=\(raise.rawValue) frontmost=\(front.rawValue) activate=\(activated)"
+    }
+
+    /// Makes the app of `ref` the active app. Some apps, for example Dia, return success for AXFrontmost and stay
+    /// inactive, so NSRunningApplication.activate() is also called. Without the all-windows option, only the main window comes forward.
+    @discardableResult
+    private static func activate(_ ref: WindowRef) -> (AXError, Bool) {
+        let front = ref.app.set(kAXFrontmostAttribute, kCFBooleanTrue)
+        return (front, NSRunningApplication(processIdentifier: ref.pid)?.activate() ?? false)
     }
 }

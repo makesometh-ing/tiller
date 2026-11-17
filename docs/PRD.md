@@ -96,6 +96,7 @@ Planned for v1:
 - Dialogs and child windows float. They aren't resized. AeroSpace, yabai, i3 and Glide do the same. The sources are in [research/child-windows.md](research/child-windows.md).
 - A new floating window doesn't cause a re-layout or a focus change.
 - When a window gets focus, all windows of its app are brought in front of the windows of other apps. The floating windows of that app stay behind the focused window. `R` raises them and gives the front one focus. With the Accessibility API, the focused window of an app is always the top window of that app. A floating window can be above the focused window only when the floating window has focus.
+- To give a window focus, Tiller sets `AXMain` on the window, raises it with `AXRaise`, sets `AXFrontmost` on its app and calls `NSRunningApplication.activate()`. Some apps, for example Dia, return success for `AXFrontmost` and stay inactive. `activate()` makes them active. Without the all-windows option, only the main window of the app comes forward.
 - `F` floats the focused tiled window. The window is returned to its frame from before Tiller first tiled it. `F` again puts it back in the focused container.
 - A Finder window with native tabs is one window on the screen. The window server contains one window for each tab, at the same frame. Only the window of the selected tab is on the screen. The Accessibility API returns only that window. A tab switch changes the window id of the visible window.
 
@@ -124,7 +125,7 @@ Planned for v1:
 
 - Mockups: variant 3 in [leader-mode-v3.html](mockups/leader-mode-v3.html) for the containers and the pills, and variant 1 in [leader-mode-v4.html](mockups/leader-mode-v4.html) for the key bar.
 - The key bar is shown at once. The containers and window pills are shown 18 to 30 ms later.
-- Container: a teal tint and edge. The focused container is brighter.
+- Container: a teal edge without a fill. The edge of the focused container is brighter.
 - Container chip: a solid pill on the top edge of the container, over the border. Teal for the focused container, grey for the others. It shows the container number, ⇆ or ⇅, a window-stack icon with the window count, and the `V` key. A tooltip on the key shows what the key does.
 - Window pill: small, translucent, at the bottom-right corner of every window, including floating windows. It shows the real app icon, the app name, Tiled or Floating, and the `F` key. The pill of a window behind the focused window in a carousel shows only the app icon, in the visible edge of the window.
 - A pill isn't shown when the area of the pill is behind another window.
@@ -179,6 +180,7 @@ Planned for v1:
 ## 13. Logging and diagnostics
 
 - The current log is `~/Library/Logs/Tiller/tiller.log`. It contains launches, actions with latency, frame times for each app, overlay times and setting changes.
+- Each focus action writes a `focus` line 150 ms after the action, from another queue: the ring order (bundle id and window id), the focused window stored in the workspace, the system focused window before the action, the ring index before and after, the window that got focus, the AXError values of `AXMain`, `AXRaise` and `AXFrontmost`, the result of `activate()`, and the system focused window and frontmost app after the action.
 
 Planned for v1: the logging described below replaces `tiller.log`.
 

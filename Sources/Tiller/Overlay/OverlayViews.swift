@@ -104,7 +104,7 @@ struct WindowPill: View {
     }
 }
 
-/// The overlay content of one screen: container tints, edges and chips, and window pills.
+/// The overlay content of one screen: container edges and chips, and window pills.
 struct ScreenOverlayView: View {
     @ObservedObject var state: OverlayState
 
@@ -116,8 +116,7 @@ struct ScreenOverlayView: View {
                 ForEach(screen.containers) { c in
                     let r = local(c.frame, screen)
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(c.focused ? theme.containerTintFocused : theme.containerTint)
-                        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(c.focused ? theme.containerEdgeFocused : theme.containerEdge, lineWidth: 2))
+                        .strokeBorder(c.focused ? theme.containerEdgeFocused : theme.containerEdge, lineWidth: 2)
                         .frame(width: r.width, height: r.height)
                         .offset(x: r.minX, y: r.minY)
                 }

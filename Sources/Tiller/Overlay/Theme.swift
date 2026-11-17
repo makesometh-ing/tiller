@@ -5,8 +5,6 @@ import SwiftUI
 /// Each color has a light and a dark value, so the UI follows the system appearance.
 struct Theme {
     var accent: Color
-    var containerTint: Color
-    var containerTintFocused: Color
     var containerEdge: Color
     var containerEdgeFocused: Color
     var chipFocused: Color
@@ -29,8 +27,6 @@ struct Theme {
 
     static let standard = Theme(
         accent: dynamic(light: 0x0F9E8E, dark: 0x3FD6C4),
-        containerTint: dynamic(light: 0x0F9E8E, dark: 0x3FD6C4, alpha: 0.08),
-        containerTintFocused: dynamic(light: 0x0F9E8E, dark: 0x3FD6C4, alpha: 0.15),
         containerEdge: dynamic(light: 0x0F9E8E, dark: 0x3FD6C4, alpha: 0.45),
         containerEdgeFocused: dynamic(light: 0x0F9E8E, dark: 0x3FD6C4, alpha: 0.95),
         chipFocused: dynamic(light: 0x0F9E8E, dark: 0x2BB8A8),

@@ -35,7 +35,7 @@ Tiller is a tiling window manager for macOS. It is a menu bar app.
 - Key caps are flat: a rounded square with a solid fill, without a border, and the key in the system sans font. Letters are upper case.
 - The leader key overlay has a key bar: draggable, at the bottom of the screen by default. The keys are in sections with a heading that says what they act on: screen, container, window and app (variant 1 in `docs/mockups/leader-mode-v4.html`). `?` opens the full key list with descriptions. The key bar and the key list read their keys from `KeyGuide` in `Sources/Tiller/Overlay/OverlayViews.swift`.
 
-- In leader key mode, each container has a teal tint and a solid chip on its top edge, over the border. The chip of the focused container is teal. The other chips are grey. The chip shows the container number, the carousel mode icon (⇆ or ⇅), the window count and the `v` key. A tooltip on the `v` key shows what the key does.
+- In leader key mode, each container has a teal edge without a fill, and a solid chip on its top edge, over the border. The chip of the focused container is teal. The other chips are grey. The chip shows the container number, the carousel mode icon (⇆ or ⇅), the window count and the `v` key. A tooltip on the `v` key shows what the key does.
 - `v` in leader key mode switches the carousel mode of the focused container between horizontal and vertical.
 - In leader key mode, each window has a small translucent pill at its bottom-right corner: app icon, app name, Tiled or Floating, and the `p` and `f` keys. The pill of a window behind the focused window in a carousel shows only the app icon. The app icon is shown in the visible edge of the window.
 

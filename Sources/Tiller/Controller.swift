@@ -136,6 +136,10 @@ final class Controller {
         var note = ""
         /// The frame of a window that the `f` key floats.
         var floatFrame: CGRect?
+        /// For the focus log line: the focused window in the stored workspace, and the focused window and ring index after the sync with the system focused window.
+        var storedFocused: WindowID?
+        var startFocused: WindowID?
+        var startIndex = 0
         switch action {
         case .layout(let kind):
             ws = Workspace(displayID: screen.uuid, desktop: screen.desktop)
@@ -148,7 +152,10 @@ final class Controller {
             guard let existing = workspaces[screen.uuid] else { return }
             ws = existing
             Self.removeClosed(&ws, refs: refs)
+            storedFocused = ws.focusedWindow
             if let focused { ws.focus(window: focused) }
+            startFocused = ws.focusedWindow
+            startIndex = ws.containers[ws.focusedContainerIndex].focusedIndex
             before = ws.windowFrames()
             if case .focusWindow = action { ws.focusWindow(offset: offset) } else { ws.focusContainer(offset: offset) }
             expectedFocused = ws.focusedWindow
@@ -201,14 +208,32 @@ final class Controller {
         var changed = target.filter { before[$0.key] != $0.value }
         if let floatFrame, let focused { changed[focused] = floatFrame }
         ax.setFrames(changed, refs: refs)
+        var raised: WindowID?
+        var axResult = "none"
         if case .raiseFloating = action {
         } else if let id = expectedFocused, let ref = refs[id], id != focused || changed[id] != nil {
-            ax.focus(ref)
+            axResult = ax.focus(ref)
+            raised = id
         }
 
         let latencyMs = Double(DispatchTime.now().uptimeNanoseconds - received.uptimeNanoseconds) / 1_000_000
         let name = Self.name(action) + (note.isEmpty ? "" : ":\(note)")
         Log.write("action=\(name) screen=\(screen.uuid) layout=\(ws.layout.rawValue) moved=\(changed.count) latencyMs=\(String(format: "%.2f", latencyMs))")
+        switch action {
+        case .focusWindow, .focusContainer:
+            // Written 150 ms later on another queue: the other app applies the focus change after the Accessibility call returns.
+            let container = ws.containers[ws.focusedContainerIndex]
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.15) { [ax] in
+                func label(_ id: WindowID?) -> String {
+                    guard let id else { return "none" }
+                    let app = refs[id].flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier } ?? "?"
+                    return "\(app):\(id)"
+                }
+                Log.write("focus action=\(name) order=[\(container.windows.map(label).joined(separator: ","))] storedFocused=\(label(storedFocused)) systemFocusedBefore=\(label(focused)) index=\(startIndex)->\(container.focusedIndex) from=\(label(startFocused)) raised=\(label(raised)) ax=\(axResult) systemFocusedAfter=\(label(ax.focusedWindowID())) frontmostApp=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none")")
+            }
+        default:
+            break
+        }
 
         guard onReport != nil else { return }
         // Focus changes are applied by the other app after the Accessibility call returns.
