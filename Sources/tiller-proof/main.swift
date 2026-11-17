@@ -92,8 +92,9 @@ wait(1)
 let video = Process()
 video.executableURL = URL(filePath: "/usr/sbin/screencapture")
 // screencapture discards the video when it is interrupted, so the duration is fixed and the run waits for the end.
-// Each step takes about 1.5 seconds.
-video.arguments = ["-v", "-x", "-V", "\(steps.count * 2 + 4)", out.appending(path: "run.mov").path]
+// Each step takes about 1.5 seconds. A window step and an app step take about 2.5 seconds.
+let windowSteps = steps.filter { $0.hasPrefix("window:") || $0.hasPrefix("app:") }.count
+video.arguments = ["-v", "-x", "-V", "\(steps.count * 2 + windowSteps + 4)", out.appending(path: "run.mov").path]
 try! video.run()
 wait(1.5)
 
@@ -113,6 +114,22 @@ var results: [StepResult] = []
 /// Key log lines that a `pass:` step after a `click:` step must write: the title of the clicked window and the chord.
 var clickedKeyLines: [String] = []
 var floatingFrames: [WindowID: Rect] = [:]
+/// The container and the ring index of each tiled window of a report.
+func ring(_ r: ActionReport) -> [WindowID: [Int]] {
+    var next: [Int: Int] = [:]
+    var result: [WindowID: [Int]] = [:]
+    for w in r.windows {
+        result[w.id] = [w.container, next[w.container, default: 0]]
+        next[w.container, default: 0] += 1
+    }
+    return result
+}
+/// The ring position before a `window:minimize:<title>` step, with the title as the key.
+var savedRings: [String: [WindowID: [Int]]] = [:]
+/// The report before an `app:hide:<bundle id>` step, with the bundle id as the key.
+var reportsBeforeHide: [String: ActionReport] = [:]
+/// The focused window of the workspace after the last step that reported a tiled focused window.
+var tiledFocus: WindowID?
 for (index, key) in steps.enumerated() {
     lastResult = nil
     center.postNotificationName(.init("com.tiller.proof.press"), object: nil, userInfo: ["key": key], deliverImmediately: true)
@@ -129,7 +146,50 @@ for (index, key) in steps.enumerated() {
     if report.expectedFocused != report.actualFocused {
         problems.append("focused window: expected \(report.expectedFocused.map(String.init) ?? "none"), actual \(report.actualFocused.map(String.init) ?? "none")")
     }
-    if report.windows.isEmpty && !key.hasPrefix("settings") { problems.append("no windows in the workspace") }
+    if report.windows.isEmpty && !key.hasPrefix("settings") && !key.hasPrefix("app:hide:") { problems.append("no windows in the workspace") }
+    // Windows that open, close, are minimized or unminimized, and apps that are hidden or shown, after a layout key.
+    if let previous = results.last?.report {
+        let parts = key.split(separator: ":", maxSplits: 2).map(String.init)
+        let target = parts.count > 2 ? parts[2] : ""
+        let ids = Set(report.windows.map(\.id)), previousIDs = Set(previous.windows.map(\.id))
+        switch (parts[0], parts.count > 1 ? parts[1] : "") {
+        case ("window", "open"):
+            let new = ids.subtracting(previousIDs)
+            if new.count != 1 { problems.append("\(new.count) new tiled windows, expected 1") }
+            if let id = new.first {
+                if report.expectedFocused != id { problems.append("the new window isn't the focused window") }
+                if let f = tiledFocus, let p = ring(previous)[f], ring(report)[id] != [p[0], p[1] + 1] {
+                    problems.append("the new window is at \(ring(report)[id] ?? []), expected after the focused window at \(p)")
+                }
+            }
+        case ("window", "open-floating"):
+            if ids != previousIDs || report.movedWindows != 0 { problems.append("a new floating window changed a container") }
+            for w in report.windows where previous.windows.first(where: { $0.id == w.id })?.actual != w.actual { problems.append("\(w.title) moved") }
+            if report.floating.count != previous.floating.count + 1 { problems.append("\(report.floating.count) floating windows, expected \(previous.floating.count + 1)") }
+        case ("window", "close"), ("window", "minimize"):
+            if report.windows.contains(where: { $0.title == target }) { problems.append("\(target) is still in a carousel") }
+            if report.windows.count != previous.windows.count - 1 { problems.append("\(report.windows.count) tiled windows, expected \(previous.windows.count - 1)") }
+            if parts[1] == "minimize", let w = previous.windows.first(where: { $0.title == target }) { savedRings[target] = [w.id: ring(previous)[w.id]!] }
+        case ("window", "unminimize"):
+            if let w = report.windows.first(where: { $0.title == target }) {
+                if ring(report)[w.id] != savedRings[target]?[w.id] {
+                    problems.append("\(target) is at \(ring(report)[w.id] ?? []), expected \(savedRings[target]?[w.id] ?? [])")
+                }
+            } else { problems.append("\(target) isn't in a carousel") }
+        case ("app", "hide"):
+            if report.windows.contains(where: { $0.bundleID == target }) { problems.append("a window of \(target) is still in a carousel") }
+            reportsBeforeHide[target] = previous
+        case ("app", "show"):
+            guard let before = reportsBeforeHide[target] else { problems.append("app:hide:\(target) didn't run before"); break }
+            if ring(report) != ring(before) { problems.append("the ring positions differ from the positions before app:hide:\(target)") }
+            // The shown app is activated. When its focused window is the focused window from before the hide, the frames are the same.
+            for w in report.windows where report.expectedFocused == before.expectedFocused && before.windows.first(where: { $0.id == w.id })?.actual != w.actual {
+                problems.append("\(w.title) has another frame than before app:hide:\(target)")
+            }
+        default: break
+        }
+    }
+    if let f = report.expectedFocused, report.windows.contains(where: { $0.id == f }) { tiledFocus = f }
     // After `record:leader`, the next `chord:` step must set the leader key.
     if key.hasPrefix("chord:"), index > 0, steps[index - 1] == "record:leader", let chord = chordOf(key),
        !report.action.contains("leader=\(chord.spec)") {

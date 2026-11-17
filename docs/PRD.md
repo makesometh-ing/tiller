@@ -106,13 +106,15 @@ Planned for v1:
 - A focus change made by Tiller doesn't cause a second arrangement. The window that gets focus is already the focused window of the workspace.
 - Some apps apply Tiller's focus call late. Until then, the system focused window is the window that had focus before. A focus change in the second after Tiller's last focus call, without a click after that call, is read again 1 second after that call.
 - The `action.done` event with the action `focus-change` gives the time from the click to the notification and from the click to the new frames.
+- A new tiled window is put into the focused container, after the focused window. It becomes the focused window. Tiller gives it focus when its app doesn't. A new floating window doesn't change a container or focus.
+- A closed window is removed from its container at once. The other windows of the carousel are arranged again.
+- A minimized window, or a window of a hidden app, is removed from its carousel at once. Its container and its position in the ring order are saved in the workspace, with the layout. The other windows of the carousel are arranged again. When the window is shown again, it is put back into the same container, at the same position in the ring order, as the focused window of that container. When several windows go back into one container, the front window becomes the focused window. If the layout changed, or the container doesn't exist, the window is put into the focused container. A window that is still open but isn't on the screen, for example a window on another Space, is handled in the same way.
+- These changes are read from the Accessibility notifications of each managed app (a window created, and for each window: destroyed, minimized and unminimized) and from the `NSWorkspace` notifications for an app hidden, shown, launched and quit. A focus change to a tiled window that isn't in a workspace also reads the window list. This finds a window that opened before the observer for its app was added. Notifications in the time before the window list is read use one window list read. When nothing changed, the window list is read again 0.25 seconds later, because a new window can be on the screen a short time after its notification.
+- Tiller doesn't read notifications for a moved or resized window. Its own frame changes then don't cause a second arrangement. The system focused window is read after a window change only from 1 second after Tiller's last focus call.
 - A Finder window with native tabs is one window on the screen. The window server contains one window for each tab, at the same frame. Only the window of the selected tab is on the screen. The Accessibility API returns only that window. A tab switch changes the window id of the visible window.
 
 Planned for v1:
 
-- A new tiled window is put into the focused container, after the focused window. It becomes the focused window.
-- A closed window is removed from its container at once. The other windows of the carousel are arranged again.
-- A minimized window, or a window of a hidden app, is removed from its carousel. Its container and its position in the ring order are recorded. When the window is shown again, it is put back into the same container, at the same position in the ring order, as the focused window of that container. If that container doesn't exist, the window is put into the focused container.
 - Each native tab group is one window in its carousel. When the visible window id changes at the same frame, the new id replaces the old id in the carousel. A new tab doesn't add a window to the carousel. A closed tab doesn't remove the window of the group from the carousel while another tab of the group is open.
 - Peek: `P` fills the workspace with the focused window. The workspace margin is kept. `P` again, or a focus change to another tiled window, returns it to its container. `P` doesn't do anything in the Full Screen layout. `P` is shown on the window pill of a tiled window and in the key bar.
 
@@ -262,7 +264,7 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
   - `setFramesMs` for each app: bundle id, number of windows, `enhancedUI`, time.
   - `focusMs`: the focus call.
   - `totalMs`: from the key press in the event tap to the end of the action.
-- The action `focus-change` is the arrangement after a click or another focus change by the user. It also has the trigger (`click` or `other`), the container and the time from the click to the notification. Its `totalMs` is from the click. The action `rearrange` is the arrangement after Tiller is turned on.
+- The action `focus-change` is the arrangement after a click or another focus change by the user. It also has the trigger (`click` or `other`), the container and the time from the click to the notification. Its `totalMs` is from the click. The action `rearrange` is the arrangement after Tiller is turned on. The action `window-change` is the arrangement after a window opens, closes, is minimized or shown again, or after an app is hidden or shown. It also has the trigger (the first notification name, for example `AXWindowCreated`, `AXUIElementDestroyed`, `AXWindowMiniaturized`, `appHidden`, `appShown` or `focusChanged`), the number of windows opened, restored and removed, `windowListMs`, `setFramesMs` and `focusMs`. Its `totalMs` is from the first notification.
 - `action.slow` (`error`): the same fields as `action.done`. It is written in addition to `action.done` when `totalMs` is more than 100 ms.
 - `action.focus`: written 150 ms after each focus action, from another queue: the ring order (bundle id and window id), the window titles in ring order (`titles`, only with "Include window titles in logs" on), the focused window stored in the workspace, the system focused window before the action, the ring index before and after, the window that got focus, the AXError values of `AXMain`, `AXRaise` and `AXFrontmost`, the result of `activate()`, and the system focused window and frontmost app after the action.
 
@@ -270,7 +272,10 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
 
 - `window.classified`: written the first time a window id is read with a kind. A window is logged again when its kind changes. Bundle id, app name, window id, the title (only with "Include window titles in logs" on), subrole, minimized, size settable, on screen, window layer, modal, parent is the app, and the result (tiled, floating or ignored). These are the inputs of the window rule. The event shows why an app window is tiled or floats.
 - `window.frameMismatch` (`error`): the frames of the moved windows are read 150 ms after the move, on another queue. The event is written when a frame differs from the target frame by more than 1 point. Bundle id, window id, target frame and actual frame. It shows apps with a minimum size, or apps that move their windows back.
-- `window.closed`: the window id, the screen and the container of a window that was removed from its carousel because it doesn't exist.
+- `window.opened`: a new tiled window was put into a container. The window id, the bundle id, the screen, the container and the ring index.
+- `window.closed`: a window was removed from its carousel because it doesn't exist. The same fields, and `reason` `closed`.
+- `window.removed`: a window was removed from its carousel and its ring position was saved. The same fields, and `reason`: `minimized`, `appHidden`, or `notOnScreen` for a window on another Space or a window that isn't tiled now.
+- `window.restored`: a window was put back into its container. The same fields, and `sameContainer`: false when the layout changed or the container doesn't exist.
 
 #### ax
 
@@ -331,6 +336,9 @@ The two switches are saved in the Tiller defaults (the proof defaults domain in 
 | Containers and pills shown | 18 to 30 ms |
 | Overlay hidden after a click in leader key mode | 0.8 to 1.8 ms |
 | Click on a window behind the focused window to the new frames, test windows | 29 to 55 ms |
+| New, closed, minimized or unminimized window to the new frames, test windows | 21 to 32 ms |
+| Hidden or shown app to the new frames, test windows | 43 to 48 ms |
+| Hidden or shown app to the new frames, test windows and Finder | 25 to 68 ms |
 
 - WeChat takes 23 to 80 ms to resize one window. A move without a resize takes 1 to 3 ms.
 
@@ -344,6 +352,7 @@ Planned for v1:
 - `build/tiller-proof` runs the end-to-end test. In proof mode, Tiller manages only the windows of the apps in `--only-bundle-ids`. Proof runs use the defaults domain `com.tiller.Tiller.proof`. It is emptied when a proof run starts Tiller. A proof run doesn't change the settings or the key bar position in the Tiller defaults.
 - `--global <action id>=<spec>,...` sets global shortcuts for a proof run. A `global:<chord>` step posts the chord without the leader key. Only the action sends the report. `shortcuts-mode:leader` and `shortcuts-mode:global` switch the Shortcuts page. `record:global:<action id>` starts the recording of a global shortcut field.
 - A `click:` proof step posts a mouse down and a mouse up at the visible point of a window nearest to its center. `click:next` and `click:previous` click the windows after and before the focused window in the focused carousel. `click:container<n>` clicks the focused window of container n. `click:floating` clicks the front floating window.
+- A `window:` step sends a command to the test windows app: `window:open` opens a tiled window with the next number, `window:open-floating` opens a fixed-size window, and `window:close:<title>`, `window:minimize:<title>` and `window:unminimize:<title>` close, minimize and unminimize a window. `app:hide:<bundle id>` hides an app with `NSRunningApplication.hide()`, which sends the same notification as ⌘H. `app:show:<bundle id>` shows the app again and activates it. The proof runner checks the ring position of each window after these steps.
 - A `settings:<page>` step opens the settings window on that page. The proof runner then also captures the settings window alone, as `screenshots/<step>-settings-window.png`.
 - `toggle:debugLogging` and `toggle:logTitles` make the same change as a click on the "Debug logging" switch and the "Include window titles in logs" switch. `expire:debugLogging` turns debug logging on for 1 second. The timer then turns it off.
 - `press:<title>` presses the button with that title in a Tiller window, with the Accessibility press action. The button action sends the report. `press:Export Diagnostics…` writes the zip to the Desktop. The proof runner moves the zip into the proof bundle.

@@ -10,7 +10,7 @@ Source: [requirements-as-written.md, section 22](../requirements-as-written.md).
 
 The behaviour is described in [PRD.md, section 7 "Windows"](../PRD.md#7-windows).
 
-- `FocusObserver` in `Sources/Tiller/FocusObserver.swift` adds an Accessibility observer for the focused window changed notification of each managed app. It also reads the app activation notification of `NSWorkspace`. Apps that start after Tiller are observed at their launch or at their first activation.
+- `WindowObserver` in `Sources/Tiller/WindowObserver.swift` adds an Accessibility observer for the focused window changed notification of each managed app. It also reads the app activation notification of `NSWorkspace`. Apps that start after Tiller are observed at their launch or at their first activation.
 - `Controller.syncFocus` reads the system focused window after each notification. When the window is a tiled window of a workspace and isn't the focused window of that workspace, it becomes the focused window of its carousel and its container. The frames of the carousel are then set, as with `H`, `L`, `J` and `K`.
 - A focus change made by Tiller doesn't change the workspace: the window that got focus is already the focused window of the workspace. A focus change without a click in the second after Tiller's focus call is read again after that second.
 - Each arrangement after a focus change writes an `action.done` event with the action `focus-change`, the trigger (`click` or `other`), the container, the moved windows, the time from the click to the notification and the time from the click to the new frames.

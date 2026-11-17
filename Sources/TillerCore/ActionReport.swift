@@ -18,8 +18,9 @@ public struct ActionReport: Codable, Sendable {
         public var container: Int
         public var expected: Rect
         public var actual: Rect?
-        public init(id: WindowID, title: String, container: Int, expected: Rect, actual: Rect?) {
-            (self.id, self.title, self.container, self.expected, self.actual) = (id, title, container, expected, actual)
+        public var bundleID: String?
+        public init(id: WindowID, title: String, container: Int, expected: Rect, actual: Rect?, bundleID: String? = nil) {
+            (self.id, self.title, self.container, self.expected, self.actual, self.bundleID) = (id, title, container, expected, actual, bundleID)
         }
     }
     public var action: String

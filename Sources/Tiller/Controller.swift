@@ -16,6 +16,13 @@ final class Controller {
     /// The time of Tiller's last focus call. Read and written on `queue`.
     private var lastFocusCall = DispatchTime(uptimeNanoseconds: 0)
     private var focusRetryScheduled = false
+    /// Each window from the last window list read on `queue`. The element of a window that is removed from its carousel is read from here.
+    private var known: [WindowID: WindowRef] = [:]
+    /// True from a window notification until `queue` starts the window sync for it. Notifications in that time use the same sync.
+    private var syncPending = false
+    private let syncLock = NSLock()
+    /// The latency and the moved window count of the last window sync. The proof runner reads it. Read and written on `queue`.
+    private var lastWindowChange: (latencyMs: Double, moved: Int)?
 
     init(ax: AXWindows) { self.ax = ax }
 
@@ -31,17 +38,102 @@ final class Controller {
     /// Call on the main thread after a focus change notification. `clicked` is the time of the last mouse down.
     func focusChanged(clicked: DispatchTime?) {
         let notified = DispatchTime.now()
-        queue.async { self.syncFocus(notified: notified, clicked: clicked) }
+        let screens = ScreenInfo.all()
+        queue.async { self.syncFocus(notified: notified, clicked: clicked, screens: screens) }
+    }
+
+    /// Call on the main thread after a window opens, closes, is minimized or unminimized, or after an app is hidden, shown, launched or quit.
+    func windowsChanged(trigger: String) {
+        let notified = DispatchTime.now()
+        let screens = ScreenInfo.all()
+        guard syncLock.withLock({ defer { syncPending = true }; return !syncPending }) else { return }
+        queue.async {
+            self.syncLock.withLock { self.syncPending = false }
+            self.syncWindows(trigger: trigger, notified: notified, screens: screens, retry: true)
+        }
+    }
+
+    /// Removes closed, minimized and hidden windows from their carousels, puts unminimized and shown windows back at their
+    /// ring position, and puts each new tiled window into the focused container after the focused window. Then sets the frames of the changed carousels.
+    /// A window can be on the screen a short time after its notification. When nothing changed, the windows are read again 0.25 seconds later if `retry` is true.
+    private func syncWindows(trigger: String, notified: DispatchTime, screens: [ScreenInfo], retry: Bool) {
+        guard !workspaces.isEmpty else { return }
+        let t = DispatchTime.now()
+        let windows = ax.windows()
+        let windowListMs = Log.ms(since: t)
+        let refs = Dictionary(windows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let before = workspaces.mapValues { $0.windowFrames() }
+        let removed = removeGone(refs: refs)
+        let focused = ax.focusedWindowID()
+        let untracked = windows.filter { ref in isTiled(ref) && !workspaces.values.contains { $0.contains(ref.id) } }
+        var restored: [WindowID] = []
+        for uuid in workspaces.keys {
+            let saved = workspaces[uuid]!.savedPositions
+            for id in workspaces[uuid]!.restore(untracked.map(\.id)) {
+                restored.append(id)
+                let p = workspaces[uuid]!.position(of: id)
+                Log.event(.windowRestored, Self.fields(refs[id], id: id, screen: uuid, position: p).merging(
+                    ["sameContainer": .bool(p?.container == saved[id]?.container && p?.layout == saved[id]?.layout)]) { $1 })
+            }
+        }
+        // An unminimized window and the focused window of a shown app usually get focus. Until 1 second after Tiller's
+        // last focus call, the system focused window can be the window that had focus before, so it isn't read.
+        if removed + restored.count > 0, DispatchTime.now() >= lastFocusCall + 1.0, let focused,
+           let uuid = workspaces.first(where: { $0.value.contains(focused) })?.key {
+            workspaces[uuid]!.focus(window: focused)
+        }
+        var opened: [WindowRef] = []
+        for ref in untracked where !restored.contains(ref.id) {
+            guard let uuid = Self.screen(of: ref.id, refs: refs, screens: screens)?.uuid, workspaces[uuid] != nil else { continue }
+            workspaces[uuid]!.insert(ref.id)
+            if untiledFrames[ref.id] == nil { untiledFrames[ref.id] = ref.frame }
+            opened.append(ref)
+            Log.event(.windowOpened, Self.fields(ref, id: ref.id, screen: uuid, position: workspaces[uuid]!.position(of: ref.id)))
+        }
+        guard removed + restored.count + opened.count > 0 else {
+            if retry {
+                queue.asyncAfter(deadline: .now() + 0.25) { self.syncWindows(trigger: trigger, notified: notified, screens: screens, retry: false) }
+            }
+            return
+        }
+        var changed: [WindowID: CGRect] = [:]
+        for (uuid, ws) in workspaces {
+            for (id, frame) in ws.windowFrames() where (before[uuid]?[id] ?? refs[id]?.frame) != frame { changed[id] = frame }
+        }
+        let setFramesMs = ax.setFrames(changed, refs: refs)
+        let focusStart = DispatchTime.now()
+        // A new window gets focus from its app. Tiller gives it focus when its app doesn't.
+        if let ref = opened.last, ref.id != focused {
+            ax.focus(ref)
+            lastFocusCall = .now()
+        }
+        let focusMs = Log.ms(since: focusStart)
+        let latencyMs = Double(DispatchTime.now().uptimeNanoseconds - notified.uptimeNanoseconds) / 1e6
+        lastWindowChange = (latencyMs, changed.count)
+        Self.logAction(["action": "window-change", "trigger": .string(trigger), "opened": .int(opened.count), "restored": .int(restored.count),
+                        "removed": .int(removed), "moved": .int(changed.count), "windowListMs": windowListMs, "setFramesMs": setFramesMs,
+                        "focusMs": focusMs, "totalMs": .ms(latencyMs)], totalMs: latencyMs)
+        checkFrames(changed, refs: refs)
+    }
+
+    /// The fields of `window.opened`, `window.closed`, `window.removed` and `window.restored`. The container is 1-based. The ring index is 0-based.
+    private static func fields(_ ref: WindowRef?, id: WindowID, screen: String, position: RingPosition?) -> [String: LogValue] {
+        ["windowId": .int(Int(id)), "bundleId": .string(ref.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier } ?? ""),
+         "screen": .string(screen), "container": position.map { .int($0.container + 1) } ?? .null, "ringIndex": position.map { .int($0.index) } ?? .null]
     }
 
     /// Makes the system focused window the focused window of its carousel and its container, and sets the frames
     /// of the carousel, as `H`, `L`, `J` and `K` do. A focus change made by Tiller doesn't change the workspace,
     /// because the window that gets focus is already the focused window of the workspace.
-    private func syncFocus(notified: DispatchTime, clicked: DispatchTime?) {
+    private func syncFocus(notified: DispatchTime, clicked: DispatchTime?, screens: [ScreenInfo]) {
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier != getpid(),
               let focused = ax.focusedWindowID(),
-              !workspaces.values.contains(where: { $0.focusedWindow == focused }),
-              let uuid = workspaces.first(where: { $0.value.contains(focused) })?.key else { return }
+              !workspaces.values.contains(where: { $0.focusedWindow == focused }) else { return }
+        guard let uuid = workspaces.first(where: { $0.value.contains(focused) })?.key else {
+            // A window of an app that opened before the app was observed gets focus.
+            syncWindows(trigger: "focusChanged", notified: notified, screens: screens, retry: false)
+            return
+        }
         // Some apps apply Tiller's focus call late. Until then, the system focused window is the window that had focus before.
         // A focus change without a click after Tiller's last focus call is read again 1 second after that call.
         let settled = lastFocusCall + 1.0
@@ -50,16 +142,16 @@ final class Controller {
             focusRetryScheduled = true
             queue.asyncAfter(deadline: settled) {
                 self.focusRetryScheduled = false
-                self.syncFocus(notified: notified, clicked: clicked)
+                self.syncFocus(notified: notified, clicked: clicked, screens: screens)
             }
             return
         }
         let t = DispatchTime.now()
         let refs = Dictionary(ax.windows().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let windowListMs = Log.ms(since: t)
+        let before = workspaces[uuid]?.windowFrames() ?? [:]
+        removeGone(refs: refs)
         guard var ws = workspaces[uuid] else { return }
-        Self.removeClosed(&ws, refs: refs)
-        let before = ws.windowFrames()
         ws.focus(window: focused)
         workspaces[uuid] = ws
         let changed = ws.windowFrames().filter { before[$0.key] != $0.value }
@@ -80,8 +172,8 @@ final class Controller {
     /// The latency and the moved window count of the last arrangement after a focus change. The proof runner reads it. Read and written on `queue`.
     private var lastFocusChange: (latencyMs: Double, moved: Int)?
 
-    /// Call on the main thread. `expectedFocused` is the system focused window when nil.
-    func reportCurrentState(action: String, latencyMs: Double = 0, expectedFocused: WindowID? = nil) {
+    /// Call on the main thread. `expectedFocused` is the system focused window when nil, or the focused window of the workspace when `workspaceFocus` is true.
+    func reportCurrentState(action: String, latencyMs: Double = 0, expectedFocused: WindowID? = nil, workspaceFocus: Bool = false) {
         guard onReport != nil else { return }
         let screens = ScreenInfo.all()
         let mouseScreen = ScreenInfo.underMouse(in: screens)
@@ -91,10 +183,13 @@ final class Controller {
             guard let screen = Self.screen(of: focused, refs: refs, screens: screens) ?? mouseScreen,
                   let ws = self.workspaces[screen.uuid] else { return }
             // After a click, the report gives the latency of the arrangement that the click caused.
-            let change = action.hasPrefix("click:") ? self.lastFocusChange : nil
+            // After a window step, the report gives the latency of the window sync.
+            let change = action.hasPrefix("click:") ? self.lastFocusChange
+                : action.hasPrefix("window:") || action.hasPrefix("app:") ? self.lastWindowChange : nil
             self.lastFocusChange = nil
+            self.lastWindowChange = nil
             self.onReport?(self.report(action, ws, refs: refs, latencyMs: change?.latencyMs ?? latencyMs, moved: change?.moved ?? 0,
-                                       expectedFocused: expectedFocused ?? focused))
+                                       expectedFocused: expectedFocused ?? (workspaceFocus ? ws.focusedWindow : focused)))
         }
     }
 
@@ -159,7 +254,7 @@ final class Controller {
             for screen in screens {
                 var item = OverlayScreen(uuid: screen.uuid, frame: screen.frame, spacing: Spacing.standard.carouselSpacing)
                 if var ws = workspaces[screen.uuid] {
-                    Self.removeClosed(&ws, refs: refs, log: false)
+                    for id in ws.containers.flatMap(\.windows) where refs[id] == nil { ws.remove(id) }
                     if syncFocus, let focused { ws.focus(window: focused) }
                     for (i, c) in ws.containers.enumerated() {
                         item.containers.append(.init(id: i, frame: c.frame, axis: c.axis, windowCount: c.windows.count,
@@ -238,9 +333,8 @@ final class Controller {
     func rearrange() {
         queue.async {
             let refs = Dictionary(self.ax.windows().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-            for (uuid, var ws) in self.workspaces {
-                Self.removeClosed(&ws, refs: refs)
-                self.workspaces[uuid] = ws
+            self.removeGone(refs: refs)
+            for (uuid, ws) in self.workspaces {
                 let changed = ws.windowFrames().filter { refs[$0.key]?.frame != $0.value }
                 let start = DispatchTime.now()
                 let setFramesMs = self.ax.setFrames(changed, refs: refs)
@@ -269,6 +363,8 @@ final class Controller {
         let focused = ax.focusedWindowID()
         let focusReadMs = Log.ms(since: t)
         guard let screen = Self.screen(of: focused, refs: refs, screens: screens) ?? mouseScreen else { return }
+        let storedFrames = workspaces[screen.uuid]?.windowFrames() ?? [:]
+        removeGone(refs: refs)
 
         var ws: Workspace
         var before: [WindowID: CGRect]
@@ -284,6 +380,7 @@ final class Controller {
         case .layout(let kind):
             ws = Workspace(displayID: screen.uuid, desktop: screen.desktop)
             ws.savedAxes = workspaces[screen.uuid]?.savedAxes ?? [:]
+            ws.savedPositions = workspaces[screen.uuid]?.savedPositions ?? [:]
             let onScreen = windows.filter { isTiled($0) && screen.frame.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }
             ws.apply(kind, windows: onScreen.map(\.id), focused: focused)
             before = Dictionary(onScreen.map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
@@ -293,19 +390,17 @@ final class Controller {
         case .focusWindow(let offset), .focusContainer(let offset):
             guard let existing = workspaces[screen.uuid] else { return }
             ws = existing
-            Self.removeClosed(&ws, refs: refs)
             storedFocused = ws.focusedWindow
             if let focused { ws.focus(window: focused) }
             startFocused = ws.focusedWindow
             startIndex = ws.containers[ws.focusedContainerIndex].focusedIndex
-            before = ws.windowFrames()
+            before = storedFrames
             if case .focusWindow = action { ws.focusWindow(offset: offset) } else { ws.focusContainer(offset: offset) }
             expectedFocused = ws.focusedWindow
         case .toggleFloat:
             guard let existing = workspaces[screen.uuid], let focused, let ref = refs[focused] else { return }
             ws = existing
-            Self.removeClosed(&ws, refs: refs)
-            before = ws.windowFrames()
+            before = storedFrames
             if ws.contains(focused) {
                 ws.remove(focused)
                 floated.insert(focused)
@@ -326,9 +421,8 @@ final class Controller {
         case .toggleAxis:
             guard let existing = workspaces[screen.uuid] else { return }
             ws = existing
-            Self.removeClosed(&ws, refs: refs)
             if let focused { ws.focus(window: focused) }
-            before = ws.windowFrames()
+            before = storedFrames
             ws.toggleAxis()
             expectedFocused = ws.focusedWindow
             note = ws.containers[ws.focusedContainerIndex].axis.rawValue
@@ -400,14 +494,35 @@ final class Controller {
         }
     }
 
-    /// Removes closed windows. `log` is false for a copy of a workspace that isn't stored.
-    private static func removeClosed(_ ws: inout Workspace, refs: [WindowID: WindowRef], log: Bool = true) {
-        for (index, container) in ws.containers.enumerated() {
-            for id in container.windows where refs[id] == nil {
-                ws.remove(id)
-                if log { Log.event(.windowClosed, ["windowId": .int(Int(id)), "screen": .string(ws.displayID), "container": .int(index + 1)]) }
+    /// Removes the windows that `refs` doesn't contain from their carousels, and writes `window.closed` or `window.removed` for each.
+    /// The ring position of a minimized window, a window of a hidden app and a window that is still open but not on the screen
+    /// is saved. Returns the number of removed windows. Then `known` is set to `refs`.
+    @discardableResult
+    private func removeGone(refs: [WindowID: WindowRef]) -> Int {
+        var count = 0
+        for (uuid, var ws) in workspaces {
+            let gone = ws.containers.flatMap(\.windows).filter { refs[$0] == nil }
+            guard !gone.isEmpty else { continue }
+            let reasons = Dictionary(uniqueKeysWithValues: gone.map { ($0, Self.removalReason(known[$0])) })
+            for id in gone {
+                Log.event(reasons[id] == "closed" ? .windowClosed : .windowRemoved,
+                          Self.fields(known[id], id: id, screen: uuid, position: ws.position(of: id)).merging(["reason": .string(reasons[id]!)]) { $1 })
             }
+            ws.removeSavingPositions(gone.filter { reasons[$0] != "closed" })
+            for id in gone where reasons[id] == "closed" { ws.remove(id) }
+            workspaces[uuid] = ws
+            count += gone.count
         }
+        known = refs
+        return count
+    }
+
+    /// `closed`, `appHidden`, `minimized`, or `notOnScreen` for a window on another Space or a window that isn't tiled now.
+    private static func removalReason(_ ref: WindowRef?) -> String {
+        guard let ref, let app = NSRunningApplication(processIdentifier: ref.pid), !app.isTerminated else { return "closed" }
+        if app.isHidden { return "appHidden" }
+        if ref.element.value(kAXMinimizedAttribute) as? Bool == true { return "minimized" }
+        return ref.element.value(kAXRoleAttribute) == nil ? "closed" : "notOnScreen"
     }
 
     /// Writes `action.done`, and `action.slow` when the action took more than 100 ms.
@@ -436,8 +551,8 @@ final class Controller {
         for (index, container) in ws.containers.enumerated() {
             for id in container.windows {
                 guard let ref = refs[id], let expected = target[id] else { continue }
-                windows.append(.init(id: id, title: ref.title, container: index,
-                                     expected: Rect(expected), actual: ref.element.frame.map(Rect.init)))
+                windows.append(.init(id: id, title: ref.title, container: index, expected: Rect(expected), actual: ref.element.frame.map(Rect.init),
+                                     bundleID: NSRunningApplication(processIdentifier: ref.pid)?.bundleIdentifier))
             }
         }
         let floating = refs.values.filter { !isTiled($0) }.sorted { $0.id < $1.id }.map {

@@ -32,6 +32,14 @@ public struct Container: Equatable, Sendable {
     }
 }
 
+/// The container and the ring index of a window when it was removed from its carousel, and the layout at that time.
+public struct RingPosition: Equatable, Sendable {
+    public var layout: LayoutKind
+    public var container: Int
+    public var index: Int
+    public init(layout: LayoutKind, container: Int, index: Int) { (self.layout, self.container, self.index) = (layout, container, index) }
+}
+
 /// The workspace of one screen. Each screen has its own workspace.
 public struct Workspace: Equatable, Sendable {
     /// The display UUID from macOS. It stays the same when the screen is disconnected and connected again.
@@ -44,6 +52,8 @@ public struct Workspace: Equatable, Sendable {
     public private(set) var focusedContainerIndex = 0
     /// The carousel mode of each container, for each layout that had a carousel mode switched. A layout that is applied again gets these modes.
     public var savedAxes: [LayoutKind: [CarouselAxis]] = [:]
+    /// The ring position of each minimized window and each window of a hidden app. `restore` puts the window back at this position.
+    public var savedPositions: [WindowID: RingPosition] = [:]
 
     public init(displayID: String, desktop: CGRect, spacing: Spacing = .standard) {
         self.displayID = displayID
@@ -136,6 +146,41 @@ public struct Workspace: Equatable, Sendable {
                 containers[i].focusedIndex = max(0, containers[i].focusedIndex - 1)
             }
         }
+    }
+
+    public func position(of window: WindowID) -> RingPosition? {
+        for (i, c) in containers.enumerated() {
+            if let index = c.windows.firstIndex(of: window) { return RingPosition(layout: layout, container: i, index: index) }
+        }
+        return nil
+    }
+
+    /// Removes `windows` and saves the ring position of each. All positions are read before the first window is removed.
+    public mutating func removeSavingPositions(_ windows: [WindowID]) {
+        for window in windows { savedPositions[window] = position(of: window) ?? savedPositions[window] }
+        for window in windows { remove(window) }
+    }
+
+    /// Puts each window of `windows` with a saved position back into its container, at its ring index, as the focused window
+    /// of that container. The windows are put back in ring index order, so that windows removed together get their old order.
+    /// When several windows go back into one container, the first of them in `windows` becomes the focused window. Pass the windows front to back.
+    /// When the layout changed or the container doesn't exist, the window is inserted into the focused container.
+    /// Returns the windows that had a saved position.
+    @discardableResult
+    public mutating func restore(_ windows: [WindowID]) -> [WindowID] {
+        let saved = windows.compactMap { w in savedPositions[w].map { (w, $0) } }.sorted { $0.1.index < $1.1.index }
+        for (window, p) in saved {
+            savedPositions[window] = nil
+            guard !contains(window) else { continue }
+            guard p.layout == layout, containers.indices.contains(p.container) else { insert(window); continue }
+            let index = min(p.index, containers[p.container].windows.count)
+            containers[p.container].windows.insert(window, at: index)
+        }
+        let restored = saved.map(\.0)
+        for window in windows.reversed() where restored.contains(window) {
+            if let p = position(of: window) { containers[p.container].focusedIndex = p.index }
+        }
+        return restored
     }
 
     public func windowFrames() -> [WindowID: CGRect] {

@@ -17,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Set by the proof runner `leader` step. The overlay is then reported after it is shown.
     private var reportOverlay = false
     private var controller: Controller!
-    private var focusObserver: FocusObserver!
+    private var windowObserver: WindowObserver!
     private var statusItem: NSStatusItem!
     private var permissionItem: NSMenuItem!
     private var trustTimer: Timer?
@@ -38,10 +38,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let ax = AXWindows(onlyBundleIDs: only)
         controller = Controller(ax: ax)
-        focusObserver = FocusObserver(ax: ax) { [weak self] in
+        windowObserver = WindowObserver(ax: ax, onFocus: { [weak self] in
             guard let self, store.enabled else { return }
             controller.focusChanged(clicked: leader.lastMouseDown)
-        }
+        }, onWindows: { [weak self] trigger in
+            guard let self, store.enabled else { return }
+            controller.windowsChanged(trigger: trigger)
+        })
         Log.event(.appLaunch, Diagnostics.systemFields(screens: ScreenInfo.all()).merging([
             "pid": .int(Int(getpid())), "proof": .bool(proofMode),
             "onlyBundleIds": only.map { .array($0.sorted().map(LogValue.string)) } ?? .null, "settings": .object(store.logFields),
@@ -231,7 +234,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let started = leader.start()
-        focusObserver.start()
+        windowObserver.start()
         Log.event(.tapStarted, ["keyTap": .bool(started), "mouseTap": .bool(leader.mouseTapStarted)])
         permissionItem.title = started ? "Leader key: \(store.shortcuts.leader.map { $0.labels.joined(separator: " ") } ?? "none")" : "Event tap failed to start"
         if started && proofMode {
@@ -284,6 +287,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // A global shortcut. The action sends the report. Without an action, the proof runner fails the step.
                 guard let chord = KeyChord(spec: String(key.dropFirst("global:".count))) else { return }
                 Self.post(chord)
+            case _ where key.hasPrefix("window:"):
+                // A command for the test windows app: `open`, `open-floating`, `close:<title>`, `minimize:<title>` or `unminimize:<title>`.
+                DistributedNotificationCenter.default().postNotificationName(.init("com.tiller.testwindows.command"), object: nil,
+                                                                             userInfo: ["command": String(key.dropFirst("window:".count))], deliverImmediately: true)
+                self.reportWindowChange(key)
+            case _ where key.hasPrefix("app:hide:") || key.hasPrefix("app:show:"):
+                // `app:hide:<bundle id>` hides the app, as ⌘H does. `app:show:<bundle id>` shows the app again and activates it, as a click on its Dock icon does.
+                for app in NSRunningApplication.runningApplications(withBundleIdentifier: String(key.dropFirst("app:hide:".count))) {
+                    if key.hasPrefix("app:hide:") { app.hide() } else { app.unhide(); app.activate() }
+                }
+                self.reportWindowChange(key)
             case "move-bar":
                 self.overlay.moveBar(dx: 120, dy: 60)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "move-bar") }
@@ -342,6 +356,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if !self.leader.isLayerActive, let leaderChord { Self.post(leaderChord) }
                 Self.post(chord)
             }
+        }
+    }
+
+    /// Sends the report 1.2 seconds after a window step. A minimize takes about 0.5 seconds. After a new floating window and a hidden app,
+    /// the expected focused window is the system focused window. After the other steps, it is the focused window of the workspace.
+    private func reportWindowChange(_ key: String) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            self.controller.reportCurrentState(action: key, workspaceFocus: key != "window:open-floating" && !key.hasPrefix("app:hide:"))
         }
     }
 

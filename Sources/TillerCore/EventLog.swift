@@ -27,7 +27,10 @@ public enum LogEventName: String, CaseIterable, Sendable {
     case actionFocus = "action.focus"
     case windowClassified = "window.classified"
     case windowFrameMismatch = "window.frameMismatch"
+    case windowOpened = "window.opened"
     case windowClosed = "window.closed"
+    case windowRemoved = "window.removed"
+    case windowRestored = "window.restored"
     case axError = "ax.error"
     case axCall = "ax.call"
     case overlayShown = "overlay.shown"
@@ -41,7 +44,7 @@ public enum LogEventName: String, CaseIterable, Sendable {
         case .appLaunch, .appEnabled, .appDisabled, .appTerminate, .tapStarted, .tapDisabled: .lifecycle
         case .leaderStart, .leaderEnd, .leaderKey, .globalKey: .keys
         case .actionDone, .actionSlow, .actionFocus: .action
-        case .windowClassified, .windowFrameMismatch, .windowClosed: .window
+        case .windowClassified, .windowFrameMismatch, .windowOpened, .windowClosed, .windowRemoved, .windowRestored: .window
         case .axError, .axCall: .ax
         case .overlayShown, .overlayHidden: .overlay
         case .settingsChanged, .diagnosticsExported: .settings

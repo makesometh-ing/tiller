@@ -28,7 +28,7 @@
 {"id": "B12", "title": "Your typing during a proof run failed the key check", "type": "bug", "status": "done", "file": "docs/tickets/B12-typing-during-proof-failed-run.md"}
 {"id": "B11", "title": "A proof run saves the key bar position in your defaults", "type": "bug", "status": "done", "priority": "P1", "depends_on": [], "blocked_by": [], "file": "docs/tickets/B11-key-bar-position-saved-in-proof-runs.md"}
 {"id": "F23", "title": "Debug log and diagnostics", "type": "feature", "status": "done", "priority": "P1", "depends_on": [], "blocked_by": [], "file": "docs/tickets/F23-debug-log.md"}
-{"id": "F13", "title": "Windows that open after a layout is applied", "type": "feature", "status": "todo", "priority": "P1", "order": 6, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F13-new-windows.md"}
+{"id": "F13", "title": "New, closed, minimized and hidden windows", "type": "feature", "status": "done", "priority": "P1", "depends_on": [], "blocked_by": [], "file": "docs/tickets/F13-new-windows.md"}
 {"id": "F33", "title": "Move a window to another container", "type": "feature", "status": "todo", "priority": "P1", "order": 7, "depends_on": ["F13"], "blocked_by": [], "file": "docs/tickets/F33-move-window-between-containers.md"}
 {"id": "F28", "title": "Workspace state across layouts and launches", "type": "feature", "status": "todo", "priority": "P1", "order": 8, "depends_on": ["F13", "F33"], "blocked_by": [], "file": "docs/tickets/F28-workspace-state.md"}
 {"id": "F34", "title": "One tile for each native tab group", "type": "feature", "status": "todo", "priority": "P1", "order": 9, "depends_on": ["F13"], "blocked_by": [], "file": "docs/tickets/F34-native-tabs.md"}

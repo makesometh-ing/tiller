@@ -104,6 +104,67 @@ func makeWorkspace() -> Workspace {
     #expect(ws.containers[0].windows == [3, 1])
 }
 
+@Test func removeSavingPositionsArrangesTheOtherWindowsOfTheCarousel() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    let before = ws.windowFrames()
+    ws.removeSavingPositions([2])
+    #expect(ws.containers[0].windows == [1, 3])
+    #expect(ws.windowFrames()[1] != before[1])
+    #expect(ws.windowFrames()[2] == nil)
+    #expect(ws.savedPositions[2] == RingPosition(layout: .fullScreen, container: 0, index: 1))
+}
+
+@Test func restorePutsTheWindowBackAtItsRingIndexAsTheFocusedWindowOfItsContainer() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5], focused: 1)
+    // Container 1: [1, 3, 5]. Container 2: [2, 4].
+    ws.removeSavingPositions([3])
+    ws.focusContainer(offset: 1)
+    #expect(ws.restore([3]) == [3])
+    #expect(ws.containers[0].windows == [1, 3, 5])
+    #expect(ws.containers[0].focusedWindow == 3)
+    // The focused container doesn't change.
+    #expect(ws.focusedContainerIndex == 1)
+    #expect(ws.savedPositions.isEmpty)
+    #expect(ws.restore([3]).isEmpty)
+}
+
+@Test func windowsRemovedTogetherAreRestoredInTheirRingOrder() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3, 4], focused: 1)
+    // A hidden app: all windows are removed at once.
+    ws.removeSavingPositions([4, 2, 1, 3])
+    #expect(ws.containers[0].windows.isEmpty)
+    ws.restore([3, 1, 4, 2])
+    #expect(ws.containers[0].windows == [1, 2, 3, 4])
+    // The front window of the app is the first window, and becomes the focused window.
+    #expect(ws.focusedWindow == 3)
+}
+
+@Test func restoreClampsTheRingIndexWhenOtherWindowsClosed() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    ws.removeSavingPositions([3])
+    ws.remove(2)
+    ws.restore([3])
+    #expect(ws.containers[0].windows == [1, 3])
+    #expect(ws.focusedWindow == 3)
+}
+
+@Test func restoreInsertsIntoTheFocusedContainerWhenTheContainerDoesNotExist() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3], focused: 1)
+    ws.removeSavingPositions([2])
+    #expect(ws.savedPositions[2]?.container == 1)
+    let saved = ws.savedPositions
+    ws.apply(.fullScreen, windows: [1, 3], focused: 3)
+    ws.savedPositions = saved
+    ws.restore([2])
+    #expect(ws.containers[0].windows == [3, 2, 1])
+    #expect(ws.focusedWindow == 2)
+}
+
 @Test func toggleAxisChangesOnlyTheFocusedContainer() {
     var ws = makeWorkspace()
     ws.apply(.verticalSplit, windows: [1, 2, 3, 4], focused: 1)

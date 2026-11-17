@@ -24,7 +24,7 @@ Source: [requirements-as-written.md, section 2](../requirements-as-written.md).
 The behaviour is described in [PRD.md, section 14 "Latency"](../PRD.md#14-latency).
 
 - Compare one size call for each window with the current size, position and size calls.
-- Update the cached window list from the Accessibility notifications of [F13: Windows that open after a layout is applied](F13-new-windows.md).
+- Update the cached window list from the Accessibility notifications of [F13: New, closed, minimized and hidden windows](F13-new-windows.md).
 
 ## Acceptance criteria
 
