@@ -322,7 +322,7 @@ Planned for v1:
 
 ## 15. Proof and test tools
 
-- `build/tiller-proof` runs the end-to-end test. In proof mode, Tiller manages only the windows of the apps in `--only-bundle-ids`. Proof runs use the defaults domain `com.tiller.Tiller.proof`. A proof run doesn't change the saved shortcuts in the Tiller defaults.
+- `build/tiller-proof` runs the end-to-end test. In proof mode, Tiller manages only the windows of the apps in `--only-bundle-ids`. Proof runs use the defaults domain `com.tiller.Tiller.proof`. It is emptied when a proof run starts Tiller. A proof run doesn't change the settings or the key bar position in the Tiller defaults.
 - `Tiller --dump-windows <path>` writes the attributes and the kind of every window.
 - `Tiller --focus-test <bundle id> <window id> <method> <path>` tests one focus method.
 - The unit tests are in `Tests/TillerCoreTests/`.

@@ -40,20 +40,16 @@ final class ShortcutStore: ObservableObject {
         }
     }
     private static let enabledKey = "enabled"
-    private let defaults: UserDefaults
+    /// The Tiller defaults, or the proof defaults domain in a proof run.
+    let defaults: UserDefaults
     private static let key = "shortcuts"
 
-    /// `--proof` uses its own defaults domain, so that a proof run doesn't change your shortcuts.
+    /// `--proof` uses its own defaults domain, so that a proof run doesn't change your settings. The domain is emptied at launch.
     /// `--leader <spec>` and `--keys <action id>=<spec>,...` replace saved shortcuts for one launch.
     init(arguments: [String]) {
         let proof = arguments.contains("--proof")
         defaults = proof ? UserDefaults(suiteName: "com.tiller.Tiller.proof")! : .standard
-        if proof {
-            defaults.removeObject(forKey: Self.key)
-            defaults.removeObject(forKey: Self.showKeyBarKey)
-            defaults.removeObject(forKey: Self.showInKey)
-            defaults.removeObject(forKey: Self.enabledKey)
-        }
+        if proof { defaults.removePersistentDomain(forName: "com.tiller.Tiller.proof") }
         var shortcuts = defaults.data(forKey: Self.key).flatMap { try? JSONDecoder().decode(Shortcuts.self, from: $0) } ?? .standard
         func value(_ name: String) -> String? {
             arguments.firstIndex(of: name).flatMap { $0 + 1 < arguments.count ? arguments[$0 + 1] : nil }

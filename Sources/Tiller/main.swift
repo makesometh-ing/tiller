@@ -209,6 +209,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // A global event monitor doesn't receive mouse events that this app posts, so the hover is read again here.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.overlay.updateHover() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "hover") }
+            case "move-bar":
+                self.overlay.moveBar(dx: 120, dy: 60)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "move-bar") }
             case "leader":
                 self.reportOverlay = true
                 if let leaderChord { Self.post(leaderChord) }

@@ -2,7 +2,7 @@
 
 ## Problem
 
-This bug was found in the project audit. `OverlayController.hide` hides the key bar. It saves the key bar position in the standard defaults, also during a proof run.
+This bug was found in the project audit. `OverlayController.hide` hides the key bar. It saved the key bar position in the standard defaults, also during a proof run.
 
 ## Events
 
@@ -12,12 +12,10 @@ This bug was found in the project audit. `OverlayController.hide` hides the key 
 
 ## Fix
 
-Save the key bar position in the proof defaults domain during a proof run.
+The key bar position is read from and saved in the defaults domain of `ShortcutStore`. In a proof run, this is `com.tiller.Tiller.proof`. The proof domain is emptied when Tiller starts with `--proof`. Each proof run then starts with the key bar at the default position.
 
-## Acceptance criteria
+The `move-bar` proof step moves the key bar by the same distance as a drag.
 
-- [ ] The key bar position in `com.tiller.Tiller` is the same before and after a proof run.
+## Proof
 
-## Proof needed
-
-`defaults read com.tiller.Tiller` before and after a proof run.
+[B11-key-bar-position](../../Tests/Proof/B11-key-bar-position): a proof run with the steps `1,leader,move-bar,esc,leader,esc`. `barOrigin` in `com.tiller.Tiller` is `{581, 90}` before and after the run. `barOrigin` in `com.tiller.Tiller.proof` is `{650, 150}` after the run. The second `leader` step shows the key bar at the moved position.

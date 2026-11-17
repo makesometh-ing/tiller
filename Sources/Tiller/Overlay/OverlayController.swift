@@ -72,6 +72,12 @@ final class OverlayController {
         return nil
     }
 
+    /// Moves the key bar by the same distance as a drag. The proof runner uses it.
+    func moveBar(dx: CGFloat, dy: CGFloat) {
+        guard let bar = barPanel else { return }
+        bar.setFrameOrigin(NSPoint(x: bar.frame.minX + dx, y: bar.frame.minY + dy))
+    }
+
     /// Opens or closes the full key list above the key bar.
     func toggleKeyList() {
         if let listPanel, listPanel.isVisible { listPanel.orderOut(nil); return }
@@ -98,7 +104,7 @@ final class OverlayController {
             entry.state.screen = nil
             entry.state.hoveredKeyContainer = nil
         }
-        if let barPanel { UserDefaults.standard.set(NSStringFromPoint(barPanel.frame.origin), forKey: Self.barOriginKey) }
+        if let barPanel { store.defaults.set(NSStringFromPoint(barPanel.frame.origin), forKey: Self.barOriginKey) }
         barPanel?.orderOut(nil)
         if let mouseMonitor { NSEvent.removeMonitor(mouseMonitor) }
         mouseMonitor = nil
@@ -110,7 +116,7 @@ final class OverlayController {
         let panel = OverlayPanel(frame: NSRect(origin: .zero, size: size), mouse: true)
         panel.isMovableByWindowBackground = true
         panel.contentView = host
-        if let saved = UserDefaults.standard.string(forKey: Self.barOriginKey) {
+        if let saved = store.defaults.string(forKey: Self.barOriginKey) {
             panel.setFrameOrigin(NSPointFromString(saved))
         } else if let screen = NSScreen.main {
             // Bottom center of the desktop, above the Dock.

@@ -25,7 +25,7 @@ Tiller is a tiling window manager for macOS. It is a menu bar app.
 
 - `scripts/test.sh`: unit tests. Xcode isn't used.
 - `scripts/build.sh`: builds `build/Tiller.app`, `build/TillerTestWindows.app` and `build/tiller-proof`, signed with the Apple Development certificate. The signature is the same after each rebuild. The Accessibility permission is then kept.
-- `build/tiller-proof --out Tests/Proof/<task>`: the end-to-end test. It manages only the test windows. `--apps <bundle id,...>` adds other apps. `--steps 2,leader,esc` runs other steps. `--leader hyper+l` and `--keys focusNextWindow=hyper+n` set the shortcuts for the run. Proof runs use their own defaults domain. Your saved shortcuts don't change. `--appearance light|dark` sets the system appearance for the run and restores it.
+- `build/tiller-proof --out Tests/Proof/<task>`: the end-to-end test. It manages only the test windows. `--apps <bundle id,...>` adds other apps. `--steps 2,leader,esc` runs other steps. `--leader hyper+l` and `--keys focusNextWindow=hyper+n` set the shortcuts for the run. Proof runs use their own defaults domain. Your saved settings and key bar position don't change. `--appearance light|dark` sets the system appearance for the run and restores it.
 - Tiller writes its log to `~/Library/Logs/Tiller/tiller.log`.
 
 ## UI
