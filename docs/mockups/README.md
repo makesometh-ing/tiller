@@ -21,3 +21,4 @@ Each HTML file shows 3 or more variants of one design, in the light and the dark
 |---|---|---|
 | Accessibility permission window at the first launch | [permission-window.html](permission-window.html) | F35 |
 | Permissions page in the settings | [permissions-page.html](permissions-page.html) | F41 |
+| About page with "Export Diagnostics…", and the "Debug logging" and "Include window titles in logs" switches | [about-page.html](about-page.html) | F23 |

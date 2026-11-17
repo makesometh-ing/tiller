@@ -54,22 +54,27 @@ final class Controller {
             }
             return
         }
+        let t = DispatchTime.now()
         let refs = Dictionary(ax.windows().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let windowListMs = Log.ms(since: t)
         guard var ws = workspaces[uuid] else { return }
         Self.removeClosed(&ws, refs: refs)
         let before = ws.windowFrames()
         ws.focus(window: focused)
         workspaces[uuid] = ws
         let changed = ws.windowFrames().filter { before[$0.key] != $0.value }
-        ax.setFrames(changed, refs: refs)
+        let setFramesMs = ax.setFrames(changed, refs: refs)
+        checkFrames(changed, refs: refs)
         // The latency is measured from the click when the click is less than 1 second before the notification.
         let click = clicked.flatMap { $0 <= notified && notified.uptimeNanoseconds - $0.uptimeNanoseconds < 1_000_000_000 ? $0 : nil }
         let ms = { (t: DispatchTime) in Double(DispatchTime.now().uptimeNanoseconds - t.uptimeNanoseconds) / 1e6 }
         let latencyMs = ms(click ?? notified)
         lastFocusChange = (latencyMs, changed.count)
-        Log.write(String(format: "action=focus-change trigger=%@ screen=%@ layout=%@ container=%d moved=%d notificationMs=%.2f latencyMs=%.2f",
-                         click == nil ? "other" : "click", uuid, ws.layout.rawValue, ws.focusedContainerIndex + 1, changed.count,
-                         click.map { Double(notified.uptimeNanoseconds - $0.uptimeNanoseconds) / 1e6 } ?? 0, latencyMs))
+        // `totalMs` is from the click, or from the notification when the focus change wasn't a click.
+        Self.logAction(["action": "focus-change", "trigger": click == nil ? "other" : "click", "screen": .string(uuid),
+                        "layout": .string(ws.layout.rawValue), "container": .int(ws.focusedContainerIndex + 1), "moved": .int(changed.count),
+                        "notificationMs": click.map { .ms(Double(notified.uptimeNanoseconds - $0.uptimeNanoseconds) / 1e6) } ?? .null,
+                        "windowListMs": windowListMs, "setFramesMs": setFramesMs, "totalMs": .ms(latencyMs)], totalMs: latencyMs)
     }
 
     /// The latency and the moved window count of the last arrangement after a focus change. The proof runner reads it. Read and written on `queue`.
@@ -138,7 +143,8 @@ final class Controller {
     /// Reads what the leader key overlay shows. The Accessibility calls run on `overlayQueue`, so they don't delay an action.
     /// Call on the main thread. `completion` runs on the main thread.
     /// After an action, `syncFocus` is false: the other app can apply the focus change after the overlay reads the focused window.
-    func overlayScreens(syncFocus: Bool = true, completion: @escaping ([OverlayScreen]) -> Void) {
+    /// `completion` gets the screens and the number of pills hidden because another window covers them.
+    func overlayScreens(syncFocus: Bool = true, completion: @escaping ([OverlayScreen], Int) -> Void) {
         let screens = ScreenInfo.all()
         overlayQueue.async {
             let (workspaces, floated) = self.queue.sync { (self.workspaces, self.floated) }
@@ -153,7 +159,7 @@ final class Controller {
             for screen in screens {
                 var item = OverlayScreen(uuid: screen.uuid, frame: screen.frame, spacing: Spacing.standard.carouselSpacing)
                 if var ws = workspaces[screen.uuid] {
-                    Self.removeClosed(&ws, refs: refs)
+                    Self.removeClosed(&ws, refs: refs, log: false)
                     if syncFocus, let focused { ws.focus(window: focused) }
                     for (i, c) in ws.containers.enumerated() {
                         item.containers.append(.init(id: i, frame: c.frame, axis: c.axis, windowCount: c.windows.count,
@@ -199,8 +205,32 @@ final class Controller {
                 }
                 if !item.containers.isEmpty || !item.windows.isEmpty { result.append(item) }
             }
-            Log.write("overlay pills=\(result.map(\.windows.count).reduce(0, +)) coveredHidden=\(hidden)")
-            DispatchQueue.main.async { completion(result) }
+            DispatchQueue.main.async { completion(result, hidden) }
+        }
+    }
+
+    /// The workspace of each screen and the floating windows, for the diagnostics zip. Window titles aren't included.
+    /// Don't call it on `queue`.
+    func workspaceState() -> LogValue {
+        queue.sync {
+            let refs = Dictionary(ax.windows().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            func window(_ id: WindowID) -> LogValue {
+                let ref = refs[id]
+                return ["windowId": .int(Int(id)),
+                        "bundleId": .string(ref.flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier } ?? ""),
+                        "frame": ref.map { .frame($0.frame) } ?? .null]
+            }
+            let spaces: [LogValue] = workspaces.values.sorted { $0.displayID < $1.displayID }.map { ws in
+                ["screen": .string(ws.displayID), "layout": .string(ws.layout.rawValue), "focusedContainer": .int(ws.focusedContainerIndex + 1),
+                 "containers": .array(ws.containers.map { c in
+                     ["frame": .frame(c.frame), "axis": .string(c.axis.rawValue), "focusedIndex": .int(c.focusedIndex),
+                      "windows": .array(c.windows.map(window))]
+                 }),
+                 "savedAxes": .object(Dictionary(uniqueKeysWithValues: ws.savedAxes.map { ($0.key.rawValue, .array($0.value.map { .string($0.rawValue) })) }))]
+            }
+            return ["workspaces": .array(spaces),
+                    "floating": .array(refs.values.filter { !isTiled($0) }.sorted { $0.id < $1.id }.map { window($0.id) }),
+                    "floatedWithF": .array(floated.sorted().map { .int(Int($0)) })]
         }
     }
 
@@ -212,8 +242,11 @@ final class Controller {
                 Self.removeClosed(&ws, refs: refs)
                 self.workspaces[uuid] = ws
                 let changed = ws.windowFrames().filter { refs[$0.key]?.frame != $0.value }
-                self.ax.setFrames(changed, refs: refs)
-                Log.write("rearrange screen=\(uuid) moved=\(changed.count)")
+                let start = DispatchTime.now()
+                let setFramesMs = self.ax.setFrames(changed, refs: refs)
+                Log.event(.actionDone, ["action": "rearrange", "screen": .string(uuid), "layout": .string(ws.layout.rawValue),
+                                        "moved": .int(changed.count), "setFramesMs": setFramesMs, "totalMs": Log.ms(since: start)])
+                self.checkFrames(changed, refs: refs)
             }
         }
     }
@@ -226,11 +259,15 @@ final class Controller {
     private func isTiled(_ ref: WindowRef) -> Bool { ref.kind == .tiled && !floated.contains(ref.id) }
 
     private func run(_ action: Action, received: DispatchTime, screens: [ScreenInfo], mouseScreen: ScreenInfo?, completion: (() -> Void)?) {
+        var t = DispatchTime.now()
         let windows = ax.windows()
+        let windowListMs = Log.ms(since: t)
         let refs = Dictionary(windows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         floated.formIntersection(refs.keys)
         untiledFrames = untiledFrames.filter { refs[$0.key] != nil }
+        t = .now()
         let focused = ax.focusedWindowID()
+        let focusReadMs = Log.ms(since: t)
         guard let screen = Self.screen(of: focused, refs: refs, screens: screens) ?? mouseScreen else { return }
 
         var ws: Workspace
@@ -313,30 +350,41 @@ final class Controller {
         let target = ws.windowFrames()
         var changed = target.filter { before[$0.key] != $0.value }
         if let floatFrame, let focused { changed[focused] = floatFrame }
-        ax.setFrames(changed, refs: refs)
+        let setFramesMs = ax.setFrames(changed, refs: refs)
         var raised: WindowID?
         var axResult = "none"
+        t = .now()
         if case .raiseFloating = action {
         } else if let id = expectedFocused, let ref = refs[id], id != focused || changed[id] != nil {
             axResult = ax.focus(ref)
             lastFocusCall = .now()
             raised = id
         }
+        let focusMs = Log.ms(since: t)
 
         let latencyMs = Double(DispatchTime.now().uptimeNanoseconds - received.uptimeNanoseconds) / 1_000_000
         let name = Self.name(action) + (note.isEmpty ? "" : ":\(note)")
-        Log.write("action=\(name) screen=\(screen.uuid) layout=\(ws.layout.rawValue) moved=\(changed.count) latencyMs=\(String(format: "%.2f", latencyMs))")
+        Self.logAction(["action": .string(name), "screen": .string(screen.uuid), "layout": .string(ws.layout.rawValue), "moved": .int(changed.count),
+                        "windowListMs": windowListMs, "focusReadMs": focusReadMs, "setFramesMs": setFramesMs, "focusMs": focusMs,
+                        "totalMs": .ms(latencyMs)], totalMs: latencyMs)
+        checkFrames(changed, refs: refs)
         switch action {
         case .focusWindow, .focusContainer:
             // Written 150 ms later on another queue: the other app applies the focus change after the Accessibility call returns.
             let container = ws.containers[ws.focusedContainerIndex]
             DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.15) { [ax] in
-                func label(_ id: WindowID?) -> String {
-                    guard let id else { return "none" }
+                func label(_ id: WindowID?) -> LogValue {
+                    guard let id else { return .null }
                     let app = refs[id].flatMap { NSRunningApplication(processIdentifier: $0.pid)?.bundleIdentifier } ?? "?"
-                    return "\(app):\(id)"
+                    return .string("\(app):\(id)")
                 }
-                Log.write("focus action=\(name) order=[\(container.windows.map(label).joined(separator: ","))] storedFocused=\(label(storedFocused)) systemFocusedBefore=\(label(focused)) index=\(startIndex)->\(container.focusedIndex) from=\(label(startFocused)) raised=\(label(raised)) ax=\(axResult) systemFocusedAfter=\(label(ax.focusedWindowID())) frontmostApp=\(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none")")
+                Log.event(.actionFocus, [
+                    "action": .string(name), "order": .array(container.windows.map(label)), "storedFocused": label(storedFocused),
+                    "systemFocusedBefore": label(focused), "indexBefore": .int(startIndex), "indexAfter": .int(container.focusedIndex),
+                    "from": label(startFocused), "raised": label(raised), "ax": .string(axResult),
+                    "systemFocusedAfter": label(ax.focusedWindowID()),
+                    "frontmostApp": .string(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none"),
+                ])
             }
         default:
             break
@@ -351,9 +399,32 @@ final class Controller {
         }
     }
 
-    private static func removeClosed(_ ws: inout Workspace, refs: [WindowID: WindowRef]) {
-        for container in ws.containers {
-            for id in container.windows where refs[id] == nil { ws.remove(id) }
+    /// Removes closed windows. `log` is false for a copy of a workspace that isn't stored.
+    private static func removeClosed(_ ws: inout Workspace, refs: [WindowID: WindowRef], log: Bool = true) {
+        for (index, container) in ws.containers.enumerated() {
+            for id in container.windows where refs[id] == nil {
+                ws.remove(id)
+                if log { Log.event(.windowClosed, ["windowId": .int(Int(id)), "screen": .string(ws.displayID), "container": .int(index + 1)]) }
+            }
+        }
+    }
+
+    /// Writes `action.done`, and `action.slow` when the action took more than 100 ms.
+    private static func logAction(_ fields: [String: LogValue], totalMs: Double) {
+        Log.event(.actionDone, fields)
+        if totalMs > 100 { Log.event(.actionSlow, fields) }
+    }
+
+    /// Reads the frames of the moved windows 150 ms later, on another queue, and writes `window.frameMismatch`
+    /// for each frame that differs from its target by more than 1 point. Some apps have a minimum size or move their windows back.
+    private func checkFrames(_ targets: [WindowID: CGRect], refs: [WindowID: WindowRef]) {
+        guard !targets.isEmpty else { return }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.15) {
+            for (id, target) in targets {
+                guard let ref = refs[id], let actual = ref.element.frame, !Rect(actual).matches(Rect(target)) else { continue }
+                Log.event(.windowFrameMismatch, ["bundleId": .string(NSRunningApplication(processIdentifier: ref.pid)?.bundleIdentifier ?? ""),
+                                                 "windowId": .int(Int(id)), "target": .frame(target), "actual": .frame(actual)])
+            }
         }
     }
 

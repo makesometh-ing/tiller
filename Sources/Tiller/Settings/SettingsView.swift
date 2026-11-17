@@ -203,7 +203,7 @@ struct MenuSwitchRow: View {
             Spacer(minLength: 24)
             Text(store.shortcuts.toggle?.labels.joined(separator: " ") ?? "").foregroundStyle(Theme.current.secondaryText)
             // A `Toggle` in a menu is drawn grey, because the app isn't active. This switch keeps the accent color.
-            Button { store.enabled.toggle() } label: {
+            Button { store.setEnabled(!store.enabled, source: "menu") } label: {
                 Capsule().fill(store.enabled ? Theme.current.accent : Color.primary.opacity(0.18)).frame(width: 30, height: 17)
                     .overlay(alignment: store.enabled ? .trailing : .leading) { Circle().fill(.white).padding(2).shadow(radius: 0.5) }
             }

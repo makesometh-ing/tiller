@@ -24,6 +24,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var showInObserver: AnyCancellable?
     private var enabledObserver: AnyCancellable?
     private let proofMode = CommandLine.arguments.contains("--proof")
+    private let termSource = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+
+    func applicationWillTerminate(_ notification: Notification) {
+        Log.event(.appTerminate)
+        Log.shared.flush()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = CommandLine.arguments
@@ -36,7 +42,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, store.enabled else { return }
             controller.focusChanged(clicked: leader.lastMouseDown)
         }
-        Log.write("launch pid=\(getpid()) proof=\(proofMode) only=\(only.map { $0.sorted().joined(separator: ",") } ?? "all")")
+        Log.event(.appLaunch, Diagnostics.systemFields(screens: ScreenInfo.all()).merging([
+            "pid": .int(Int(getpid())), "proof": .bool(proofMode),
+            "onlyBundleIds": only.map { .array($0.sorted().map(LogValue.string)) } ?? .null, "settings": .object(store.logFields),
+        ]) { $1 })
+        // `pkill` sends SIGTERM. The app then quits through `applicationWillTerminate`, so the log is written to disk.
+        signal(SIGTERM, SIG_IGN)
+        termSource.setEventHandler { NSApp.terminate(nil) }
+        termSource.resume()
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
+            Log.event(.displayChanged, ["screens": Diagnostics.systemFields(screens: ScreenInfo.all())["screens"] ?? .null])
+        }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let icon = NSImage(named: "menubar")
@@ -57,6 +73,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
+        menu.addItem(withTitle: "Export Diagnostics…", action: #selector(exportDiagnosticsToDesktop), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Tiller", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
@@ -64,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // The app menu is shown in the menu bar when the activation policy is `.regular`.
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(withTitle: "Export Diagnostics…", action: #selector(exportDiagnosticsToDesktop), keyEquivalent: "").target = self
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Tiller", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         let appItem = NSMenuItem()
@@ -80,16 +98,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         leader.shortcuts = { [store] in store.shortcuts }
         leader.onLayerChange = { [weak self] active in
-            Log.write("layer \(active ? "start" : "end")")
             // Leave the event tap callback first. Panel work in the callback delays all key presses.
             DispatchQueue.main.async { self?.layerChanged(active) }
         }
         leader.clickEndsLayer = { [weak self] point in !(self?.overlay.barContains(point) ?? false) }
         leader.isEnabled = { [store] in store.enabled }
-        leader.onToggle = { [store] in store.enabled.toggle() }
+        leader.onToggle = { [store] in store.setEnabled(!store.enabled, source: "globalShortcut") }
         leader.onAction = { [weak self] action, received in
             guard let self else { return }
-            if action == .turnOff { store.enabled = false; return }
+            if action == .turnOff { store.setEnabled(false, source: "leaderKey"); return }
             controller.perform(action, received: received) { [weak self] in
                 // Leader key mode continues after an action with the "Exit after" setting off.
                 guard let self, leader.isLayerActive else { return }
@@ -112,7 +129,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             startTap()
         } else {
             permissionItem.title = "Accessibility permission: not granted"
-            Log.write("waiting for Accessibility permission")
             trustTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] timer in
                 guard AXIsProcessTrusted() else { return }
                 timer.invalidate()
@@ -123,12 +139,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() { settings.show() }
 
-    @objc private func toggleEnabled() { store.enabled.toggle() }
+    @objc private func toggleEnabled() { store.setEnabled(!store.enabled, source: "dock") }
+
+    /// Writes the diagnostics zip to the Desktop and shows it in Finder.
+    @objc private func exportDiagnosticsToDesktop() {
+        exportDiagnostics(to: FileManager.default.homeDirectoryForCurrentUser.appending(path: "Desktop")) { url in
+            if let url { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+        }
+    }
+
+    /// `completion` runs on the main thread with the URL of the zip.
+    private func exportDiagnostics(to directory: URL, completion: @escaping (URL?) -> Void) {
+        let system = Diagnostics.systemFields(screens: ScreenInfo.all())
+        let settings = store.logFields
+        DispatchQueue.global(qos: .userInitiated).async { [controller] in
+            let url = Diagnostics.export(to: directory, system: system, settings: settings, controller: controller!)
+            DispatchQueue.main.async { completion(url) }
+        }
+    }
 
     private func apply(_ showIn: ShowIn) {
         statusItem.isVisible = showIn != .dock
         NSApp.setActivationPolicy(showIn == .menuBar ? .accessory : .regular)
-        Log.write("showIn=\(showIn.rawValue) statusItem=\(statusItem.isVisible) policy=\(NSApp.activationPolicy().rawValue)")
         // A change to `.accessory` deactivates the app after this function returns. The settings window is then behind other apps.
         // On the next run loop pass the app is still active, so the window is shown again 0.2 seconds later.
         if settings.isOpen { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [settings] in settings.show(page: settings.model.page) } }
@@ -153,7 +185,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let start = DispatchTime.now()
         guard active else {
             overlay.hide()
-            Log.write(String(format: "overlay hidden hideMs=%.1f", Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6))
+            Log.event(.overlayHidden, ["hideMs": Log.ms(since: start)])
             return
         }
         overlay.show()
@@ -163,15 +195,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Reads the containers and windows, and shows them in the overlay. `start` is the leader key press or the action key press.
     private func updateOverlay(since start: DispatchTime, barMs: Double? = nil, syncFocus: Bool = true) {
-        controller.overlayScreens(syncFocus: syncFocus) { [weak self] screens in
+        controller.overlayScreens(syncFocus: syncFocus) { [weak self] screens, hiddenPills in
             guard let self, self.leader.isLayerActive else { return }
             self.overlay.update(screens)
             let ms = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6
-            if let barMs {
-                Log.write(String(format: "overlay barMs=%.1f containersMs=%.1f screens=%d keyBar=%@", barMs, ms, screens.count, self.store.showKeyBar ? "shown" : "hidden"))
-            } else {
-                Log.write(String(format: "overlay updated after action msSinceKeyPress=%.1f screens=%d", ms, screens.count))
-            }
+            // After an action, `containersMs` is from the action key press.
+            Log.event(.overlayShown, ["trigger": barMs == nil ? "action" : "leader", "barMs": barMs.map(LogValue.ms) ?? .null,
+                                      "containersMs": .ms(ms), "screens": .int(screens.count), "pills": .int(screens.map(\.windows.count).reduce(0, +)),
+                                      "hiddenPills": .int(hiddenPills), "keyBar": .bool(self.store.showKeyBar)])
             if self.reportOverlay {
                 self.reportOverlay = false
                 // Wait for the panels to draw before the proof runner takes a screenshot.
@@ -189,14 +220,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let i = CommandLine.arguments.firstIndex(of: "--dump-windows"), i + 1 < CommandLine.arguments.count {
             WindowDump.write(to: CommandLine.arguments[i + 1])
-            Log.write("window dump written to \(CommandLine.arguments[i + 1])")
             NSApp.terminate(nil)
             return
         }
         let started = leader.start()
         focusObserver.start()
+        Log.event(.tapStarted, ["keyTap": .bool(started), "mouseTap": .bool(leader.mouseTapStarted)])
         permissionItem.title = started ? "Leader key: \(store.shortcuts.leader.map { $0.labels.joined(separator: " ") } ?? "none")" : "Event tap failed to start"
-        Log.write(started ? "event tap started" : "event tap failed to start")
         if started && proofMode {
             DistributedNotificationCenter.default().postNotificationName(.init("com.tiller.proof.ready"), object: nil, userInfo: nil, deliverImmediately: true)
         }
@@ -232,6 +262,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                         self.controller.reportCurrentState(action: "click:\(name) window=\(target.id) layer=\(self.leader.isLayerActive)", expectedFocused: target.id)
                     }
+                }
+            case _ where key.hasPrefix("export-diagnostics:"):
+                // The same export as the "Export Diagnostics…" menu item, to the directory after the colon. Finder isn't opened.
+                let dir = URL(filePath: String(key.dropFirst("export-diagnostics:".count)))
+                self.exportDiagnostics(to: dir) { url in
+                    self.controller.reportCurrentState(action: "export-diagnostics zip=\(url?.lastPathComponent ?? "failed")")
                 }
             case "move-bar":
                 self.overlay.moveBar(dx: 120, dy: 60)

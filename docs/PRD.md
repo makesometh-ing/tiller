@@ -105,7 +105,7 @@ Planned for v1:
 - Focus changes are read from the Accessibility notification for a focused window change of each app, and from the app activation notification of `NSWorkspace`. Each focus change by the user is handled in the same way as a click, for example ⌘Tab to an app whose focused window is behind another window of its carousel.
 - A focus change made by Tiller doesn't cause a second arrangement. The window that gets focus is already the focused window of the workspace.
 - Some apps apply Tiller's focus call late. Until then, the system focused window is the window that had focus before. A focus change in the second after Tiller's last focus call, without a click after that call, is read again 1 second after that call.
-- The log line `action=focus-change` gives the time from the click to the notification and from the click to the new frames.
+- The `action.done` event with the action `focus-change` gives the time from the click to the notification and from the click to the new frames.
 - A Finder window with native tabs is one window on the screen. The window server contains one window for each tab, at the same frame. Only the window of the selected tab is on the screen. The Accessibility API returns only that window. A tab switch changes the window id of the visible window.
 
 Planned for v1:
@@ -186,11 +186,6 @@ Planned for v1:
 
 ## 13. Logging and diagnostics
 
-- The current log is `~/Library/Logs/Tiller/tiller.log`. It contains launches, actions with latency, frame times for each app, overlay times and setting changes.
-- Each focus action writes a `focus` line 150 ms after the action, from another queue: the ring order (bundle id and window id), the focused window stored in the workspace, the system focused window before the action, the ring index before and after, the window that got focus, the AXError values of `AXMain`, `AXRaise` and `AXFrontmost`, the result of `activate()`, and the system focused window and frontmost app after the action.
-
-Planned for v1: the logging described below replaces `tiller.log`.
-
 ### Goal
 
 A user sends one diagnostics file. The file contains enough information to find the cause of these problems:
@@ -205,84 +200,90 @@ All data stays on the Mac. Tiller doesn't send data over the network. The user s
 
 ### Destinations
 
-Each log event is written to two places.
+Each log event is written to two places. `EventLog` in `Sources/TillerCore/EventLog.swift` writes them.
 
 | Destination | Why | How to read it |
 |---|---|---|
-| Apple unified log, subsystem `com.tiller.Tiller` | A write takes less time than a file write. Console.app and `log` read it. | `log stream --level debug --predicate 'subsystem == "com.tiller.Tiller"'` |
-| JSON Lines file `~/Library/Logs/Tiller/tiller.jsonl` | The user can attach this one file. Each line is one event with typed fields. A script can read it. | Any text editor, or `jq` |
+| Apple unified log, subsystem `com.tiller.Tiller`, one category for each `cat` | A write takes less time than a file write. Console.app and `log` read it. | `log stream --level debug --predicate 'subsystem == "com.tiller.Tiller"'` |
+| JSON Lines file `~/Library/Logs/Tiller/tiller.jsonl` | The user can attach this one file. Each line is one event with typed fields. A script can read it. | Any text editor, `jq`, or `scripts/check-log.py` |
 
-The JSON Lines file rotates at 5 MB. Tiller keeps 3 files: `tiller.jsonl`, `tiller.1.jsonl` and `tiller.2.jsonl`.
+The JSON Lines file rotates before a line makes it bigger than 5 MB. Tiller keeps 3 files: `tiller.jsonl`, `tiller.1.jsonl` and `tiller.2.jsonl`.
 
-Events are written on one background queue. A log call takes less than 0.05 ms on the calling queue. The event tap callback and the window move code aren't blocked by file writes.
+Events are encoded and written on one background queue. A log call takes 0.002 ms on the calling queue. The event tap callback and the window move code aren't blocked by file writes. `pkill` sends SIGTERM. Tiller then quits through `applicationWillTerminate`, which writes `app.terminate` and waits for the queued events.
 
 ### Levels
 
-| Level | Written by default | Use |
+| Level | Written to the file | Use |
 |---|---|---|
-| `error` | Yes | An Accessibility call failed, the event tap was disabled, a frame didn't match the target frame after a move. |
-| `info` | Yes | Launch, settings changes, each action with its timings, each new app and window classification. |
-| `debug` | No | Each Accessibility call with its time and result, each overlay update, each window list read. |
-
-Settings → General → "Debug logging" turns `debug` on. It is turned off after 24 hours. This prevents debug logging from staying on by mistake.
+| `error` | Yes | An Accessibility call failed, an event tap was disabled, a frame didn't match the target frame after a move, an action took more than 100 ms. |
+| `info` | Yes | Launch, settings changes, each action with its timings, each new window classification, leader key mode, the overlay. |
+| `debug` | No | Each Accessibility call to set a window frame, with its time. Only `log stream --level debug` shows these events. The unified log doesn't store them. |
 
 ### Event format
 
 Each line of the JSON Lines file is one object:
 
 ```json
-{"ts":"2026-11-16T17:29:03.412Z","level":"info","cat":"action","event":"action.done","session":"6F2A…","fields":{…}}
+{"cat":"action","event":"action.done","fields":{…},"level":"info","session":"6F2A…","ts":"2026-11-16T17:29:03.412Z"}
 ```
 
 - `ts`: the time in UTC, with milliseconds.
 - `cat`: one of `lifecycle`, `keys`, `action`, `window`, `ax`, `overlay`, `settings`, `display`.
 - `session`: a random id for each launch. It is used to separate the events of two launches in one file.
+- Times in the fields are in milliseconds, rounded to 0.01 ms. A frame is `[x, y, width, height]` in Accessibility coordinates.
+
+`scripts/check-log.py <file>` checks that each line is one JSON object with these keys, a known event, its category and the required fields of the event. It prints the number of lines of each event.
 
 ### Events
 
 #### lifecycle
 
-- `app.launch`: Tiller version and build, macOS version, Mac model, Accessibility permission, the screens (display UUID, frame, desktop frame, scale), and all settings: leader key, each action key, spacing values, enabled state.
-- `app.enabled` and `app.disabled`: the source (menu, global shortcut, settings).
-- `tap.disabled`: the reason (`timeout` or `userInput`) and the time since the last key press. A timeout means a callback took too long.
+- `app.launch`: Tiller version and build, macOS version, Mac model, Accessibility permission, the screens (display UUID, frame, desktop frame, scale), the process id, the proof mode, and all settings: leader key, the shortcut to turn Tiller on and off, each action key, each "Exit after" value, "Show the key bar", "Show Tiller in", the enabled state and the spacing values.
+- `app.enabled` and `app.disabled`: the source: `menu`, `settings`, `dock`, `globalShortcut` or `leaderKey` (`Q`).
+- `tap.started`: whether the key event tap and the mouse event tap started.
+- `tap.disabled` (`error`): the tap (`keys` or `mouse`), the reason (`timeout` or `userInput`) and the time since the last key press. A timeout means a callback took too long.
 - `app.terminate`.
 
 #### keys
 
 Tiller logs only the leader key and the keys in leader key mode. Text typed by the user isn't in the log.
 
-- `leader.start` and `leader.end`: the chord and the reason for the end (action, `Esc`, leader key again).
-- `leader.key`: the chord and the action id, or `unbound` when the chord doesn't have an action.
-- `global.key`: the chord and the action id of a global shortcut.
+- `leader.start`: the chord of the leader key.
+- `leader.end`: the reason: `action` (an action with "Exit after" on), `esc`, `leader` (the leader key again), `click` or `toggle`. A click also gives the click point and the time from the click to the tap callback.
+- `leader.key`: the chord and the action id, or `keyList`, `esc`, `leader` or `unbound`.
 
 #### action
 
-- `action.done`: the action id, the screen UUID, the layout, the number of windows moved, and the timings in milliseconds:
+- `action.done`: the action, the screen UUID, the layout, the number of windows moved, and the timings in milliseconds:
   - `windowListMs`: the read of all windows.
   - `focusReadMs`: the read of the focused window.
-  - `setFramesMs` for each app: bundle id, number of windows, time.
+  - `setFramesMs` for each app: bundle id, number of windows, `enhancedUI`, time.
   - `focusMs`: the focus call.
   - `totalMs`: from the key press in the event tap to the end of the action.
-- `action.slow` (`error`): the same fields as `action.done`. It is logged when `totalMs` is more than 100 ms.
+- The action `focus-change` is the arrangement after a click or another focus change by the user. It also has the trigger (`click` or `other`), the container and the time from the click to the notification. Its `totalMs` is from the click. The action `rearrange` is the arrangement after Tiller is turned on.
+- `action.slow` (`error`): the same fields as `action.done`. It is written in addition to `action.done` when `totalMs` is more than 100 ms.
+- `action.focus`: written 150 ms after each focus action, from another queue: the ring order (bundle id and window id), the focused window stored in the workspace, the system focused window before the action, the ring index before and after, the window that got focus, the AXError values of `AXMain`, `AXRaise` and `AXFrontmost`, the result of `activate()`, and the system focused window and frontmost app after the action.
 
 #### window
 
-- `window.classified`: logged one time for each window id. Bundle id, app name, window id, role, subrole, size settable, window layer, modal, parent role, buttons, and the result (tiled, floating or ignored). This event shows why an app window is tiled or floats.
-- `window.frameMismatch` (`error`): logged when the frame read back after a move differs from the target frame by more than 1 point. Bundle id, window id, target frame and actual frame. It shows apps with a minimum size, or apps that move their windows back.
-- `window.closed` and `window.opened`.
+- `window.classified`: written the first time a window id is read with a kind. A window is logged again when its kind changes. Bundle id, app name, window id, subrole, minimized, size settable, on screen, window layer, modal, parent is the app, and the result (tiled, floating or ignored). These are the inputs of the window rule. The event shows why an app window is tiled or floats.
+- `window.frameMismatch` (`error`): the frames of the moved windows are read 150 ms after the move, on another queue. The event is written when a frame differs from the target frame by more than 1 point. Bundle id, window id, target frame and actual frame. It shows apps with a minimum size, or apps that move their windows back.
+- `window.closed`: the window id, the screen and the container of a window that was removed from its carousel because it doesn't exist.
 
 #### ax
 
-- `ax.error` (`error`): the Accessibility function, the attribute, the `AXError` code, the bundle id and the time. For example `kAXErrorCannotComplete` from a hung app.
-- `ax.call` (`debug`): each Accessibility call with its time.
+- `ax.error` (`error`): the Accessibility function, the attribute, the `AXError` code and the bundle id. It is written for a failed window list read (for example `kAXErrorCannotComplete` from a hung app, with the time of the call), a failed size or position set, and a failed focus notification observer.
+- `ax.call` (`debug`): each frame set of a window, with its time.
 
 #### overlay
 
-- `overlay.shown`: the time to the key bar, the time to the containers and pills, the number of pills, and the number of pills hidden because they are behind another window.
+- `overlay.shown`: the trigger (`leader` or `action`), the time to the key bar, the time to the containers and pills, the number of screens, the number of pills, the number of pills hidden because they are behind another window, and "Show the key bar".
+- `overlay.hidden`: the time to hide the overlay.
 
 #### settings
 
-- `settings.changed`: the setting and the new value. Chords are logged as text, for example `ctrl+opt+shift+cmd+l`.
+- `settings.changed`: the setting and the new value: `showKeyBar`, `showIn`, `leader`, `toggle`, `key.<action id>` or `exitAfter.<action id>`. Chords are logged as text, for example `ctrl+opt+shift+cmd+l`.
+- `diagnostics.exported`: the path of the zip and the time of the export.
 
 #### display
 
@@ -290,22 +291,24 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
 
 ### Window titles
 
-Window titles can contain private text, for example a document name or a chat name. Titles aren't logged by default. Each window is logged with its window id and bundle id.
-
-Settings → General → "Include window titles in logs" adds the titles.
+Window titles can contain private text, for example a document name or a chat name. Titles aren't logged. Each window is logged with its window id and bundle id.
 
 ### Export diagnostics
 
-The About page of the settings window has an "Export Diagnostics…" button. The Tiller menu has an "Export Diagnostics…" item. Both write `Tiller-Diagnostics-<date>.zip` to the Desktop. The zip is then shown in Finder. The zip contains:
+"Export Diagnostics…" in the menu bar menu, and in the Tiller app menu with "Show Tiller in" set to "Dock", writes `Tiller-Diagnostics-<date>.zip` to the Desktop. The zip is then shown in Finder. The export takes about 1.3 seconds. The zip contains:
 
-- The state at the time of the export: Tiller version and build, macOS version, Mac model, Accessibility permission, and the screens (display UUID, frame, desktop frame, scale).
-- The JSON Lines files.
-- The unified log entries of the last 2 hours: `log show --last 2h --predicate 'subsystem == "com.tiller.Tiller"'`.
-- A window dump: the attributes and the window rule result of every window. This is the same data as `Tiller --dump-windows`.
-- The settings.
-- The workspace state of each screen: layout, containers, windows in each container, carousel mode, floating windows.
+- `state.json`: Tiller version and build, macOS version, Mac model, Accessibility permission, the screens (display UUID, frame, desktop frame, scale), the session id and the export time.
+- `tiller.jsonl`, and `tiller.1.jsonl` and `tiller.2.jsonl` when they exist.
+- `unified-log.txt`: the unified log entries of the Tiller process of the last 2 hours: `log show --last 2h --info --debug --predicate 'subsystem == "com.tiller.Tiller" AND process == "Tiller"'`.
+- `windows.json`: the attributes and the window rule result of every window, without titles. This is the same data as `Tiller --dump-windows`.
+- `settings.json`: the same settings as in `app.launch`.
+- `workspaces.json`: the workspace of each screen (layout, focused container, and the frame, carousel mode, focused index and windows of each container, and the saved carousel modes of each layout), the floating windows, and the windows floated with `F`.
 
-Window titles are added only when "Include window titles in logs" is on.
+Planned for v1:
+
+- The About page of the settings window has an "Export Diagnostics…" button. It writes the same zip as the menu item. Mockups: [about-page.html](mockups/about-page.html), waiting for approval.
+- Settings → General → "Debug logging" writes `debug` events to the file. It is turned off after 24 hours. This prevents debug logging from staying on by mistake.
+- Settings → General → "Include window titles in logs" adds the titles to the log events and to the diagnostics zip.
 
 ## 14. Latency
 

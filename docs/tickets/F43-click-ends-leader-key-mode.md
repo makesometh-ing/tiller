@@ -13,7 +13,7 @@ The behaviour is described in [PRD.md, section 6 "Leader key mode"](../PRD.md#6-
 - `LeaderKey` in `Sources/Tiller/LeaderKey.swift` has a second event tap for mouse down events. It is a listen-only tap, so it can't stop or delay a click.
 - A mouse down while leader key mode is active ends leader key mode. The overlay is hidden. The app under the pointer receives the click and gives the clicked window focus.
 - A mouse down on the key bar doesn't end leader key mode. The key bar can then be dragged.
-- The log line `layer end reason=click` gives the click point and the time from the click to the tap callback (`clickToTapMs`). The line `overlay hidden` gives the time to hide the overlay (`hideMs`).
+- The `leader.end` event with the reason `click` gives the click point and the time from the click to the tap callback (`clickToTapMs`). The `overlay.hidden` event gives the time to hide the overlay (`hideMs`).
 - The `click:` proof step clicks a window. See [PRD.md, section 15 "Proof and test tools"](../PRD.md#15-proof-and-test-tools). The proof runner checks that leader key mode ended after each click. It checks that a `pass:` chord after a click reaches the clicked window.
 - A click on a tiled window behind the focused window of a carousel is described in [F44](F44-click-tiles-window-behind.md).
 

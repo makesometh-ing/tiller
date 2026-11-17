@@ -21,14 +21,14 @@ final class ShortcutStore: ObservableObject {
     @Published var showKeyBar: Bool {
         didSet {
             defaults.set(showKeyBar, forKey: Self.showKeyBarKey)
-            Log.write("setting showKeyBar=\(showKeyBar)")
+            Log.event(.settingsChanged, ["setting": "showKeyBar", "value": .bool(showKeyBar)])
         }
     }
     private static let showKeyBarKey = "showKeyBar"
     @Published var showIn: ShowIn {
         didSet {
             defaults.set(showIn.rawValue, forKey: Self.showInKey)
-            Log.write("setting showIn=\(showIn.rawValue)")
+            Log.event(.settingsChanged, ["setting": "showIn", "value": .string(showIn.rawValue)])
         }
     }
     private static let showInKey = "showIn"
@@ -36,8 +36,16 @@ final class ShortcutStore: ObservableObject {
     @Published var enabled: Bool {
         didSet {
             defaults.set(enabled, forKey: Self.enabledKey)
-            Log.write("setting enabled=\(enabled)")
+            Log.event(enabled ? .appEnabled : .appDisabled, ["source": .string(enabledSource)])
+            enabledSource = "settings"
         }
+    }
+    /// Where the next change of `enabled` comes from, for the log: `settings`, `menu`, `dock`, `globalShortcut` or `leaderKey`.
+    private var enabledSource = "settings"
+
+    func setEnabled(_ on: Bool, source: String) {
+        enabledSource = source
+        enabled = on
     }
     private static let enabledKey = "enabled"
     /// The Tiller defaults, or the proof defaults domain in a proof run.
@@ -68,28 +76,43 @@ final class ShortcutStore: ObservableObject {
 
     func setLeader(_ chord: KeyChord?) {
         shortcuts.leader = chord
-        save()
+        save("leader", .string(chord?.spec ?? "none"))
     }
 
     func set(_ chord: KeyChord?, for action: ActionID) {
         shortcuts.set(chord, for: action)
-        save()
+        save("key.\(action.rawValue)", .string(chord?.spec ?? "none"))
     }
 
     func setToggle(_ chord: KeyChord?) {
         shortcuts.toggle = chord
-        save()
+        save("toggle", .string(chord?.spec ?? "none"))
     }
 
     func setExitAfter(_ exits: Bool, for action: ActionID) {
         shortcuts.exitAfter[action] = exits
-        save()
+        save("exitAfter.\(action.rawValue)", .bool(exits))
     }
 
-    private func save() {
+    private func save(_ setting: String, _ value: LogValue) {
         defaults.set(try? JSONEncoder().encode(shortcuts), forKey: Self.key)
-        Log.write("shortcuts saved leader=\(shortcuts.leader?.spec ?? "none") toggle=\(shortcuts.toggle?.spec ?? "none") "
-                  + "exitAfter=\(ActionID.allCases.filter(shortcuts.exits(after:)).map(\.rawValue).joined(separator: ",")) " + shortcuts.actions.map { "\($0.key.rawValue)=\($0.value.spec)" }.sorted().joined(separator: " "))
+        Log.event(.settingsChanged, ["setting": .string(setting), "value": value])
+    }
+
+    /// All settings, for the log and the diagnostics zip. Chords are text, for example `ctrl+opt+shift+cmd+l`.
+    var logFields: [String: LogValue] {
+        let spacing = Spacing.standard
+        return [
+            "leader": .string(shortcuts.leader?.spec ?? "none"),
+            "toggle": .string(shortcuts.toggle?.spec ?? "none"),
+            "keys": .object(Dictionary(uniqueKeysWithValues: shortcuts.actions.map { ($0.key.rawValue, .string($0.value.spec)) })),
+            "exitAfter": .object(Dictionary(uniqueKeysWithValues: ActionID.allCases.map { ($0.rawValue, .bool(shortcuts.exits(after: $0))) })),
+            "showKeyBar": .bool(showKeyBar),
+            "showIn": .string(showIn.rawValue),
+            "enabled": .bool(enabled),
+            "spacing": ["workspaceMargin": .double(spacing.workspaceMargin), "containerMargin": .double(spacing.containerMargin),
+                        "carouselSpacing": .double(spacing.carouselSpacing)],
+        ]
     }
 }
 

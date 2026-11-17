@@ -49,6 +49,10 @@ final class AXWindows {
 
     init(onlyBundleIDs: Set<String>?) { self.onlyBundleIDs = onlyBundleIDs }
 
+    /// The window id and kind of each `window.classified` event. A window is logged again when its kind changes.
+    private var classified = Set<String>()
+    private let classifiedLock = NSLock()
+
     func isManaged(_ app: NSRunningApplication) -> Bool {
         app.activationPolicy == .regular && !app.isHidden
             && app.processIdentifier != getpid()
@@ -65,16 +69,38 @@ final class AXWindows {
             let appElement = AXUIElementCreateApplication(app.processIdentifier)
             // A hung app returns an error after this time instead of blocking Tiller.
             AXUIElementSetMessagingTimeout(appElement, 1.0)
-            guard let list = appElement.value(kAXWindowsAttribute) as? [AXUIElement] else { continue }
+            var value: CFTypeRef?
+            let start = DispatchTime.now()
+            let error = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &value)
+            if error != .success && error != .noValue && error != .attributeUnsupported {
+                // For example kAXErrorCannotComplete from a hung app.
+                Log.event(.axError, ["function": "AXUIElementCopyAttributeValue", "attribute": .string(kAXWindowsAttribute),
+                                     "code": .int(Int(error.rawValue)), "bundleId": .string(app.bundleIdentifier ?? ""), "ms": Log.ms(since: start)])
+            }
+            guard let list = value as? [AXUIElement] else { continue }
             for element in list {
                 guard let id = element.windowID, let frame = element.frame else { continue }
-                let kind = Self.traits(element, id: id, order: order).kind
+                let traits = Self.traits(element, id: id, order: order)
+                let kind = traits.kind
+                logClassified(traits, id: id, app: app)
                 guard kind != .ignored else { continue }
                 refs.append(WindowRef(id: id, element: element, app: appElement, pid: app.processIdentifier,
                                       frame: frame, title: element.value(kAXTitleAttribute) as? String ?? "", kind: kind))
             }
         }
         return refs.sorted { (order[$0.id]?.index ?? .max) < (order[$1.id]?.index ?? .max) }
+    }
+
+    /// Writes `window.classified` the first time a window id is read with a kind. The event shows why a window is tiled, floats or is ignored.
+    private func logClassified(_ t: WindowTraits, id: WindowID, app: NSRunningApplication) {
+        let key = "\(id):\(t.kind)"
+        guard classifiedLock.withLock({ classified.insert(key).inserted }) else { return }
+        Log.event(.windowClassified, [
+            "bundleId": .string(app.bundleIdentifier ?? ""), "app": .string(app.localizedName ?? ""), "windowId": .int(Int(id)),
+            "subrole": t.subrole.map(LogValue.string) ?? .null, "minimized": .bool(t.minimized), "sizeSettable": .bool(t.sizeSettable),
+            "onScreen": .bool(t.onScreen), "layer": .int(t.layer), "modal": .bool(t.modal), "parentIsApp": .bool(t.parentIsApp),
+            "kind": .string("\(t.kind)"),
+        ])
     }
 
     /// On-screen windows from the window server, front to back, with their layer.
@@ -123,36 +149,47 @@ final class AXWindows {
     }
 
     /// Sets the frames. Windows of different apps are moved in parallel, because each call waits for the other app.
-    func setFrames(_ frames: [WindowID: CGRect], refs: [WindowID: WindowRef]) {
+    /// Returns the time for each app, for the `setFramesMs` field of `action.done`.
+    @discardableResult
+    func setFrames(_ frames: [WindowID: CGRect], refs: [WindowID: WindowRef]) -> LogValue {
         let byApp = Dictionary(grouping: frames.compactMap { id, frame in refs[id].map { ($0, frame) } }, by: { $0.0.pid })
         let groups = Array(byApp.values)
+        var timings = [LogValue](repeating: .null, count: groups.count)
+        // Each iteration writes only its own index.
+        timings.withUnsafeMutableBufferPointer { timings in
         DispatchQueue.concurrentPerform(iterations: groups.count) { i in
             let app = groups[i][0].0.app
             let start = DispatchTime.now().uptimeNanoseconds
             // When AXEnhancedUserInterface is on, some apps animate each resize slowly. It is restored after the move.
             let enhanced = app.value("AXEnhancedUserInterface") as? Bool == true
             if enhanced { app.set("AXEnhancedUserInterface", kCFBooleanFalse) }
-            var calls: [String] = []
+            let name = NSRunningApplication(processIdentifier: groups[i][0].0.pid)?.bundleIdentifier ?? "\(groups[i][0].0.pid)"
             for (ref, frame) in groups[i] {
-                let t = DispatchTime.now().uptimeNanoseconds
-                Self.setFrame(ref.element, frame)
-                calls.append(String(format: "%.1f", Double(DispatchTime.now().uptimeNanoseconds - t) / 1e6))
+                let t = DispatchTime.now()
+                Self.setFrame(ref.element, frame, id: ref.id, bundleID: name)
+                Log.event(.axCall, ["function": "setFrame", "bundleId": .string(name), "windowId": .int(Int(ref.id)), "ms": Log.ms(since: t)])
             }
             if enhanced { app.set("AXEnhancedUserInterface", kCFBooleanTrue) }
-            let name = NSRunningApplication(processIdentifier: groups[i][0].0.pid)?.bundleIdentifier ?? "\(groups[i][0].0.pid)"
-            Log.write("setFrames app=\(name) windows=\(groups[i].count) enhancedUI=\(enhanced) totalMs=\(String(format: "%.1f", Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)) perWindowMs=\(calls.joined(separator: ","))")
+            timings[i] = ["app": .string(name), "windows": .int(groups[i].count), "enhancedUI": .bool(enhanced),
+                          "ms": .ms(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e6)]
         }
+        }
+        return .array(timings)
     }
 
-    private static func setFrame(_ element: AXUIElement, _ frame: CGRect) {
+    private static func setFrame(_ element: AXUIElement, _ frame: CGRect, id: WindowID, bundleID: String) {
         var size = frame.size, origin = frame.origin
         let sizeValue = AXValueCreate(.cgSize, &size)!
         let originValue = AXValueCreate(.cgPoint, &origin)!
         // Size first, so that the window fits at the new position. Size again, because some apps
         // limit the size to the screen at the old position.
-        element.set(kAXSizeAttribute, sizeValue)
-        element.set(kAXPositionAttribute, originValue)
-        element.set(kAXSizeAttribute, sizeValue)
+        for (attribute, value) in [(kAXSizeAttribute, sizeValue), (kAXPositionAttribute, originValue), (kAXSizeAttribute, sizeValue)] {
+            let error = element.set(attribute, value)
+            if error != .success {
+                Log.event(.axError, ["function": "AXUIElementSetAttributeValue", "attribute": .string(attribute), "code": .int(Int(error.rawValue)),
+                                     "bundleId": .string(bundleID), "windowId": .int(Int(id))])
+            }
+        }
     }
 
     /// Raises the windows. The last window gets focus.

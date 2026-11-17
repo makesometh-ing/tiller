@@ -114,7 +114,8 @@ var floatingFrames: [WindowID: Rect] = [:]
 for (index, key) in steps.enumerated() {
     lastResult = nil
     center.postNotificationName(.init("com.tiller.proof.press"), object: nil, userInfo: ["key": key], deliverImmediately: true)
-    let stepDeadline = Date().addingTimeInterval(5)
+    // The diagnostics export reads the unified log, which takes some seconds.
+    let stepDeadline = Date().addingTimeInterval(key.hasPrefix("export-diagnostics") ? 60 : 5)
     while lastResult == nil && Date() < stepDeadline { wait(0.02) }
     guard let report = lastResult else { fail("Tiller didn't send a result for key \(key) in 5 seconds.") }
 
@@ -159,7 +160,7 @@ for (index, key) in steps.enumerated() {
     results.append(StepResult(step: index + 1, key: key, passed: problems.isEmpty, problems: problems, report: report))
     print("\(index + 1) \(key) \(report.action) moved=\(report.movedWindows) latencyMs=\(String(format: "%.1f", report.latencyMs)) \(problems.isEmpty ? "PASS" : "FAIL \(problems)")")
     wait(0.8)
-    screenshot(String(format: "%02d-%@-%@", index + 1, key, report.action.replacingOccurrences(of: ":", with: "-")))
+    screenshot(String(format: "%02d-%@-%@", index + 1, key, report.action.replacingOccurrences(of: ":", with: "-")).replacingOccurrences(of: "/", with: "_"))
 }
 
 while video.isRunning { wait(0.2) }

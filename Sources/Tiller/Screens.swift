@@ -7,6 +7,8 @@ struct ScreenInfo {
     let frame: CGRect
     /// The screen frame minus the menu bar and the Dock.
     let desktop: CGRect
+    /// Pixels for each point.
+    let scale: CGFloat
 
     /// Reads all screens. Call on the main thread.
     static func all() -> [ScreenInfo] {
@@ -18,7 +20,7 @@ struct ScreenInfo {
             guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID,
                   let uuid = CGDisplayCreateUUIDFromDisplayID(number)?.takeRetainedValue() else { return nil }
             return ScreenInfo(uuid: CFUUIDCreateString(nil, uuid) as String,
-                              frame: flip(screen.frame), desktop: flip(screen.visibleFrame))
+                              frame: flip(screen.frame), desktop: flip(screen.visibleFrame), scale: screen.backingScaleFactor)
         }
     }
 

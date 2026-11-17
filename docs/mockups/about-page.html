@@ -1,0 +1,107 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; background: #f4f4f6; color: #1d1d22; }
+  @media (prefers-color-scheme: dark) { body { background: #161619; color: #eee; } }
+  .mock { margin: 0 0 34px; }
+  .label { font: 600 14px/1.3 -apple-system; margin: 0 0 4px; }
+  .note { font: 13px/1.45 -apple-system; color: #888; margin: 0 0 10px; max-width: 1460px; }
+  .tag { font: 600 11px/1 -apple-system; color: #888; margin: 0 0 6px; }
+  .pair { display: flex; gap: 24px; flex-wrap: wrap; }
+
+  .dark { --wall: linear-gradient(160deg, #4a3bb8, #23194f); --win: #232228; --side: #1d1c22; --group: #2c2b32; --line: rgba(255,255,255,.07);
+    --text: #f2f2f5; --muted: rgba(255,255,255,.5); --field: #3a3940; --field-text: #e8e8ec; --sel: rgba(255,255,255,.08); --accent: #3fd6c4;
+    --button: #4a4950; --button-text: #f2f2f5; --off: rgba(255,255,255,.18); --icon: url(../../Resources/AppIcon-dark.png); }
+  .light { --wall: linear-gradient(160deg, #e9e4ff, #cfc6f2); --win: #f6f6f8; --side: #ececf0; --group: #ffffff; --line: rgba(0,0,0,.07);
+    --text: #1d1d22; --muted: rgba(0,0,0,.5); --field: #e4e4e8; --field-text: #2a2a30; --sel: rgba(0,0,0,.06); --accent: #0f9e8e;
+    --button: #ffffff; --button-text: #1d1d22; --off: rgba(0,0,0,.14); --icon: url(../../Resources/AppIcon-light.png); }
+
+  .desk { width: 712px; padding: 22px 0; border-radius: 12px; background: var(--wall); display: flex; justify-content: center; }
+  .win { width: 660px; height: 500px; border-radius: 12px; overflow: hidden; background: var(--win); color: var(--text); display: flex;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); border: 1px solid var(--line); font-size: 12px; position: relative; }
+  .lights { position: absolute; left: 14px; top: 14px; display: flex; gap: 7px; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+  .side { width: 172px; background: var(--side); padding: 44px 8px 10px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); }
+  .nav { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; }
+  .nav.on { background: var(--sel); }
+  .ico { width: 20px; height: 20px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; background: #8e8e93; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .title { font-size: 15px; font-weight: 700; padding: 13px 20px 8px; }
+  .content { padding: 4px 20px 20px; flex: 1; display: flex; flex-direction: column; }
+  .sec { font-size: 12px; font-weight: 700; margin: 12px 2px 6px; }
+  .group { background: var(--group); border-radius: 9px; border: 1px solid var(--line); }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; min-height: 22px; gap: 10px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .row .name { flex: 1; min-width: 0; }
+  .sub { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; line-height: 1.35; }
+  .help { color: var(--muted); font-size: 10.5px; padding: 6px 2px 0; line-height: 1.4; }
+
+  .appicon { width: 84px; height: 84px; background: var(--icon) center / contain no-repeat; flex: none; }
+  .appicon.small { width: 56px; height: 56px; }
+  .name-big { font-size: 18px; font-weight: 700; }
+  .version { color: var(--muted); margin-top: 3px; }
+  .center { display: flex; flex-direction: column; align-items: center; text-align: center; }
+
+  /* A push button, as an NSButton with the rounded bezel. */
+  .btn { height: 22px; padding: 0 12px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500;
+    background: var(--button); color: var(--button-text); border: 1px solid var(--line); box-shadow: 0 1px 1.5px rgba(0,0,0,.18); white-space: nowrap; flex: none; }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .link { color: var(--accent); font-size: 11px; font-weight: 600; white-space: nowrap; }
+  /* A switch, as the SwiftUI switch with the theme accent. */
+  .sw { width: 30px; height: 17px; border-radius: 9px; background: var(--off); position: relative; flex: none; }
+  .sw::after { content: ''; position: absolute; top: 2px; left: 2px; width: 13px; height: 13px; border-radius: 50%; background: #fff; box-shadow: 0 0.5px 1px rgba(0,0,0,.3); }
+  .sw.on { background: var(--accent); }
+  .sw.on::after { left: 15px; }
+  .badge { font-size: 10px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, transparent); border-radius: 4px; padding: 1px 5px; margin-left: 6px; }
+  .mono { font: 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const lights = `<div class="lights"><i></i><i></i><i></i></div>`;
+  const sidebar = `<div class="side"><div class="nav"><span class="ico">⚙</span>General</div><div class="nav"><span class="ico" style="background:#636366">⌘</span>Shortcuts</div>
+      <div style="flex:1"></div><div class="nav on"><span class="ico">i</span>About</div></div>`;
+  const page = body => `<div class="win">${lights}${sidebar}<div class="main"><div class="title">About</div><div class="content">${body}</div></div></div>`;
+  const identity = `<div class="center" style="margin-top:18px"><div class="appicon"></div><div class="name-big" style="margin-top:10px">Tiller</div>
+      <div class="version">Version 0.1.0 (1)</div></div>`;
+  const exportHelp = 'Writes Tiller-Diagnostics-&lt;date&gt;.zip to the Desktop: the log, the settings, the windows and the workspace of each screen. Send this file with a bug report.';
+  const debugRow = on => `<div class="row"><span class="name">Debug logging${on ? '<span class="badge">23 h left</span>' : ''}
+      <span class="sub">Logs each Accessibility call. Turns off after 24 hours.</span></span><span class="sw ${on ? 'on' : ''}"></span></div>`;
+  const titlesRow = `<div class="row"><span class="name">Include window titles in logs<span class="sub">Titles can contain private text, for example a document name.</span></span><span class="sw"></span></div>`;
+
+  // Variant 1: the button under the version. The two switches are on the General page, as the PRD describes.
+  const v1 = page(`${identity}
+      <div class="center" style="margin-top:26px"><span class="btn">Export Diagnostics…</span>
+      <div class="help" style="max-width:330px;text-align:center">${exportHelp}</div></div>
+      <div style="flex:1"></div><div class="help" style="text-align:center">Debug logging and window titles: General page.</div>`);
+
+  // Variant 2: a "Diagnostics" group with the two switches and the export row. All diagnostics settings are on one page.
+  const v2 = page(`${identity}
+      <div class="sec" style="margin-top:22px">Diagnostics</div><div class="group">${debugRow(false)}${titlesRow}
+      <div class="row"><span class="name">Diagnostics file<span class="sub">The log, the settings, the windows and the workspace of each screen.</span></span><span class="btn">Export Diagnostics…</span></div></div>
+      <div class="help">The zip file is written to the Desktop and shown in Finder. Send it with a bug report.</div>`);
+
+  // Variant 3: a small header row, then a "Log" group that shows where the log is, with the export as the main button.
+  const v3 = page(`<div style="display:flex;align-items:center;gap:14px;margin-top:6px"><div class="appicon small"></div>
+      <div><div class="name-big">Tiller</div><div class="version">Version 0.1.0 (1) · GPL 3.0</div></div></div>
+      <div class="sec" style="margin-top:20px">Log</div><div class="group">
+      <div class="row"><span class="name">Log file<span class="sub mono">~/Library/Logs/Tiller · 3 files · 2.1 MB</span></span><span class="link">Show in Finder</span></div>
+      ${debugRow(true)}${titlesRow}</div>
+      <div class="sec">Diagnostics</div><div class="group"><div class="row"><span class="name">Diagnostics file<span class="sub">Written to the Desktop. Send it with a bug report.</span></span><span class="btn primary">Export Diagnostics…</span></div></div>`);
+
+  const variants = [
+    ['Variant 1: button under the version', 'The About page keeps the icon, the name and the version. "Export Diagnostics…" is a standard button under the version, with one help line. "Debug logging" and "Include window titles in logs" stay on the General page, as the PRD describes.', v1],
+    ['Variant 2: "Diagnostics" group on the About page', 'A "Diagnostics" group under the version with the "Debug logging" switch, the "Include window titles in logs" switch and the export row. All diagnostics settings are on one page. The PRD then moves the two switches from the General page to the About page.', v2],
+    ['Variant 3: "Log" group and a teal export button', 'A small header row. A "Log" group shows the log file path and size with "Show in Finder", and the two switches. "Debug logging" is shown on, with the time until it turns off. The export button is teal, in its own "Diagnostics" group.', v3],
+  ];
+  // window.ONLY = [variant index, 'dark' or 'light'] renders one window without the page frame.
+  if (window.ONLY) { const [i, t] = window.ONLY; document.getElementById('root').innerHTML = `<div class="desk ${t}" style="width:auto">${variants[i][2]}</div>`; }
+  else document.getElementById('root').innerHTML = variants.map(([t, n, w]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n}</p>
+      <div class="pair"><div><p class="tag">Dark</p><div class="desk dark">${w}</div></div><div><p class="tag">Light</p><div class="desk light">${w}</div></div></div></div>`).join('');
+</script>
+</body>
+</html>

@@ -46,6 +46,17 @@ final class LeaderKey {
     private(set) var isLayerActive = false {
         didSet { if oldValue != isLayerActive { onLayerChange(isLayerActive) } }
     }
+    /// The time of the last key down, for the `tap.disabled` log event.
+    private var lastKeyDown: DispatchTime?
+    /// True when the listen-only mouse tap started.
+    private(set) var mouseTapStarted = false
+
+    /// Starts or ends leader key mode and writes `leader.start` or `leader.end`.
+    private func setLayer(_ active: Bool, reason: String, _ fields: [String: LogValue] = [:]) {
+        guard active != isLayerActive else { return }
+        Log.event(active ? .leaderStart : .leaderEnd, fields.merging(["reason": .string(reason)]) { $1 })
+        isLayerActive = active
+    }
     private var tap: CFMachPort?
     /// A listen-only tap for mouse down events. It can't stop or delay a click.
     private var mouseTap: CFMachPort?
@@ -78,8 +89,7 @@ final class LeaderKey {
         if let mouseTap {
             CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, mouseTap, 0), .commonModes)
             CGEvent.tapEnable(tap: mouseTap, enable: true)
-        } else {
-            Log.write("mouse event tap failed to start")
+            mouseTapStarted = true
         }
         return true
     }
@@ -88,27 +98,30 @@ final class LeaderKey {
     private func handleMouse(_ type: CGEventType, _ event: CGEvent) {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let mouseTap { CGEvent.tapEnable(tap: mouseTap, enable: true) }
+            Log.event(.tapDisabled, ["tap": "mouse", "reason": type == .tapDisabledByTimeout ? "timeout" : "userInput"])
             return
         }
         lastMouseDown = .now()
         guard isLayerActive, clickEndsLayer(event.location) else { return }
         // `timestamp` is the time of the click in nanoseconds since boot.
         let tapMs = Double(clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - event.timestamp) / 1e6
-        Log.write(String(format: "layer end reason=click x=%d y=%d clickToTapMs=%.1f", Int(event.location.x), Int(event.location.y), tapMs))
-        isLayerActive = false
+        setLayer(false, reason: "click", ["x": .int(Int(event.location.x)), "y": .int(Int(event.location.y)), "clickToTapMs": .ms(tapMs)])
     }
 
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {
         let pass = Unmanaged.passUnretained(event)
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            Log.write("event tap re-enabled after \(type == .tapDisabledByTimeout ? "timeout" : "user input")")
+            // A timeout means that a callback took too long.
+            Log.event(.tapDisabled, ["tap": "keys", "reason": type == .tapDisabledByTimeout ? "timeout" : "userInput",
+                                     "msSinceLastKey": lastKeyDown.map(Log.ms(since:)) ?? .null])
             return pass
         }
         let code = event.getIntegerValueField(.keyboardEventKeycode)
         if type == .keyUp {
             return stoppedKeyUps.remove(code) != nil ? nil : pass
         }
+        lastKeyDown = .now()
         let modifiers = Modifiers(event.flags)
         if let recorder {
             stoppedKeyUps.insert(code)
@@ -121,7 +134,7 @@ final class LeaderKey {
         if KeyChord(keyCode: UInt16(code), modifiers: modifiers) == shortcuts.toggle {
             stoppedKeyUps.insert(code)
             guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else { return nil }
-            isLayerActive = false
+            setLayer(false, reason: "toggle")
             onToggle()
             return nil
         }
@@ -132,16 +145,22 @@ final class LeaderKey {
         stoppedKeyUps.insert(code)
         if event.getIntegerValueField(.keyboardEventAutorepeat) != 0 { return nil }
         let received = DispatchTime.now()
+        let chord = LogValue.string(KeyChord(keyCode: UInt16(code), modifiers: modifiers).spec)
         if !isLayerActive {
-            isLayerActive = true
+            setLayer(true, reason: "leader", ["chord": chord])
         } else if isLeader || code == Self.escapeKeyCode {
-            isLayerActive = false
+            Log.event(.leaderKey, ["chord": chord, "action": isLeader ? "leader" : "esc"])
+            setLayer(false, reason: isLeader ? "leader" : "esc")
             onCancel()
         } else if code == Self.keyListKeyCode {
+            Log.event(.leaderKey, ["chord": chord, "action": "keyList"])
             onKeyList()
         } else if let id = shortcuts.action(keyCode: UInt16(code), modifiers: modifiers) {
-            if shortcuts.exits(after: id) { isLayerActive = false }
+            Log.event(.leaderKey, ["chord": chord, "action": .string(id.rawValue)])
+            if shortcuts.exits(after: id) { setLayer(false, reason: "action", ["action": .string(id.rawValue)]) }
             onAction(id.action, received)
+        } else {
+            Log.event(.leaderKey, ["chord": chord, "action": "unbound"])
         }
         return nil
     }

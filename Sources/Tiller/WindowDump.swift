@@ -29,7 +29,8 @@ enum WindowDump {
         var kind: String
     }
 
-    static func write(to path: String) {
+    /// `titles` is false for the diagnostics zip. Window titles can contain private text.
+    static func write(to path: String, titles: Bool = true) {
         let info = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
         var layers: [UInt32: Int] = [:], onScreen: [UInt32: Bool] = [:]
         for entry in info {
@@ -57,7 +58,7 @@ enum WindowDump {
                 let kind = id.map { "\(AXWindows.traits(w, id: $0, order: order).kind)" } ?? "ignored"
                 entries.append(Entry(
                     app: app.localizedName ?? "", bundleID: app.bundleIdentifier ?? "", windowID: id,
-                    title: w.value(kAXTitleAttribute) as? String ?? "",
+                    title: titles ? w.value(kAXTitleAttribute) as? String ?? "" : "",
                     role: w.value(kAXRoleAttribute) as? String, subrole: w.value(kAXSubroleAttribute) as? String,
                     frame: w.frame.map { [$0.minX, $0.minY, $0.width, $0.height] },
                     minimized: w.value(kAXMinimizedAttribute) as? Bool, modal: w.value(kAXModalAttribute) as? Bool,

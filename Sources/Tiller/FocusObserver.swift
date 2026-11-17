@@ -46,7 +46,8 @@ final class FocusObserver {
         AXUIElementSetMessagingTimeout(element, 0.5)
         let result = AXObserverAddNotification(observer, element, kAXFocusedWindowChangedNotification as CFString, Unmanaged.passUnretained(self).toOpaque())
         guard result == .success else {
-            Log.write("focus observer not added app=\(app.bundleIdentifier ?? "\(pid)") axError=\(result.rawValue)")
+            Log.event(.axError, ["function": "AXObserverAddNotification", "attribute": .string(kAXFocusedWindowChangedNotification),
+                                 "code": .int(Int(result.rawValue)), "bundleId": .string(app.bundleIdentifier ?? "\(pid)")])
             return
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)

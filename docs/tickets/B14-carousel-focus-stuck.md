@@ -19,7 +19,7 @@ Dia stays inactive after `AXFrontmost` from each app that was tested: Slack and 
 
 ## Fix
 
-`AXWindows.focus` and `AXWindows.raise` call `NSRunningApplication.activate()` after `AXFrontmost`. Each focus action also writes a `focus` line to the log. The line is described in section 13 "Logging and diagnostics" of the PRD.
+`AXWindows.focus` and `AXWindows.raise` call `NSRunningApplication.activate()` after `AXFrontmost`. Each focus action also writes an `action.focus` event to the log. The event is described in section 13 "Logging and diagnostics" of the PRD.
 
 ## Proof
 

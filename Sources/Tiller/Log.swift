@@ -1,25 +1,16 @@
 import Foundation
+import TillerCore
 
-/// Appends lines to ~/Library/Logs/Tiller/tiller.log.
+/// The Tiller log: the unified log, subsystem `com.tiller.Tiller`, and `~/Library/Logs/Tiller/tiller.jsonl`.
 enum Log {
-    static let url: URL = {
-        let dir = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Tiller")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appending(path: "tiller.log")
-    }()
-    private static let queue = DispatchQueue(label: "tiller.log")
-    private static let formatter = ISO8601DateFormatter()
+    static let directory = FileManager.default.homeDirectoryForCurrentUser.appending(path: "Library/Logs/Tiller")
+    static let shared = EventLog(file: LogFile(directory: directory, name: "tiller"))
 
-    static func write(_ message: String) {
-        let line = "\(formatter.string(from: Date())) \(message)\n"
-        queue.async {
-            if let handle = try? FileHandle(forWritingTo: url) {
-                handle.seekToEndOfFile()
-                handle.write(Data(line.utf8))
-                try? handle.close()
-            } else {
-                try? Data(line.utf8).write(to: url)
-            }
-        }
+    static func event(_ name: LogEventName, level: LogLevel? = nil, _ fields: [String: LogValue] = [:]) {
+        shared.log(name, level: level, fields)
+    }
+
+    static func ms(since start: DispatchTime) -> LogValue {
+        .ms(Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6)
     }
 }
