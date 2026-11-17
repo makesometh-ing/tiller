@@ -65,6 +65,7 @@ After v1: Left Busy, Right Busy, Horizontal Split, named custom layouts, and a c
 - In leader key mode, each key press is stopped. The focused app doesn't receive it.
 - An action key does its action and ends leader key mode. `Esc` or the leader key ends leader key mode. `?` opens the key list and keeps leader key mode active. A key without an action keeps leader key mode active.
 - An action key without modifiers also matches while modifiers are still held, for example `1` while Hyper is still held.
+- A click in leader key mode ends leader key mode. The click isn't stopped. The app under the pointer receives it and gives the clicked window focus. A click on the key bar doesn't end leader key mode, so that the key bar can be dragged. Clicks are read with a listen-only event tap, so that Tiller can't delay a click.
 
 | Section | Key | Action |
 |---|---|---|
@@ -86,7 +87,6 @@ Planned for v1:
 - `⇧J` and `⇧K` move the focused window to the next or previous container. The moved window becomes the focused window of its new carousel. Focus stays in the old container, on the next window of its carousel. Their "Exit after" setting is off by default.
 - Leader key mode ends 10 seconds after the last key press. It doesn't end while the key list is open.
 - Leader key mode ends on an app switch and a screen lock.
-- A click on a window in leader key mode gives the window focus and ends leader key mode. The overlay doesn't stop the click.
 - When the event tap doesn't start, the menu bar menu shows the failure. Tiller starts the event tap again every second until it starts.
 - Key names are read from the current keyboard layout. They are read again when the keyboard layout changes. Chords are stored as key codes. A saved chord stays on the same key after a keyboard layout change.
 
@@ -323,6 +323,7 @@ Planned for v1:
 ## 15. Proof and test tools
 
 - `build/tiller-proof` runs the end-to-end test. In proof mode, Tiller manages only the windows of the apps in `--only-bundle-ids`. Proof runs use the defaults domain `com.tiller.Tiller.proof`. It is emptied when a proof run starts Tiller. A proof run doesn't change the settings or the key bar position in the Tiller defaults.
+- A `click:` proof step posts a mouse down and a mouse up at the visible point of a window nearest to its center. `click:next` and `click:previous` click the windows after and before the focused window in the focused carousel. `click:container<n>` clicks the focused window of container n. `click:floating` clicks the front floating window.
 - `Tiller --dump-windows <path>` writes the attributes and the kind of every window.
 - `Tiller --focus-test <bundle id> <window id> <method> <path>` tests one focus method.
 - The unit tests are in `Tests/TillerCoreTests/`.

@@ -72,6 +72,12 @@ final class OverlayController {
         return nil
     }
 
+    /// True when `point`, in Accessibility coordinates, is over the key bar. A click there starts a drag of the key bar.
+    func barContains(_ point: CGPoint) -> Bool {
+        guard let bar = barPanel, bar.isVisible, let primaryHeight = NSScreen.screens.first?.frame.height else { return false }
+        return bar.frame.contains(NSPoint(x: point.x, y: primaryHeight - point.y))
+    }
+
     /// Moves the key bar by the same distance as a drag. The proof runner uses it.
     func moveBar(dx: CGFloat, dy: CGFloat) {
         guard let bar = barPanel else { return }

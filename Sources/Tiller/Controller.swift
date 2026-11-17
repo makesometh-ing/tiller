@@ -25,8 +25,8 @@ final class Controller {
         }
     }
 
-    /// Call on the main thread.
-    func reportCurrentState(action: String, latencyMs: Double = 0) {
+    /// Call on the main thread. `expectedFocused` is the system focused window when nil.
+    func reportCurrentState(action: String, latencyMs: Double = 0, expectedFocused: WindowID? = nil) {
         guard onReport != nil else { return }
         let screens = ScreenInfo.all()
         let mouseScreen = ScreenInfo.underMouse(in: screens)
@@ -35,7 +35,46 @@ final class Controller {
             let focused = self.ax.focusedWindowID()
             guard let screen = Self.screen(of: focused, refs: refs, screens: screens) ?? mouseScreen,
                   let ws = self.workspaces[screen.uuid] else { return }
-            self.onReport?(self.report(action, ws, refs: refs, latencyMs: latencyMs, moved: 0, expectedFocused: focused))
+            self.onReport?(self.report(action, ws, refs: refs, latencyMs: latencyMs, moved: 0, expectedFocused: expectedFocused ?? focused))
+        }
+    }
+
+    /// The proof runner `click:` step. Returns a window and a visible point of it, in Accessibility coordinates.
+    /// `next` and `previous` are the windows after and before the focused window in the focused carousel.
+    /// `container<n>` is the focused window of container n. `floating` is the front floating window.
+    /// Call on the main thread. `completion` runs on the main thread.
+    func clickTarget(_ name: String, completion: @escaping ((id: WindowID, point: CGPoint)?) -> Void) {
+        queue.async {
+            let windows = self.ax.windows()
+            let focused = self.ax.focusedWindowID()
+            var id: WindowID?
+            if name == "floating" {
+                id = windows.first { !self.isTiled($0) }?.id
+            } else if let ws = self.workspaces.values.first(where: { focused.map($0.contains) ?? false }) ?? self.workspaces.values.first {
+                let c = ws.containers[ws.focusedContainerIndex]
+                let n = c.windows.count
+                if name == "next", n > 1 { id = c.windows[(c.focusedIndex + 1) % n] }
+                if name == "previous", n > 1 { id = c.windows[(c.focusedIndex - 1 + n) % n] }
+                if name.hasPrefix("container"), let i = Int(name.dropFirst("container".count)), ws.containers.indices.contains(i - 1) {
+                    id = ws.containers[i - 1].focusedWindow
+                }
+            }
+            let order = AXWindows.frontToBackFrames()
+            var target: (id: WindowID, point: CGPoint)?
+            if let id, let frame = order.first(where: { $0.id == id })?.frame {
+                // The visible point nearest to the center of the window.
+                var best = CGFloat.infinity
+                for x in stride(from: frame.minX + 3, to: frame.maxX - 3, by: 6) {
+                    for y in stride(from: frame.minY + 3, to: frame.maxY - 3, by: 6) {
+                        let d = hypot(x - frame.midX, y - frame.midY)
+                        if d < best, !isCovered(CGRect(x: x, y: y, width: 1, height: 1), window: id, frontToBack: order) {
+                            best = d
+                            target = (id, CGPoint(x: x, y: y))
+                        }
+                    }
+                }
+            }
+            DispatchQueue.main.async { completion(target) }
         }
     }
 

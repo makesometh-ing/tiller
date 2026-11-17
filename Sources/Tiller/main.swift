@@ -78,6 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Leave the event tap callback first. Panel work in the callback delays all key presses.
             DispatchQueue.main.async { self?.layerChanged(active) }
         }
+        leader.clickEndsLayer = { [weak self] point in !(self?.overlay.barContains(point) ?? false) }
         leader.isEnabled = { [store] in store.enabled }
         leader.onToggle = { [store] in store.enabled.toggle() }
         leader.onAction = { [weak self] action, received in
@@ -143,8 +144,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func layerChanged(_ active: Bool) {
-        guard active else { overlay.hide(); return }
         let start = DispatchTime.now()
+        guard active else {
+            overlay.hide()
+            Log.write(String(format: "overlay hidden hideMs=%.1f", Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6))
+            return
+        }
         overlay.show()
         let barMs = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6
         updateOverlay(since: start, barMs: barMs)
@@ -209,6 +214,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // A global event monitor doesn't receive mouse events that this app posts, so the hover is read again here.
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.overlay.updateHover() }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "hover") }
+            case _ where key.hasPrefix("click:"):
+                // A click at a visible point of a window, as a click with the mouse.
+                let name = String(key.dropFirst("click:".count))
+                self.controller.clickTarget(name) { target in
+                    guard let target else { self.controller.reportCurrentState(action: "click:\(name) target-not-found"); return }
+                    for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+                        CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: target.point, mouseButton: .left)?.post(tap: .cghidEventTap)
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        self.controller.reportCurrentState(action: "click:\(name) window=\(target.id) layer=\(self.leader.isLayerActive)", expectedFocused: target.id)
+                    }
+                }
             case "move-bar":
                 self.overlay.moveBar(dx: 120, dy: 60)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "move-bar") }

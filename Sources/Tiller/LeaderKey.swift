@@ -37,10 +37,18 @@ final class LeaderKey {
     /// Called on the main thread when the `toggle` chord is pressed. Leader key mode ends.
     var onToggle: () -> Void = {}
 
+    /// Called on the main thread for a mouse down while leader key mode is active, with the location in Accessibility coordinates.
+    /// Returns false when the click doesn't end leader key mode, for example a click on the key bar.
+    var clickEndsLayer: (CGPoint) -> Bool = { _ in true }
+    /// The time of the last mouse down. Read and written on the main thread.
+    private(set) var lastMouseDown: DispatchTime?
+
     private(set) var isLayerActive = false {
         didSet { if oldValue != isLayerActive { onLayerChange(isLayerActive) } }
     }
     private var tap: CFMachPort?
+    /// A listen-only tap for mouse down events. It can't stop or delay a click.
+    private var mouseTap: CFMachPort?
     /// Key codes whose key down event was stopped. Their key up event is stopped too.
     private var stoppedKeyUps = Set<Int64>()
 
@@ -58,7 +66,36 @@ final class LeaderKey {
         guard let tap else { return false }
         CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, tap, 0), .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        let mouseMask = [CGEventType.leftMouseDown, .rightMouseDown, .otherMouseDown].reduce(0) { $0 | (1 << $1.rawValue) }
+        mouseTap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap, place: .tailAppendEventTap, options: .listenOnly,
+            eventsOfInterest: CGEventMask(mouseMask),
+            callback: { _, type, event, refcon in
+                Unmanaged<LeaderKey>.fromOpaque(refcon!).takeUnretainedValue().handleMouse(type, event)
+                return Unmanaged.passUnretained(event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque())
+        if let mouseTap {
+            CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, mouseTap, 0), .commonModes)
+            CGEvent.tapEnable(tap: mouseTap, enable: true)
+        } else {
+            Log.write("mouse event tap failed to start")
+        }
         return true
+    }
+
+    /// A click ends leader key mode. The click goes to the window under the pointer.
+    private func handleMouse(_ type: CGEventType, _ event: CGEvent) {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let mouseTap { CGEvent.tapEnable(tap: mouseTap, enable: true) }
+            return
+        }
+        lastMouseDown = .now()
+        guard isLayerActive, clickEndsLayer(event.location) else { return }
+        // `timestamp` is the time of the click in nanoseconds since boot.
+        let tapMs = Double(clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - event.timestamp) / 1e6
+        Log.write(String(format: "layer end reason=click x=%d y=%d clickToTapMs=%.1f", Int(event.location.x), Int(event.location.y), tapMs))
+        isLayerActive = false
     }
 
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Unmanaged<CGEvent>? {

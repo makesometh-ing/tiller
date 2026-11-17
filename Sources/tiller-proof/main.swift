@@ -108,6 +108,8 @@ struct StepResult: Codable {
     var report: ActionReport
 }
 var results: [StepResult] = []
+/// Key log lines that a `pass:` step after a `click:` step must write: the title of the clicked window and the chord.
+var clickedKeyLines: [String] = []
 var floatingFrames: [WindowID: Rect] = [:]
 for (index, key) in steps.enumerated() {
     lastResult = nil
@@ -129,6 +131,14 @@ for (index, key) in steps.enumerated() {
     if key.hasPrefix("chord:"), index > 0, steps[index - 1] == "record:leader", let chord = chordOf(key),
        !report.action.contains("leader=\(chord.spec)") {
         problems.append("the leader key wasn't recorded: \(report.action)")
+    }
+    // A click ends leader key mode and gives the clicked window focus.
+    if key.hasPrefix("click:") && !report.action.contains("layer=false") { problems.append("leader key mode didn't end: \(report.action)") }
+    // A `pass:` chord after a click must reach the clicked window. It is checked in the key log at the end of the run.
+    if key.hasPrefix("pass:"), index > 0, steps[index - 1].hasPrefix("click:"), let chord = chordOf(key),
+       let clicked = results.last?.report, let id = clicked.expectedFocused,
+       let title = (clicked.windows + clicked.floating).first(where: { $0.id == id })?.title {
+        clickedKeyLines.append("\(title) \(logSuffix(chord))")
     }
     // A `pass:` chord isn't a leader key, so leader key mode must stay off.
     if key.hasPrefix("pass:") && !report.action.contains("layer=false") { problems.append("leader key mode started: \(report.action)") }
@@ -173,7 +183,9 @@ let proofLines = Set(sentChords.map(logSuffix)).subtracting(passLines)
 let logLines = ((try? String(contentsOf: keyLog, encoding: .utf8)) ?? "").split(separator: "\n").map(String.init)
 let passReached = passLines.allSatisfy { pass in logLines.contains { $0.hasSuffix(pass) } }
 let keysReachedApp = logLines.filter { line in proofLines.contains { line.hasSuffix($0) } }.map { $0 + "\n" }.joined()
-let keyLogPassed = keysReachedApp.isEmpty && passReached
+let clickedKeysReached = clickedKeyLines.allSatisfy(logLines.contains)
+let keyLogPassed = keysReachedApp.isEmpty && passReached && clickedKeysReached
+try? FileManager.default.copyItem(at: keyLog, to: out.appending(path: "testwindows-keys.log"))
 let allPassed = keyLogPassed && results.allSatisfy(\.passed)
 
 let encoder = JSONEncoder()
@@ -191,6 +203,9 @@ for r in results {
 }
 summary += "\nKey presses that reached the test windows while the Tiller layer was active: \(keysReachedApp.isEmpty ? "0 (PASS)" : "FAIL\n\n```\n\(keysReachedApp)```")\n"
 if !passLines.isEmpty { summary += "Chords that must reach the test windows (`pass:` steps): \(passReached ? "all reached (PASS)" : "FAIL")\n" }
+if !clickedKeyLines.isEmpty {
+    summary += "Chords after a click that must reach the clicked window: \(clickedKeysReached ? "all reached (PASS)" : "FAIL") (\(clickedKeyLines.map { "`\($0)`" }.joined(separator: ", ")))\n"
+}
 try! summary.write(to: out.appending(path: "summary.md"), atomically: true, encoding: .utf8)
 
 run("/usr/bin/pkill", ["-x", "Tiller"])
