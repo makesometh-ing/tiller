@@ -16,6 +16,13 @@ The shortcut to turn Tiller on and off can be recorded in the "Global shortcuts"
 
 The behaviour is described in [PRD.md, section 11 "Settings window and menu bar menu"](../PRD.md#11-settings-window-and-menu-bar-menu).
 
+Approved designs, listed in [docs/mockups/README.md](../mockups/README.md):
+
+- Variant 3 of the Shortcuts page in [settings-v2.html](../mockups/settings-v2.html): a segmented control with "Leader key mode" and "Global". Source: [requirements-as-written.md, section 14](../requirements-as-written.md).
+- Variant 1 in [exit-leader-key-mode.html](../mockups/exit-leader-key-mode.html): the "Global shortcuts" group and the "Exit after" checkbox column. Source: [requirements-as-written.md, section 19](../requirements-as-written.md).
+
+The "Exit after" column is shown with the "Leader key mode" fields.
+
 ## Acceptance criteria
 
 - [ ] A Hyper global shortcut for "Focus next window" does the action.

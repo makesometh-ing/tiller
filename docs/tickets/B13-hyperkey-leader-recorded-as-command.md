@@ -20,9 +20,6 @@ Tiller's event tap is at the annotated session tap point. Each key event is rece
 
 [B13-hyperkey-leader](../../Tests/Proof/B13-hyperkey-leader): the end-to-end test passes with the tap at the annotated session tap point.
 
-## Proof needed
+Test with the physical keys on the owner's laptop, after the build of commit 379e382:
 
-- A recording of the leader key with Caps Lock and L in Hyperkey shows ⌃⌥⇧⌘ L.
-- Caps Lock and L in Hyperkey start leader key mode.
-
-Synthetic key events don't start Hyperkey. This test is done on your laptop with the physical keys.
+> I've tested, it works. I've already set the leader key to hyper + l.

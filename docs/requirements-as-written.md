@@ -480,3 +480,17 @@ On a proof screenshot with the floating window "Test Floating" behind the tiled 
 > No, I would say that these 2 windows are in a container. There's a floating window with a floating overlay, and there's 2 windows that are in the container, which show between the overlay and the floating window. That's what I'm saying.
 
 > I mean, it doesn't really matter what I mean in my description. Like, can you not see the problem? That there's a window in between one window, 2 windows, doesn't really matter. There's windows in between the overlay and the window that the overlay belongs to.
+
+## 21. Hyperkey test, tickets and approved mockups
+
+On "B13: The leader key from Hyperkey is recorded and detected as ⌘":
+
+> I've tested, it works. I've already set the leader key to hyper + l.
+
+On the known gap of F42 "`⇧J` and `⇧K` don't exist yet.":
+
+> eh? that's a different issue/feature isn't it?
+
+On "F20: Global shortcuts: a second shortcut for each action":
+
+> make sure you save the mockups that I accepted for this somewhere

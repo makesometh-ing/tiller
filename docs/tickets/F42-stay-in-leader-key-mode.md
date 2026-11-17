@@ -18,6 +18,3 @@ Built as variant 1 in [exit-leader-key-mode.html](../mockups/exit-leader-key-mod
 
 [F42-stay-in-leader-key-mode](../../Tests/Proof/F42-stay-in-leader-key-mode): a run in the dark appearance with 19 steps and a run in the light appearance with 8 steps. Unit tests `focusActionsKeepLeaderKeyModeByDefault` and `toggleChordAndExitAfterAfterJSON`.
 
-## Known gaps
-
-- `⇧J` and `⇧K` don't exist yet. Their "Exit after" setting is off by default when they are built in [F33](F33-move-window-between-containers.md).
