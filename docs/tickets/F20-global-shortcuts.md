@@ -8,7 +8,9 @@ Source: [requirements-as-written.md, section 10](../requirements-as-written.md).
 
 ## What exists
 
-Mockups only: [settings-v2.html](../mockups/settings-v2.html).
+Mockups: [settings-v2.html](../mockups/settings-v2.html).
+
+The shortcut to turn Tiller on and off can be recorded in the "Global shortcuts" group of the Shortcuts page. It was built in [F42](F42-stay-in-leader-key-mode.md). The other actions don't have a global shortcut yet.
 
 ## What to build
 

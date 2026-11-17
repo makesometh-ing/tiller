@@ -8,24 +8,16 @@ Source: [requirements-as-written.md, section 18](../requirements-as-written.md) 
 
 ## What exists
 
-Each action ends leader key mode.
+Built as variant 1 in [exit-leader-key-mode.html](../mockups/exit-leader-key-mode.html). The behaviour is described in [PRD.md, section 6 "Leader key mode"](../PRD.md#6-leader-key-mode) and [section 11 "Settings window and menu bar menu"](../PRD.md#11-settings-window-and-menu-bar-menu).
 
-## What to build
+- Each action on the Shortcuts page has an "Exit after" checkbox. `H`, `L`, `J` and `K` keep leader key mode by default. The checkbox of "Turn Tiller off" is checked and disabled.
+- With leader key mode active after an action, the overlay is updated 38 to 48 ms after the key press.
+- The "Global shortcuts" group contains the leader key and the shortcut to turn Tiller on and off. Both can be recorded.
 
-The behaviour is described in [PRD.md, section 6 "Leader key mode"](../PRD.md#6-leader-key-mode) and [section 11 "Settings window and menu bar menu"](../PRD.md#11-settings-window-and-menu-bar-menu).
+## Proof
 
-- Approved design: variant 1 in [exit-leader-key-mode.html](../mockups/exit-leader-key-mode.html), a checkbox column with the heading "Exit after".
-- The "Global shortcuts" group on the Shortcuts page contains the leader key and the shortcut to turn Tiller on and off. Both can be recorded.
+[F42-stay-in-leader-key-mode](../../Tests/Proof/F42-stay-in-leader-key-mode): a run in the dark appearance with 19 steps and a run in the light appearance with 8 steps. Unit tests `focusActionsKeepLeaderKeyModeByDefault` and `toggleChordAndExitAfterAfterJSON`.
 
-## Acceptance criteria
+## Known gaps
 
-- [x] With the default settings, leader, then `L` three times, moves focus three windows. The overlay stays open between the key presses.
-- [x] With the default settings, leader, then `1`, applies the layout and ends leader key mode.
-- [x] A changed checkbox is saved and applied without a relaunch.
-- [x] The shortcut to turn Tiller on and off can be recorded. The recorded chord turns Tiller off and on.
-- [x] `Q` always ends leader key mode. Its checkbox can't be changed.
-- [x] The overlay is updated after each action in leader key mode, within the latency of the action.
-
-## Proof needed
-
-A `tiller-proof` run with `L` pressed three times after one leader key press, screenshots of the overlay after each press, and screenshots of the Shortcuts page in the light and the dark appearance.
+- `⇧J` and `⇧K` don't exist yet. Their "Exit after" setting is off by default when they are built in [F33](F33-move-window-between-containers.md).

@@ -22,6 +22,7 @@ The behaviour is described in [PRD.md, section 6 "Leader key mode"](../PRD.md#6-
 - [ ] The moved window is in front of the carousel of container 2.
 - [ ] Focus is on the next window of container 1.
 - [ ] A move into an empty container works.
+- [ ] `⇧J` and `⇧K` have an "Exit after" checkbox on the Shortcuts page. It is off by default. Leader key mode continues after the move.
 - [ ] The latency of each move is logged. The screen recording shows if the move causes flicker.
 
 ## Proof needed
