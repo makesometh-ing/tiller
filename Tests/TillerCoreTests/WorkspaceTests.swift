@@ -252,3 +252,55 @@ func makeWorkspace() -> Workspace {
     #expect(fronts.focus == nil)
     #expect(fronts.raise.isEmpty)
 }
+
+@Test func moveFocusedWindowPutsItInFrontOfTheNextCarouselAndKeepsFocusInTheOldContainer() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5], focused: 3)
+    // Container 1: [3, 2, 5], container 2: [1, 4].
+    let move = ws.moveFocusedWindow(offset: 1)
+    #expect(move?.from == 0 && move?.to == 1)
+    #expect(ws.containers[0].windows == [2, 5])
+    #expect(ws.focusedContainerIndex == 0)
+    #expect(ws.focusedWindow == 2)
+    #expect(ws.containers[1].windows == [1, 3, 4])
+    #expect(ws.containers[1].focusedWindow == 3)
+}
+
+@Test func moveFocusedWindowWrapsAroundAndFocusesTheNextWindowOfTheRing() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3], focused: 1)
+    // Container 1: [1, 3], container 2: [2]. The last window of the ring is focused, so the first window is next.
+    ws.focus(window: 3)
+    #expect(ws.moveFocusedWindow(offset: -1)?.to == 1)
+    #expect(ws.focusedWindow == 1)
+    #expect(ws.containers[1].windows == [2, 3])
+    // From container 2, the next container is container 1.
+    ws.focus(window: 3)
+    #expect(ws.moveFocusedWindow(offset: 1)?.to == 0)
+    #expect(ws.containers[0].windows == [1, 3])
+    #expect(ws.containers[0].focusedWindow == 3)
+    #expect(ws.focusedWindow == 2)
+}
+
+@Test func moveIntoAnEmptyContainerAndOutOfTheLastWindowOfAContainer() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1], focused: 1)
+    ws.focusContainer(offset: 1)
+    #expect(ws.containers[1].windows.isEmpty)
+    #expect(ws.moveFocusedWindow(offset: 1)?.to == 1)
+    #expect(ws.containers[1].windows == [1])
+    // The old container is empty, so the new container becomes the focused container.
+    #expect(ws.focusedContainerIndex == 1)
+    #expect(ws.focusedWindow == 1)
+    for (id, frame) in ws.windowFrames() { #expect(id == 1 && frame == ws.containers[1].frame) }
+}
+
+@Test func moveDoesNothingWithOneContainerOrWithoutAFocusedWindow() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2], focused: 1)
+    let before = ws
+    #expect(ws.moveFocusedWindow(offset: 1) == nil)
+    #expect(ws == before)
+    ws.apply(.verticalSplit, windows: [], focused: nil)
+    #expect(ws.moveFocusedWindow(offset: -1) == nil)
+}

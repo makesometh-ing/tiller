@@ -92,13 +92,14 @@ public enum ActionID: String, Codable, CaseIterable, Sendable {
     case layoutFullScreen, layoutVerticalSplit, layoutLeftTwoThirds, layoutRightTwoThirds
     case focusPreviousContainer, focusNextContainer, toggleAxis
     case focusPreviousWindow, focusNextWindow, toggleFloat
+    case moveWindowPreviousContainer, moveWindowNextContainer
     case raiseFloating
     case turnOff
 
-    /// The focus actions keep leader key mode by default, so that their keys can be pressed in a row.
-    // TODO: add the actions that move a window to the previous or next container.
+    /// The focus actions and the move actions keep leader key mode by default, so that their keys can be pressed in a row.
     public var exitsByDefault: Bool {
-        ![.focusPreviousContainer, .focusNextContainer, .focusPreviousWindow, .focusNextWindow].contains(self)
+        ![.focusPreviousContainer, .focusNextContainer, .focusPreviousWindow, .focusNextWindow,
+          .moveWindowPreviousContainer, .moveWindowNextContainer].contains(self)
     }
 }
 
@@ -166,6 +167,7 @@ public struct Shortcuts: Codable, Equatable, Sendable {
             .focusPreviousContainer: KeyChord(spec: "k")!, .focusNextContainer: KeyChord(spec: "j")!,
             .toggleAxis: KeyChord(spec: "v")!, .focusPreviousWindow: KeyChord(spec: "h")!,
             .focusNextWindow: KeyChord(spec: "l")!, .toggleFloat: KeyChord(spec: "f")!,
+            .moveWindowPreviousContainer: KeyChord(spec: "shift+k")!, .moveWindowNextContainer: KeyChord(spec: "shift+j")!,
             .raiseFloating: KeyChord(spec: "r")!, .turnOff: KeyChord(spec: "q")!,
         ])
 

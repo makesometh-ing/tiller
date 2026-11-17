@@ -153,3 +153,33 @@ import Testing
     let old = try JSONDecoder().decode(Shortcuts.self, from: Data(#"{"actions":[]}"#.utf8))
     #expect(old.global.isEmpty)
 }
+
+@Test func moveActionsUseShiftJAndShiftKAndKeepLeaderKeyMode() {
+    let s = Shortcuts.standard
+    #expect(s.actions[.moveWindowNextContainer] == KeyChord(spec: "shift+j"))
+    #expect(s.actions[.moveWindowPreviousContainer] == KeyChord(spec: "shift+k"))
+    #expect(!s.exits(after: .moveWindowNextContainer))
+    #expect(!s.exits(after: .moveWindowPreviousContainer))
+    #expect(s.global[.moveWindowNextContainer] == nil)
+}
+
+@Test func shiftJDoesNotRunJAndJDoesNotRunShiftJ() {
+    let s = Shortcuts.standard
+    #expect(s.action(keyCode: 38, modifiers: .shift) == .moveWindowNextContainer)
+    #expect(s.action(keyCode: 40, modifiers: .shift) == .moveWindowPreviousContainer)
+    #expect(s.action(keyCode: 38, modifiers: []) == .focusNextContainer)
+    #expect(s.action(keyCode: 40, modifiers: []) == .focusPreviousContainer)
+    // Hyper is still held after Hyper L. Hyper contains ⇧, but only the key without modifiers matches.
+    #expect(s.action(keyCode: 38, modifiers: .hyper) == .focusNextContainer)
+}
+
+@Test func savedShortcutsGetShiftJAndShiftKWhenTheyAreNotUsed() throws {
+    var old = Shortcuts.standard
+    old.actions[.moveWindowNextContainer] = nil
+    old.actions[.moveWindowPreviousContainer] = nil
+    old.actions[.toggleFloat] = KeyChord(spec: "shift+k")
+    let read = try JSONDecoder().decode(Shortcuts.self, from: JSONEncoder().encode(old))
+    #expect(read.actions[.moveWindowNextContainer] == KeyChord(spec: "shift+j"))
+    #expect(read.actions[.moveWindowPreviousContainer] == nil)
+    #expect(read.actions[.toggleFloat] == KeyChord(spec: "shift+k"))
+}

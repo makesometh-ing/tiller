@@ -105,6 +105,29 @@ public struct Workspace: Equatable, Sendable {
         if !containers[index].windows.isEmpty { focusedContainerIndex = index }
     }
 
+    /// Moves the focused window to the container `offset` positions away in container order. The first and the last container wrap around.
+    /// Empty containers aren't skipped. The moved window is put after the focused window of the new carousel and becomes its focused window.
+    /// The window after it in the old carousel becomes the focused window of the old carousel, and the focused container doesn't change.
+    /// When the old container is then empty, the new container becomes the focused container.
+    /// Returns the old and the new container index, or nil when the workspace has one container or the focused container is empty.
+    @discardableResult
+    public mutating func moveFocusedWindow(offset: Int) -> (from: Int, to: Int)? {
+        let from = focusedContainerIndex
+        let n = containers.count
+        guard n > 1, let window = focusedWindow else { return nil }
+        let to = ((from + offset) % n + n) % n
+        guard to != from else { return nil }
+        let index = containers[from].focusedIndex
+        containers[from].windows.remove(at: index)
+        let count = containers[from].windows.count
+        containers[from].focusedIndex = count == 0 ? 0 : index % count
+        let target = containers[to].windows.isEmpty ? 0 : containers[to].focusedIndex + 1
+        containers[to].windows.insert(window, at: target)
+        containers[to].focusedIndex = target
+        if count == 0 { focusedContainerIndex = to }
+        return (from, to)
+    }
+
     /// Moves focus to `window`, for example after a click on a window. Returns false if `window` isn't in the workspace.
     @discardableResult
     public mutating func focus(window: WindowID) -> Bool {

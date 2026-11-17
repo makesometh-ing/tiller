@@ -199,9 +199,23 @@ for (index, key) in steps.enumerated() {
             }
         default: break
         }
+        // A move puts the focused window in front of the carousel of the next or previous container. Focus stays in the old container,
+        // on the window after the moved window, unless the old container is then empty.
+        if report.action.hasPrefix("move-window-"), let moved = tiledFocus, let from = ring(previous)[moved] {
+            let to = ring(report)[moved]
+            if report.action.hasSuffix(":not-moved") {
+                if ring(report) != ring(previous) { problems.append("a window moved to another container") }
+            } else if let to {
+                let left = previous.windows.filter { $0.container == from[0] && $0.id != moved }.map(\.id)
+                if to[0] == from[0] { problems.append("the focused window is still in container \(from[0] + 1)") }
+                if !(report.fronts ?? []).contains(moved) { problems.append("the moved window isn't the focused window of container \(to[0] + 1)") }
+                let expected = left.isEmpty ? moved : left[from[1] % left.count]
+                if report.expectedFocused != expected { problems.append("focus is on \(report.expectedFocused.map(String.init) ?? "none"), expected \(expected)") }
+            } else { problems.append("the moved window isn't in a carousel") }
+        }
     }
-    // After a window is closed or minimized, the focused window of each carousel is in front of the other windows of that carousel.
-    if key.hasPrefix("close:") || key.hasPrefix("window:close:") || key.hasPrefix("window:minimize:") {
+    // After a window is closed, minimized or moved, the focused window of each carousel is in front of the other windows of that carousel.
+    if key.hasPrefix("close:") || key.hasPrefix("window:close:") || key.hasPrefix("window:minimize:") || report.action.hasPrefix("move-window-") {
         let order = frontToBack()
         func title(_ id: WindowID?) -> String {
             guard let id else { return "none" }
@@ -253,8 +267,8 @@ for (index, key) in steps.enumerated() {
     wait(0.8)
     let shot = String(format: "%02d-%@-%@", index + 1, key, report.action.replacingOccurrences(of: ":", with: "-")).replacingOccurrences(of: "/", with: "_")
     screenshot(shot)
-    // A `settings` step reports the window number of the settings window. The window is also captured alone.
-    if key.hasPrefix("settings"), let number = report.action.split(separator: " ").first(where: { $0.hasPrefix("window=") })?.dropFirst("window=".count) {
+    // A `settings` step and a `scroll:` step report the window number of the settings window. The window is also captured alone.
+    if key.hasPrefix("settings") || key.hasPrefix("scroll:"), let number = report.action.split(separator: " ").first(where: { $0.hasPrefix("window=") })?.dropFirst("window=".count) {
         run("/usr/sbin/screencapture", ["-x", "-o", "-l", String(number), out.appending(path: "screenshots/\(String(format: "%02d", index + 1))-settings-window.png").path])
     }
     // The "Export Diagnostics…" button writes the zip to the Desktop. The zip is moved into the proof bundle.
@@ -309,7 +323,7 @@ if !clickedKeyLines.isEmpty {
     summary += "Chords after a click that must reach the clicked window: \(clickedKeysReached ? "all reached (PASS)" : "FAIL") (\(clickedKeyLines.map { "`\($0)`" }.joined(separator: ", ")))\n"
 }
 if !zOrderLines.isEmpty {
-    summary += "\n## Window order after each close and minimize step\n\n" + zOrderLines.map { "- \($0)\n" }.joined()
+    summary += "\n## Window order after each close, minimize and move step\n\n" + zOrderLines.map { "- \($0)\n" }.joined()
     try! zOrderLines.joined(separator: "\n").appending("\n").write(to: out.appending(path: "zorder.log"), atomically: true, encoding: .utf8)
 }
 try! summary.write(to: out.appending(path: "summary.md"), atomically: true, encoding: .utf8)

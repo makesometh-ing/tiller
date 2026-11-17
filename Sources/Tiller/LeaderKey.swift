@@ -5,6 +5,8 @@ enum Action: Equatable {
     case layout(LayoutKind)
     case focusWindow(Int)
     case focusContainer(Int)
+    /// Moves the focused window to the container `offset` positions away. Focus stays in the old container.
+    case moveWindow(Int)
     /// Floats the focused tiled window, or tiles the focused window that was floated with this action.
     case toggleFloat
     /// Raises the floating windows of the focused app. The front floating window gets focus.

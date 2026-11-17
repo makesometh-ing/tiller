@@ -486,6 +486,11 @@ final class SettingsWindowController {
     var isOpen: Bool { window?.isVisible == true }
     /// The window server number of the settings window. The proof runner takes a screenshot of this window.
     var windowNumber: Int { window?.windowNumber ?? 0 }
+    /// The center of the settings window in Accessibility coordinates, or nil when the window isn't open.
+    var center: CGPoint? {
+        guard let w = window, w.isVisible, let primary = NSScreen.screens.first else { return nil }
+        return CGPoint(x: w.frame.midX, y: primary.frame.maxY - w.frame.midY)
+    }
 
     func show(page: SettingsPage = .general) {
         model.page = page

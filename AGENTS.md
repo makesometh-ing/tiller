@@ -37,10 +37,11 @@ Tiller is a tiling window manager for macOS. It is a menu bar app.
 
 - In leader key mode, each container has a teal edge without a fill, and a solid chip on its top edge, over the border. The chip of the focused container is teal. The other chips are grey. The chip shows the container number, the carousel mode icon (⇆ or ⇅), the window count and the `v` key. A tooltip on the `v` key shows what the key does.
 - `v` in leader key mode switches the carousel mode of the focused container between horizontal and vertical.
+- `⇧J` and `⇧K` in leader key mode move the focused window to the next or previous container. The moved window becomes the focused window of its new carousel. Focus stays in the old container, on the next window of its carousel. Their "Exit after" checkbox is off by default.
 - In leader key mode, each window has a small translucent pill at its bottom-right corner: app icon, app name, Tiled or Floating, and the `p` and `f` keys. The pill of a window behind the focused window in a carousel shows only the app icon. The app icon is shown in the visible edge of the window.
 
 - The settings window is variant 1 in `docs/mockups/settings.html`: a sidebar with colored icons, as in the CleanShot settings, and shortcut fields with a clear button, as in Rectangle Pro. The references are in `docs/references/`.
-- The leader key, the shortcut to turn Tiller on and off, every key in leader key mode and the global shortcut of each action can be recorded in the settings. A segmented control on the Shortcuts page switches between "Leader key mode" and "Global" (variant 3 in `docs/mockups/settings-v2.html`). Each action in leader key mode has an "Exit after" checkbox (variant 1 in `docs/mockups/exit-leader-key-mode.html`). Each chord can use Hyper (⌃⌥⇧⌘ together). A key without modifiers in leader key mode also matches while modifiers are still held.
+- The leader key, the shortcut to turn Tiller on and off, every key in leader key mode and the global shortcut of each action can be recorded in the settings. A segmented control on the Shortcuts page switches between "Leader key mode" and "Global" (variant 3 in `docs/mockups/settings-v2.html`). Each action in leader key mode has an "Exit after" checkbox (variant 1 in `docs/mockups/exit-leader-key-mode.html`). Each chord can use Hyper (⌃⌥⇧⌘ together). A key without modifiers in leader key mode also matches while modifiers are still held. A chord with modifiers, for example `⇧J`, is matched first, so `⇧J` doesn't run `J`.
 
 ## Window behavior
 

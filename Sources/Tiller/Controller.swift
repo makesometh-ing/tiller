@@ -408,6 +408,8 @@ final class Controller {
         var storedFocused: WindowID?
         var startFocused: WindowID?
         var startIndex = 0
+        /// For `action.done` after a move: the moved window and the old and the new container, 1-based.
+        var moveFields: [String: LogValue] = [:]
         switch action {
         case .layout(let kind):
             ws = Workspace(displayID: screen.uuid, desktop: screen.desktop)
@@ -428,6 +430,20 @@ final class Controller {
             startIndex = ws.containers[ws.focusedContainerIndex].focusedIndex
             before = storedFrames
             if case .focusWindow = action { ws.focusWindow(offset: offset) } else { ws.focusContainer(offset: offset) }
+            expectedFocused = ws.focusedWindow
+        case .moveWindow(let offset):
+            guard let existing = workspaces[screen.uuid] else { return }
+            ws = existing
+            if let focused { ws.focus(window: focused) }
+            before = storedFrames
+            let window = ws.focusedWindow
+            if let move = ws.moveFocusedWindow(offset: offset), let window {
+                moveFields = ["windowId": .int(Int(window)), "fromContainer": .int(move.from + 1), "toContainer": .int(move.to + 1)]
+                note = "\(move.from + 1)-to-\(move.to + 1)"
+            } else {
+                // The workspace has one container, or the focused container is empty.
+                note = "not-moved"
+            }
             expectedFocused = ws.focusedWindow
         case .toggleFloat:
             guard let existing = workspaces[screen.uuid], let focused, let ref = refs[focused] else { return }
@@ -492,7 +508,7 @@ final class Controller {
         let name = Self.name(action) + (note.isEmpty ? "" : ":\(note)")
         Self.logAction(["action": .string(name), "screen": .string(screen.uuid), "layout": .string(ws.layout.rawValue), "moved": .int(changed.count),
                         "windowListMs": windowListMs, "focusReadMs": focusReadMs, "setFramesMs": setFramesMs, "focusMs": focusMs,
-                        "totalMs": .ms(latencyMs)], totalMs: latencyMs)
+                        "totalMs": .ms(latencyMs)].merging(moveFields) { $1 }, totalMs: latencyMs)
         checkFrames(changed, refs: refs)
         switch action {
         case .focusWindow, .focusContainer:
@@ -600,6 +616,7 @@ final class Controller {
         case .layout(let kind): "layout:\(kind.rawValue)"
         case .focusWindow(let offset): offset > 0 ? "focus-next-window" : "focus-previous-window"
         case .focusContainer(let offset): offset > 0 ? "focus-next-container" : "focus-previous-container"
+        case .moveWindow(let offset): offset > 0 ? "move-window-next-container" : "move-window-previous-container"
         case .toggleFloat: "toggle-float"
         case .toggleAxis: "toggle-axis"
         case .raiseFloating: "raise-floating"

@@ -199,6 +199,8 @@ extension ActionID {
         case .focusPreviousWindow: .focusWindow(-1)
         case .focusNextWindow: .focusWindow(1)
         case .toggleFloat: .toggleFloat
+        case .moveWindowPreviousContainer: .moveWindow(-1)
+        case .moveWindowNextContainer: .moveWindow(1)
         case .raiseFloating: .raiseFloating
         case .turnOff: .turnOff
         }
@@ -216,6 +218,8 @@ extension ActionID {
         case .focusPreviousWindow: "Focus previous window"
         case .focusNextWindow: "Focus next window"
         case .toggleFloat: "Float or tile"
+        case .moveWindowPreviousContainer: "Move to previous container"
+        case .moveWindowNextContainer: "Move to next container"
         case .raiseFloating: "Raise floating windows"
         case .turnOff: "Turn Tiller off"
         }

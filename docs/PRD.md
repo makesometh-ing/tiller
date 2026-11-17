@@ -74,17 +74,23 @@ After v1: Left Busy, Right Busy, Horizontal Split, named custom layouts, and a c
 | Container | `V` | Switch the carousel mode |
 | Window | `H`, `L` | Focus the previous or next window in the carousel |
 | Window | `F` | Float a tiled window, or tile it again |
+| Window | `⇧K`, `⇧J` | Move the focused window to the previous or next container |
 | App | `R` | Raise the floating windows of the focused app |
 | Tiller | `Q` | Turn Tiller off |
 | | `?` | Open or close the key list |
 | | `Esc` | End leader key mode |
 
-- Each action has an "Exit after" setting on the Shortcuts page. When it is off, leader key mode continues after the action. The overlay is then updated after the action. Off by default for `H`, `L`, `J` and `K`. On by default for the other actions. `Q` always ends leader key mode.
+- Each action has an "Exit after" setting on the Shortcuts page. When it is off, leader key mode continues after the action. The overlay is then updated after the action. Off by default for `H`, `L`, `J`, `K`, `⇧J` and `⇧K`. On by default for the other actions. `Q` always ends leader key mode.
+- `⇧J` and `⇧K` move the focused window to the next or previous container. The moved window is put after the focused window of the new carousel and becomes the focused window of that carousel. Focus stays in the old container, on the next window of its carousel. When the moved window was the last window in the ring order, the first window is the next window.
+- A move into an empty container works. Empty containers aren't skipped. `J` and `K` skip them.
+- When the old container is empty after the move, the new container becomes the focused container, and the moved window keeps focus. An empty container can't be the focused container.
+- `⇧J` from the last container moves the window to container 1. `⇧K` from container 1 moves the window to the last container. `J` and `K` wrap around in the same way.
+- In the Full Screen layout, the workspace has one container. `⇧J` and `⇧K` don't move a window. They write `action.done` with `not-moved`.
+- A chord with modifiers is matched before a key without modifiers. `⇧J` doesn't run `J`, and `J` doesn't run `⇧J`. With Hyper still held after Hyper L, `J` runs `J`.
 
 Planned for v1:
 
 - `P`: peek. See section 7 "Windows".
-- `⇧J` and `⇧K` move the focused window to the next or previous container. The moved window becomes the focused window of its new carousel. Focus stays in the old container, on the next window of its carousel. Their "Exit after" setting is off by default.
 - Leader key mode ends 10 seconds after the last key press. It doesn't end while the key list is open.
 - Leader key mode ends on an app switch and a screen lock.
 - When the event tap doesn't start, the menu bar menu shows the failure. Tiller starts the event tap again every second until it starts.
@@ -268,6 +274,7 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
   - `focusMs`: the focus call.
   - `totalMs`: from the key press in the event tap to the end of the action.
 - The action `focus-change` is the arrangement after a click or another focus change by the user. It also has the trigger (`click` or `other`), the container and the time from the click to the notification. Its `totalMs` is from the click. The action `rearrange` is the arrangement after Tiller is turned on. The action `window-change` is the arrangement after a window opens, closes, is minimized or shown again, or after an app is hidden or shown. It also has the trigger (the first notification name, for example `AXWindowCreated`, `AXUIElementDestroyed`, `AXWindowMiniaturized`, `appHidden`, `appShown` or `focusChanged`), the number of windows opened, restored and removed, `raised` (the number of new focused windows of other carousels raised without focus), `focused` (the window id that got focus from Tiller, or null), `windowListMs`, `setFramesMs` and `focusMs`. Its `totalMs` is from the first notification.
+- The actions `move-window-next-container` and `move-window-previous-container` also have `windowId` (the moved window), `fromContainer` and `toContainer` (1-based). The action name ends with the containers, for example `move-window-next-container:1-to-2`, or with `not-moved`.
 - `action.slow` (`error`): the same fields as `action.done`. It is written in addition to `action.done` when `totalMs` is more than 100 ms.
 - `action.focus`: written 150 ms after each focus action, from another queue: the ring order (bundle id and window id), the window titles in ring order (`titles`, only with "Include window titles in logs" on), the focused window stored in the workspace, the system focused window before the action, the ring index before and after, the window that got focus, the AXError values of `AXMain`, `AXRaise` and `AXFrontmost`, the result of `activate()`, and the system focused window and frontmost app after the action.
 
@@ -334,6 +341,8 @@ The two switches are saved in the Tiller defaults (the proof defaults domain in 
 |---|---|
 | Layout, test windows | 25 to 50 ms |
 | Focus step, test windows | 19 to 35 ms |
+| Window moved to another container (`⇧J`, `⇧K`), test windows | 20 to 38 ms |
+| Overlay updated after a move in leader key mode | 37 to 58 ms |
 | Layout, with WeChat windows | 77 to 141 ms |
 | Key bar shown | 0.5 to 1.4 ms |
 | Containers and pills shown | 18 to 30 ms |
@@ -358,7 +367,8 @@ Planned for v1:
 - A `click:` proof step posts a mouse down and a mouse up at the visible point of a window nearest to its center. `click:next` and `click:previous` click the windows after and before the focused window in the focused carousel. `click:container<n>` clicks the focused window of container n. `click:floating` clicks the front floating window.
 - A `window:` step sends a command to the test windows app: `window:open` opens a tiled window with the next number, `window:open-floating` opens a fixed-size window, and `window:close:<title>`, `window:minimize:<title>` and `window:unminimize:<title>` close, minimize and unminimize a window. `app:hide:<bundle id>` hides an app with `NSRunningApplication.hide()`, which sends the same notification as ⌘H. `app:show:<bundle id>` shows the app again and activates it. The proof runner checks the ring position of each window after these steps.
 - `close:focused` clicks the close button of the system focused window. After `close:focused`, `window:close:` and `window:minimize:` steps, the proof runner checks that the focused window of each carousel is in front of the other windows of that carousel in the window server order. It writes the system focused window, the frontmost app, the focused window of each container and the window server order to `zorder.log` and to the summary.
-- A `settings:<page>` step opens the settings window on that page. The proof runner then also captures the settings window alone, as `screenshots/<step>-settings-window.png`.
+- A `settings:<page>` step opens the settings window on that page. The proof runner then also captures the settings window alone, as `screenshots/<step>-settings-window.png`. A `scroll:<points>` step posts a scroll wheel event over the center of the settings window. A positive value scrolls down. The proof runner then also captures the settings window alone.
+- After a `⇧J` or `⇧K` step (for example `shift+j`), the proof runner checks that the window that had focus is the focused window of the other container, that focus is on the next window of the old carousel, and that the focused window of each carousel is in front of the other windows of that carousel. It writes the window server order to `zorder.log`. After a `not-moved` step, it checks that each window is in the same container.
 - `toggle:debugLogging` and `toggle:logTitles` make the same change as a click on the "Debug logging" switch and the "Include window titles in logs" switch. `expire:debugLogging` turns debug logging on for 1 second. The timer then turns it off.
 - `press:<title>` presses the button with that title in a Tiller window, with the Accessibility press action. The button action sends the report. `press:Export Diagnostics…` writes the zip to the Desktop. The proof runner moves the zip into the proof bundle.
 - `Tiller --dump-windows <path>` writes the attributes and the kind of every window.

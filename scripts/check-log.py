@@ -74,8 +74,11 @@ def problems(line):
         found.append(f"cat {e['cat']!r}, expected {category!r}")
     missing = required - set(e["fields"])
     if e["event"] == "action.done" and e["fields"].get("action", "").split(":")[0] in {"layout", "focus-next-window", "focus-previous-window",
-                                                                                       "focus-next-container", "focus-previous-container", "toggle-axis", "toggle-float"}:
+                                                                                       "focus-next-container", "focus-previous-container", "toggle-axis", "toggle-float",
+                                                                                       "move-window-next-container", "move-window-previous-container"}:
         missing |= ACTION_TIMINGS - set(e["fields"])
+    if e["event"] == "action.done" and e["fields"].get("action", "").startswith("move-window-") and not e["fields"]["action"].endswith(":not-moved"):
+        missing |= {"windowId", "fromContainer", "toContainer"} - set(e["fields"])
     if missing:
         found.append(f"fields missing: {sorted(missing)}")
     state = SESSIONS.setdefault(e["session"], {"logTitles": False, "debugLogging": False})

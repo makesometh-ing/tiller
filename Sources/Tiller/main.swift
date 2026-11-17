@@ -320,6 +320,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
                     self.controller.reportCurrentState(action: "settings:\(self.settings.model.page.rawValue) window=\(self.settings.windowNumber)")
                 }
+            case _ where key.hasPrefix("scroll:"):
+                // A scroll wheel event over the center of the settings window, as a scroll with the mouse. A positive value scrolls down, in points.
+                if let points = Int32(key.dropFirst("scroll:".count)), let center = self.settings.center {
+                    CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: center, mouseButton: .left)?.post(tap: .cghidEventTap)
+                    let scroll = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 1, wheel1: -points, wheel2: 0, wheel3: 0)
+                    scroll?.location = center
+                    scroll?.post(tap: .cghidEventTap)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    self.controller.reportCurrentState(action: "\(key) window=\(self.settings.windowNumber)")
+                }
             case "toggle:debugLogging":
                 // The same change as a click on the "Debug logging" switch.
                 self.store.setDebugLogging(!self.store.debugLogging)
