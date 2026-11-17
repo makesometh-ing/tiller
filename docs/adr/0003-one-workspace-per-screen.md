@@ -9,4 +9,4 @@ Each screen has exactly one workspace with its own container layout. The workspa
 
 ## Consequences
 
-- A command to copy a container layout to another screen is planned. It copies the layout. The two workspaces stay separate.
+- A command to copy a container layout to another screen is planned. The two workspaces stay separate.

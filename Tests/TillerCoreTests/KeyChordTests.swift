@@ -62,3 +62,31 @@ import Testing
     let data = try JSONEncoder().encode(s)
     #expect(try JSONDecoder().decode(Shortcuts.self, from: data) == s)
 }
+
+@Test func savedShortcutsGetTheStandardChordOfANewAction() throws {
+    var old = Shortcuts.standard
+    old.actions[.turnOff] = nil
+    var saved = try JSONSerialization.jsonObject(with: JSONEncoder().encode(old)) as! [String: Any]
+    saved["cleared"] = nil  // Shortcuts saved before `cleared` existed.
+    let read = try JSONDecoder().decode(Shortcuts.self, from: JSONSerialization.data(withJSONObject: saved))
+    #expect(read.actions[.turnOff] == KeyChord(spec: "q"))
+}
+
+@Test func clearedActionStaysClearedAfterJSON() throws {
+    var s = Shortcuts.standard
+    s.set(nil, for: .turnOff)
+    s.set(KeyChord(spec: "r"), for: .toggleFloat)  // `r` is taken from raiseFloating.
+    let read = try JSONDecoder().decode(Shortcuts.self, from: JSONEncoder().encode(s))
+    #expect(read.actions[.turnOff] == nil)
+    #expect(read.actions[.raiseFloating] == nil)
+    #expect(read == s)
+}
+
+@Test func newActionDoesNotTakeAChordInUse() throws {
+    var old = Shortcuts.standard
+    old.actions[.turnOff] = nil
+    old.actions[.toggleFloat] = KeyChord(spec: "q")
+    let read = try JSONDecoder().decode(Shortcuts.self, from: JSONEncoder().encode(old))
+    #expect(read.actions[.turnOff] == nil)
+    #expect(read.actions[.toggleFloat] == KeyChord(spec: "q"))
+}

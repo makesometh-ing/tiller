@@ -170,6 +170,7 @@ enum KeyGuide {
         Section(title: "WINDOW", entries: [Entry(actions: [.focusPreviousWindow, .focusNextWindow], label: "Focus", detail: "Previous or next window in the carousel"),
                                            Entry(actions: [.toggleFloat], label: "Float", detail: "Float a tiled window, or tile it again")]),
         Section(title: "APP", entries: [Entry(actions: [.raiseFloating], label: "Raise", detail: "Raise the floating windows of the focused app")]),
+        Section(title: "TILLER", entries: [Entry(actions: [.turnOff], label: "Off", detail: "Turn Tiller off. \(LeaderKey.toggleChord.labels.joined(separator: " ")) turns it on again")]),
     ]
 
     /// The key cap labels of an entry. An action without a key isn't shown.

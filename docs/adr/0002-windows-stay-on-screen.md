@@ -1,6 +1,6 @@
 # Windows aren't moved off-screen
 
-Tiller doesn't hide windows by moving them outside the screen. A window that isn't in front of its carousel stays in the container, behind the focused window. The owner rejected off-screen windows because "it causes jank".
+Tiller doesn't hide windows by moving them outside the screen. A window behind the focused window of a carousel stays in its container. The owner rejected off-screen windows with the reason "it causes jank".
 
 ## Considered options
 

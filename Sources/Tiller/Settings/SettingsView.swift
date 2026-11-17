@@ -12,7 +12,7 @@ enum RecordTarget: Equatable {
 final class SettingsModel: ObservableObject {
     let store: ShortcutStore
     let leaderKey: LeaderKey
-    @Published var page: SettingsPage = .shortcuts
+    @Published var page: SettingsPage = .general
     @Published private(set) var recording: RecordTarget?
 
     init(store: ShortcutStore, leaderKey: LeaderKey) {
@@ -52,10 +52,16 @@ final class SettingsModel: ObservableObject {
 }
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case shortcuts, about
+    case general, shortcuts, about
     var id: String { rawValue }
-    var title: String { self == .shortcuts ? "Shortcuts" : "About" }
-    var symbol: String { self == .shortcuts ? "command" : "info" }
+    var title: String { rawValue.capitalized }
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .shortcuts: "command"
+        case .about: "info"
+        }
+    }
     var color: Color { self == .shortcuts ? Color(white: 0.45) : Color(white: 0.55) }
 }
 
@@ -72,6 +78,7 @@ struct SettingsView: View {
                 ScrollView {
                     Group {
                         switch model.page {
+                        case .general: GeneralPage(store: model.store)
                         case .shortcuts: ShortcutsPage(model: model, store: model.store)
                         case .about: AboutPage()
                         }
@@ -86,6 +93,7 @@ struct SettingsView: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 2) {
+            navItem(.general)
             navItem(.shortcuts)
             Spacer()
             navItem(.about)
@@ -175,13 +183,79 @@ struct ShortcutField: View {
     }
 }
 
+struct SettingsHeader: View {
+    let text: String
+    var body: some View {
+        Text(text).font(.system(size: 12, weight: .bold)).padding(.top, 10).padding(.leading, 2)
+    }
+}
+
+/// The first row of the menu bar menu: the shortcut that turns Tiller off and on, and a switch.
+struct MenuSwitchRow: View {
+    @ObservedObject var store: ShortcutStore
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("Tiller").fontWeight(.semibold)
+            Spacer(minLength: 24)
+            Text(LeaderKey.toggleChord.labels.joined(separator: " ")).foregroundStyle(Theme.current.secondaryText)
+            // A `Toggle` in a menu is drawn grey, because the app isn't active. This switch keeps the accent color.
+            Button { store.enabled.toggle() } label: {
+                Capsule().fill(store.enabled ? Theme.current.accent : Color.primary.opacity(0.18)).frame(width: 30, height: 17)
+                    .overlay(alignment: store.enabled ? .trailing : .leading) { Circle().fill(.white).padding(2).shadow(radius: 0.5) }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Enable Tiller")
+            .accessibilityValue(store.enabled ? "on" : "off")
+        }
+        .padding(.horizontal, 14).frame(height: 24)
+    }
+}
+
+struct EnabledSwitch: View {
+    @ObservedObject var store: ShortcutStore
+    var body: some View {
+        Toggle("Enable Tiller", isOn: $store.enabled).toggleStyle(.switch).labelsHidden().tint(Theme.current.accent)
+    }
+}
+
+struct GeneralPage: View {
+    @ObservedObject var store: ShortcutStore
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            SettingsHeader(text: "App")
+            SettingsGroup {
+                SettingsRow(title: "Enable Tiller", showsDivider: false) { EnabledSwitch(store: store) }
+                Text("When Tiller is off, the leader key goes to the focused app. Windows stay where they are.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.current.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+            }
+            SettingsHeader(text: "Menu bar and Dock")
+            SettingsGroup {
+                SettingsRow(title: "Show Tiller in", showsDivider: false) {
+                    Picker("Show Tiller in", selection: $store.showIn) {
+                        ForEach(ShowIn.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().fixedSize().tint(Theme.current.accent)
+                }
+                Text("With \"Dock\", click the Tiller icon in the Dock to open the settings.")
+                    .font(.system(size: 11)).foregroundStyle(Theme.current.secondaryText)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.bottom, 8)
+            }
+        }
+    }
+}
+
 struct ShortcutsPage: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var store: ShortcutStore
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            header("Leader key")
+            SettingsHeader(text: "Leader key")
             SettingsGroup {
                 SettingsRow(title: "Leader key", showsDivider: false) {
                     ShortcutField(model: model, target: .leader, chord: store.shortcuts.leader, accessibilityName: "Leader key")
@@ -196,7 +270,7 @@ struct ShortcutsPage: View {
                 }
             }
             ForEach(KeyGuide.sections, id: \.title) { section in
-                header(section.title.capitalized)
+                SettingsHeader(text: section.title.capitalized)
                 SettingsGroup {
                     let ids = section.entries.flatMap(\.actions)
                     ForEach(Array(ids.enumerated()), id: \.element) { index, id in
@@ -207,10 +281,6 @@ struct ShortcutsPage: View {
                 }
             }
         }
-    }
-
-    private func header(_ text: String) -> some View {
-        Text(text).font(.system(size: 12, weight: .bold)).padding(.top, 10).padding(.leading, 2)
     }
 }
 
@@ -232,7 +302,9 @@ final class SettingsWindowController {
 
     init(model: SettingsModel) { self.model = model }
 
-    func show(page: SettingsPage = .shortcuts) {
+    var isOpen: Bool { window?.isVisible == true }
+
+    func show(page: SettingsPage = .general) {
         model.page = page
         let window = self.window ?? {
             let w = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 600),
@@ -246,7 +318,8 @@ final class SettingsWindowController {
             return w
         }()
         self.window = window
-        NSApp.activate()
+        // `activate()` is refused after a change of the activation policy to `.accessory`. `activate(ignoringOtherApps:)` isn't refused.
+        NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         // macOS can refuse the activation when it wasn't caused by a click, for example from the proof runner.
         // The window is then still shown in front.

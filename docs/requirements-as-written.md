@@ -1,6 +1,6 @@
 # Tiller requirements, as written by the owner
 
-This file contains the requirements word for word, in the order they were given. Typos are kept. A note after a quote says where a later message changed it. The current decisions are in [PRD.md](PRD.md).
+This file contains the requirements word for word, in the order of the messages. Typos are kept. A note after a quote says where a later message changed it. The current decisions are in [PRD.md](PRD.md).
 
 ## 1. Requirements drawing (`docs/diagrams_drawing_tiller.tldraw`, page "rough designs")
 
@@ -153,7 +153,7 @@ This file contains the requirements word for word, in the order they were given.
 >
 > carousel spacing: the space left in the container by the focused window to reveal the unfocused window(s) after and before it in the carousel.
 
-Note: "the workspace … is a singleton" was changed in message 5 below: the workspace is a singleton per screen.
+Note: "the workspace … is a singleton" was changed in section 5, "Workspaces, screens and slice 1 scope": the workspace is a singleton per screen.
 
 The summary image is [references/requirements-infographic.png](references/requirements-infographic.png).
 
@@ -262,7 +262,7 @@ Comment on "tldraw windows on other Spaces.":
 
 > they're not on any space... or other spaces... I only have one space... that's weird... I think I was experimenting with glide, it moved them into weird places. I've moved them all back
 
-Answer to the floating focus options:
+Answer to the floating focus options (option 1: focus stays on the tiled window, and a key raises the floating windows):
 
 > Option one is probably the best for the moment.
 
@@ -344,7 +344,7 @@ Comment on "Should f and r also be removed from the key bar?":
 >
 > "Hype" shouldn't be the shortcut text, it should show all the keys that are assigned
 
-## 12. This audit
+## 12. Project audit
 
 > Our list of features keeps growing, our list of bugs keeps growing, and our context is getting full. Time to do a multiple sweep audit of the entire project and session so far, and record using one markdown file per feature/issue implemented, and then an index file that links them all and marks them done or not done (so we record all the words we've done so far), and then a PRD that records all the decisions and behaviours as they currently stand. use sugagents if necessary and then I'll compact the context. Please do not paraphrase or rephrase my initial requirements (unless they've bee changed) so that I can capture everything I initially asked for. All the documents should go through my writing rules/prose style checks so they don't sound like dickheads wrote them.
 
@@ -402,7 +402,13 @@ Comment on "The other tiled windows on that screen go into the containers in tur
 > sorry, this doesn't make sense? what? other tiled windows? none have been tiled yet...
 > even if they have, what if there is only one container?
 
-Comment on the recommended behaviour for minimized windows and the windows of hidden apps (removed from the carousel, the container and the ring position are recorded, the window goes back to the same place when it comes back):
+The recommended behaviour for minimized windows and the windows of hidden apps:
+
+- The window is removed from the carousel.
+- Its container and its ring position are recorded.
+- When the window comes back, it is put back in the same place.
+
+Comment on this behaviour:
 
 > yes
 
@@ -410,7 +416,7 @@ Comment on "macOS native tabs, for example in Finder and Terminal, are a separat
 
 > not true see screenshot, same window, all tabs, because I set the setting to use native tabs
 
-Comment on "I recommend "Keep". With the `⇧J` and `⇧K` keys, you make each window move yourself." ("Keep": when a layout key adds containers, all windows stay in container 1, and the new containers are empty until a window is moved into them):
+Comment on "I recommend "Keep". With the `⇧J` and `⇧K` keys, you make each window move yourself." ("Keep": when a layout key adds containers, all windows stay in container 1. The new containers are empty until a window is moved into them.):
 
 > fine with me
 
@@ -428,7 +434,7 @@ On the three menu bar menu designs in [mockups/menu-bar-menu.html](mockups/menu-
 
 > can we combo 2 and 3? also, that default needs to be leader -> Q OR global shortcut -> shift command + T (I hope that doesn't conflict) otherwise, something else with T.
 
-On the three combined menu designs in [mockups/menu-bar-menu-v2.html](mockups/menu-bar-menu-v2.html) (variant A: the global shortcut `⌃⌥⇧⌘ T` before the switch):
+On the three combined menu designs in [mockups/menu-bar-menu-v2.html](mockups/menu-bar-menu-v2.html) (variant A: the global shortcut `⌃⌥⇧⌘ T` before the switch. Variant B: the shortcuts under the name. Variant C: a help row under the switch):
 
 > variant A. the leader shortcut can show in the leader key panel.
 

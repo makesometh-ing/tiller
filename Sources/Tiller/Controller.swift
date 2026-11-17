@@ -101,6 +101,20 @@ final class Controller {
         }
     }
 
+    /// Moves each window of each workspace to its frame in its container. Call on the main thread.
+    func rearrange() {
+        queue.async {
+            let refs = Dictionary(self.ax.windows().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+            for (uuid, var ws) in self.workspaces {
+                Self.removeClosed(&ws, refs: refs)
+                self.workspaces[uuid] = ws
+                let changed = ws.windowFrames().filter { refs[$0.key]?.frame != $0.value }
+                self.ax.setFrames(changed, refs: refs)
+                Log.write("rearrange screen=\(uuid) moved=\(changed.count)")
+            }
+        }
+    }
+
     private static func screen(of window: WindowID?, refs: [WindowID: WindowRef], screens: [ScreenInfo]) -> ScreenInfo? {
         guard let window, let frame = refs[window]?.frame else { return nil }
         return screens.first { $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) }
@@ -169,6 +183,8 @@ final class Controller {
             ws.toggleAxis()
             expectedFocused = ws.focusedWindow
             note = ws.containers[ws.focusedContainerIndex].axis.rawValue
+        case .turnOff:
+            return
         case .raiseFloating:
             ws = workspaces[screen.uuid] ?? Workspace(displayID: screen.uuid, desktop: screen.desktop)
             before = ws.windowFrames()
@@ -232,6 +248,7 @@ final class Controller {
         case .toggleFloat: "toggle-float"
         case .toggleAxis: "toggle-axis"
         case .raiseFloating: "raise-floating"
+        case .turnOff: "turn-off"
         }
     }
 }

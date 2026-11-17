@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 0 0 10px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .mock { margin: 0 0 30px; }
+  .label { font: 600 14px/1.3 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; margin: 0 0 4px; }
+  .note { font: 13px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; color: var(--muted-foreground, #999); margin: 0 0 10px; }
+  .tag { font: 600 11px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; color: var(--muted-foreground, #999); margin: 8px 0 6px; }
+
+  .dark { --wall: linear-gradient(160deg, #4a3bb8, #23194f); --win: #232228; --side: #1d1c22; --group: #2c2b32; --line: rgba(255,255,255,.07);
+    --text: #f2f2f5; --muted: rgba(255,255,255,.55); --field: #3a3940; --sel: rgba(255,255,255,.08); --accent: #3fd6c4; --on-accent: #06302b;
+    --accent-soft: rgba(63,214,196,.14); --btn: #3a3940; --ok: #30d158; --ok-soft: rgba(48,209,88,.16); --ok-text: #5fe07f;
+    --warn: #ff9f0a; --warn-soft: rgba(255,159,10,.16); --warn-text: #ffb340; --cap: rgba(255,255,255,.78); --dim: rgba(255,255,255,.14); }
+  .light { --wall: linear-gradient(160deg, #e9e4ff, #cfc6f2); --win: #f6f6f8; --side: #ececf0; --group: #ffffff; --line: rgba(0,0,0,.08);
+    --text: #1d1d22; --muted: rgba(0,0,0,.55); --field: #e4e4e8; --sel: rgba(0,0,0,.06); --accent: #0f9e8e; --on-accent: #ffffff;
+    --accent-soft: rgba(15,158,142,.1); --btn: #ffffff; --ok: #28a745; --ok-soft: rgba(40,167,69,.12); --ok-text: #1b7f36;
+    --warn: #f08c00; --warn-soft: rgba(240,140,0,.13); --warn-text: #a85c00; --cap: rgba(35,25,80,.75); --dim: rgba(0,0,0,.1); }
+
+  .desk { padding: 18px 24px 26px; border-radius: 12px; background: var(--wall); display: flex; gap: 28px; align-items: flex-start; width: max-content; }
+  .state { display: flex; flex-direction: column; gap: 10px; }
+  .cap { font-size: 11.5px; font-weight: 600; color: var(--cap); }
+  .win { width: 600px; height: 300px; border-radius: 12px; overflow: hidden; background: var(--win); color: var(--text); display: flex;
+    box-shadow: 0 20px 50px rgba(0,0,0,.4); border: 1px solid var(--line); font-size: 12px; position: relative; }
+  .lights { position: absolute; left: 14px; top: 14px; display: flex; gap: 7px; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; } .lights i:nth-child(2) { background: #febc2e; } .lights i:nth-child(3) { background: #28c840; }
+
+  .side { width: 172px; background: var(--side); padding: 44px 8px 10px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); flex: none; }
+  .nav { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 7px; }
+  .nav.on { background: var(--sel); }
+  .nav .dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--warn); }
+  .ico { width: 20px; height: 20px; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; flex: none; }
+  .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+  .title { font-size: 15px; font-weight: 700; padding: 13px 20px 8px; }
+  .content { padding: 4px 20px 20px; overflow: hidden; }
+  .sec { font-size: 12px; font-weight: 700; margin: 12px 2px 6px; }
+  .intro { color: var(--muted); font-size: 11.5px; line-height: 1.45; margin: 0 2px 4px; }
+  .group { background: var(--group); border-radius: 9px; border: 1px solid var(--line); }
+  .row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; min-height: 22px; }
+  .row + .row { border-top: 1px solid var(--line); }
+  .help { color: var(--muted); font-size: 10.5px; line-height: 1.45; padding: 0 10px 9px; margin-top: -2px; }
+  .grow { flex: 1; min-width: 0; }
+  .muted { color: var(--muted); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 10px; border-radius: 6px; background: var(--btn);
+    border: 1px solid var(--line); font-size: 11.5px; font-weight: 500; box-shadow: 0 1px 1px rgba(0,0,0,.12); white-space: nowrap; }
+  .btn.pri { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .badge.ok { background: var(--ok-soft); color: var(--ok-text); }
+  .badge.no { background: var(--warn-soft); color: var(--warn-text); }
+  .sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+  .name b { display: block; font-size: 12.5px; font-weight: 600; }
+  .name span { display: block; font-size: 10.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+
+  /* Variant 2: one card for each permission */
+  .card { background: var(--group); border: 1px solid var(--line); border-radius: 11px; padding: 14px; margin-top: 6px; }
+  .card.no { box-shadow: inset 3px 0 0 var(--warn); }
+  .card .top { display: flex; align-items: center; gap: 12px; }
+  .card .top b { font-size: 14px; }
+  .card p { font-size: 11.5px; color: var(--muted); margin: 10px 0 8px; line-height: 1.45; }
+  .uses { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; }
+  .uses li { display: flex; align-items: center; gap: 7px; }
+  .uses li i { font-style: normal; width: 16px; height: 16px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); display: inline-flex;
+    align-items: center; justify-content: center; font-size: 10px; }
+  .cardfoot { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line); font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  const icon = (bg, glyph) => `<span class="ico" style="background:${bg}">${glyph}</span>`;
+  const handGlyph = `<svg width="12" height="12" viewBox="0 0 12 12"><path d="M3.2 6.4V3.1a.7.7 0 0 1 1.4 0V5.6V1.9a.7.7 0 0 1 1.4 0v3.6V2.3a.7.7 0 0 1 1.4 0v3.4V3.2a.7.7 0 0 1 1.4 0v4.4c0 2-1.3 3.4-3.2 3.4-1.2 0-2-.6-2.6-1.5L1.6 7.4a.7.7 0 0 1 1.1-.8z" fill="#fff"/></svg>`;
+  const nav = [['General', '#8e8e93', '⚙'], ['Shortcuts', '#636366', '⌘'], ['Permissions', '#3478f6', handGlyph]];
+  const sidebar = granted => `<div class="side">${nav.map(([n, c, g]) => `<div class="nav ${n === 'Permissions' ? 'on' : ''}">${icon(c, g)}${n}${n === 'Permissions' && !granted ? '<span class="dot"></span>' : ''}</div>`).join('')}
+      <div style="flex:1"></div><div class="nav">${icon('#8e8e93', 'i')}About</div></div>`;
+  const lights = `<div class="lights"><i></i><i></i><i></i></div>`;
+  // The macOS Accessibility symbol: a person in a blue circle.
+  const axIcon = s => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" style="display:block;flex:none"><circle cx="12" cy="12" r="12" fill="#0a84ff"/>
+      <circle cx="12" cy="6.3" r="1.7" fill="#fff"/><path d="M6.2 9.2 L12 10.3 L17.8 9.2" stroke="#fff" stroke-width="1.7" stroke-linecap="round" fill="none"/>
+      <path d="M12 10.3 V13.6 M12 13.6 L9.6 18.3 M12 13.6 L14.4 18.3" stroke="#fff" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>`;
+  const uses = 'Move and resize the windows of other apps, and read the leader key.';
+  const page = (granted, body) => `<div class="win">${lights}${sidebar(granted)}<div class="main"><div class="title">Permissions</div><div class="content">${body}</div></div></div>`;
+  const open = (pri = false) => `<span class="btn ${pri ? 'pri' : ''}">Open System Settings</span>`;
+
+  // Variant 1: grouped list row with a status badge and a button.
+  const v1 = granted => page(granted, `<p class="intro">Tiller uses these permissions. A change in System Settings is shown here at once.</p>
+      <div class="group"><div class="row">${axIcon(26)}<div class="grow name"><b>Accessibility</b><span>${uses}</span></div>
+        ${granted ? '<span class="badge ok"><span class="sdot" style="background:var(--ok)"></span>Granted</span>'
+          : `<span class="badge no"><span class="sdot" style="background:var(--warn)"></span>Not granted</span>`}</div>
+        ${granted ? '' : `<div class="row"><span class="grow muted" style="font-size:11px">Tiller can't arrange windows without this permission.</span>${open(true)}</div>`}</div>`);
+
+  // Variant 2: one card for each permission, with an icon and a description.
+  const v2 = granted => page(granted, `<div class="card ${granted ? '' : 'no'}"><div class="top">${axIcon(36)}<div class="grow"><b>Accessibility</b></div>
+        ${granted ? '<span class="badge ok">✓ Granted</span>' : '<span class="badge no">Not granted</span>'}</div>
+      <p>Tiller uses this permission to:</p>
+      <ul class="uses"><li><i>◳</i>Move and resize the windows of other apps</li><li><i>⌘</i>Read the leader key in every app</li></ul>
+      <div class="cardfoot">${granted ? '<span class="muted">To remove this permission, use System Settings → Privacy &amp; Security → Accessibility.</span>'
+        : `<span class="grow muted">Turn on Tiller in System Settings.</span>${open(true)}`}</div></div>`);
+
+  // Variant 3: a row with a status dot. "Granted" changes to a button when the permission isn't granted.
+  const v3 = granted => page(granted, `<div class="sec" style="margin-top:4px">Required</div>
+      <div class="group"><div class="row">${axIcon(20)}<span class="grow" style="font-size:12px">Accessibility</span>
+        ${granted ? '<span class="sdot" style="background:var(--ok)"></span><span class="muted">Granted</span>'
+          : `<span class="sdot" style="background:var(--warn)"></span>${open(false)}`}</div>
+        <div class="help">${uses}</div></div>`);
+
+  const caps = [[true, 'Accessibility granted'], [false, 'Accessibility not granted']];
+  const states = make => caps.map(([g, c]) => `<div class="state"><span class="cap">${c}</span>${make(g)}</div>`).join('');
+  const variants = [
+    ['Variant 1: grouped list row with a status badge', 'One row for each permission, with a colored badge on the right. When the permission isn\'t granted, a second row in the same group contains the result and a teal button.', v1],
+    ['Variant 2: one card for each permission', 'A card with a large icon, the uses of the permission as a list, and a footer. A card for a permission that isn\'t granted has an orange edge and a teal button.', v2],
+    ['Variant 3: status dot and text', 'A compact row, as in the macOS System Settings. A green dot and "Granted", or an orange dot and a grey button. The uses are in grey text below the row.', v3],
+  ];
+  document.getElementById('root').innerHTML = variants.map(([t, n, make]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n}</p>
+      <p class="tag">Dark</p><div class="desk dark">${states(make)}</div><p class="tag">Light</p><div class="desk light">${states(make)}</div></div>`).join('');
+</script>
+</body>
+</html>

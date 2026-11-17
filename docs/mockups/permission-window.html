@@ -1,0 +1,184 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { margin: 0; padding: 0 0 10px; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  .mock { margin: 0 0 30px; }
+  .label { font: 600 14px/1.3 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; margin: 0 0 4px; }
+  .note { font: 13px/1.45 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; color: var(--muted-foreground, #999); margin: 0 0 10px; }
+  .tag { font: 600 11px/1 -apple-system, BlinkMacSystemFont, system-ui, sans-serif; color: var(--muted-foreground, #999); margin: 8px 0 6px; }
+
+  .dark { --wall: linear-gradient(160deg, #4a3bb8, #23194f); --win: #232228; --side: #1d1c22; --group: #2c2b32; --line: rgba(255,255,255,.07);
+    --text: #f2f2f5; --muted: rgba(255,255,255,.55); --field: #3a3940; --sel: rgba(255,255,255,.08); --accent: #3fd6c4; --on-accent: #06302b;
+    --accent-soft: rgba(63,214,196,.14); --key: rgba(255,255,255,.12); --key-text: #e2e2e8; --btn: #3a3940; --ok: #30d158; --cap: rgba(255,255,255,.78);
+    --icon-bg: #1e1520; --ic1: #ffb347; --ic2: #f25a6a; --sys-switch: #0a84ff; --dim: rgba(255,255,255,.14); }
+  .light { --wall: linear-gradient(160deg, #e9e4ff, #cfc6f2); --win: #f6f6f8; --side: #ececf0; --group: #ffffff; --line: rgba(0,0,0,.08);
+    --text: #1d1d22; --muted: rgba(0,0,0,.55); --field: #e4e4e8; --sel: rgba(0,0,0,.06); --accent: #0f9e8e; --on-accent: #ffffff;
+    --accent-soft: rgba(15,158,142,.1); --key: rgba(0,0,0,.08); --key-text: #2a2a30; --btn: #ffffff; --ok: #1f9d45; --cap: rgba(35,25,80,.75);
+    --icon-bg: #f4f2fb; --ic1: #8b5cf6; --ic2: #3b82f6; --sys-switch: #0a7aff; --dim: rgba(0,0,0,.1); }
+
+  .desk { padding: 18px 24px 26px; border-radius: 12px; background: var(--wall); display: flex; gap: 28px; align-items: flex-start; width: max-content; }
+  .state { display: flex; flex-direction: column; gap: 10px; }
+  .cap { font-size: 11.5px; font-weight: 600; color: var(--cap); }
+  .win { border-radius: 12px; overflow: hidden; background: var(--win); color: var(--text); box-shadow: 0 20px 50px rgba(0,0,0,.4);
+    border: 1px solid var(--line); font-size: 12px; position: relative; }
+  .lights { position: absolute; left: 14px; top: 14px; display: flex; gap: 7px; z-index: 2; }
+  .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; background: var(--dim); }
+  .lights i:nth-child(1) { background: #ff5f57; }
+
+  .muted { color: var(--muted); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; height: 24px; padding: 0 12px; border-radius: 7px; background: var(--btn);
+    border: 1px solid var(--line); font-size: 12px; font-weight: 500; box-shadow: 0 1px 1px rgba(0,0,0,.12); white-space: nowrap; }
+  .btn.pri { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; }
+  .btn.wide { display: flex; width: 100%; box-sizing: border-box; height: 28px; }
+  .key { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 5px;
+    background: var(--key); color: var(--key-text); font-size: 10.5px; font-weight: 600; vertical-align: middle; margin: 0 1px; }
+  .spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent-soft); border-top-color: var(--accent); border-right-color: var(--accent); flex: none; }
+  .status { display: flex; align-items: center; gap: 7px; font-size: 11.5px; }
+  .okmark { width: 16px; height: 16px; border-radius: 50%; background: var(--ok); color: #fff; font-size: 10px; font-weight: 800; display: inline-flex;
+    align-items: center; justify-content: center; flex: none; }
+  .iconwrap { position: relative; display: inline-block; }
+  .iconwrap .okmark { position: absolute; right: -3px; bottom: -3px; width: 22px; height: 22px; font-size: 13px; border: 2px solid var(--win); }
+
+  /* Variant 1: compact alert */
+  .alert { width: 280px; padding: 22px 20px 18px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .alert h1 { font-size: 13px; font-weight: 700; margin: 12px 0 6px; }
+  .alert p { font-size: 11.5px; line-height: 1.45; margin: 0 0 6px; color: var(--muted); }
+  .alert .status { margin: 6px 0 2px; justify-content: center; }
+  .alert .btns { display: flex; flex-direction: column; gap: 7px; width: 100%; margin-top: 12px; }
+
+  /* Variant 2: onboarding with an illustration */
+  .onb { width: 500px; }
+  .art { height: 176px; background: linear-gradient(180deg, var(--accent-soft), transparent), var(--side); border-bottom: 1px solid var(--line);
+    display: flex; align-items: flex-end; justify-content: center; position: relative; overflow: hidden; }
+  .sys { width: 330px; height: 148px; border-radius: 10px 10px 0 0; background: var(--win); border: 1px solid var(--line); border-bottom: 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,.18); display: flex; overflow: hidden; font-size: 10.5px; }
+  .sys .sb { width: 108px; background: var(--side); border-right: 1px solid var(--line); padding: 26px 6px 6px; display: flex; flex-direction: column; gap: 3px; }
+  .sys .sbi { display: flex; align-items: center; gap: 5px; padding: 3px 5px; border-radius: 5px; color: var(--muted); font-size: 9.5px; white-space: nowrap; }
+  .sys .sbi.on { background: var(--sel); color: var(--text); font-weight: 600; }
+  .sys .sbi b { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex: none; }
+  .sys .pane { flex: 1; padding: 10px 10px 0; }
+  .sys .crumb { font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+  .sys .list { background: var(--group); border: 1px solid var(--line); border-radius: 7px; }
+  .sys .li { display: flex; align-items: center; gap: 6px; padding: 5px 7px; position: relative; }
+  .sys .li + .li { border-top: 1px solid var(--line); }
+  .sys .ph { height: 6px; border-radius: 3px; background: var(--dim); }
+  .sys .li.me { border-radius: 6px; }
+  .sys .li.ring { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-soft); }
+  .sw { width: 24px; height: 14px; border-radius: 7px; background: var(--dim); position: relative; margin-left: auto; flex: none; }
+  .sw i { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #fff; box-shadow: 0 1px 1px rgba(0,0,0,.25); }
+  .sw.on { background: var(--sys-switch); } .sw.on i { left: 12px; }
+  .cursor { position: absolute; right: -4px; top: 9px; width: 14px; height: 18px; }
+  .onb .body { padding: 16px 22px 0; }
+  .onb h1 { font-size: 16px; font-weight: 700; margin: 0 0 4px; }
+  .onb .lead { font-size: 12px; color: var(--muted); margin: 0 0 12px; line-height: 1.45; }
+  .reason { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .reason .ri { width: 26px; height: 26px; border-radius: 7px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center;
+    justify-content: center; font-size: 14px; flex: none; }
+  .reason b { display: block; font-size: 12px; font-weight: 600; }
+  .reason span { font-size: 11px; color: var(--muted); }
+  .foot { display: flex; align-items: center; gap: 8px; padding: 14px 22px 16px; margin-top: 8px; }
+  .foot .grow { flex: 1; }
+  .foot .status { white-space: nowrap; }
+
+  /* Variant 3: step list */
+  .steps { width: 400px; padding: 40px 20px 18px; box-sizing: border-box; }
+  .head { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+  .head h1 { font-size: 14px; font-weight: 700; margin: 0 0 3px; }
+  .head p { font-size: 11.5px; color: var(--muted); margin: 0; line-height: 1.4; }
+  .group { background: var(--group); border-radius: 9px; border: 1px solid var(--line); }
+  .step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-height: 26px; }
+  .step + .step { border-top: 1px solid var(--line); }
+  .step .n { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--dim); color: var(--muted); font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; flex: none; box-sizing: border-box; }
+  .step.cur .n { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .step.done .n { border: 0; background: var(--ok); color: #fff; }
+  .step .t { flex: 1; }
+  .step .t b { display: block; font-size: 12px; font-weight: 600; }
+  .step .t span { font-size: 11px; color: var(--muted); }
+  .step.todo .t b { color: var(--muted); font-weight: 500; }
+  .step.done .t b { color: var(--muted); font-weight: 500; }
+  .step.final.done .t b { color: var(--text); font-weight: 600; }
+  .steps .foot2 { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  let gid = 0;
+  // Tiller app icon: three windows with a T in the gaps. The colors come from the appearance.
+  const appIcon = s => { const id = 'g' + (++gid); return `<svg width="${s}" height="${s}" viewBox="0 0 100 100" style="display:block">
+      <defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--ic1)"/><stop offset="1" style="stop-color:var(--ic2)"/></linearGradient></defs>
+      <rect x="6" y="6" width="88" height="88" rx="21" style="fill:var(--icon-bg)" stroke="rgba(127,127,127,.25)"/>
+      <rect x="21" y="22" width="58" height="19" rx="5" fill="url(#${id})"/><rect x="21" y="45" width="26" height="33" rx="5" fill="url(#${id})"/>
+      <rect x="53" y="45" width="26" height="33" rx="5" fill="url(#${id})"/></svg>`; };
+  const lights = `<div class="lights"><i></i><i></i><i></i></div>`;
+  const keys = `<span class="key">⌃</span><span class="key">⌥</span><span class="key">Space</span>`;
+  const spinner = `<span class="spin"></span>`;
+  const ok = `<span class="okmark">✓</span>`;
+  const why = 'Tiller moves and resizes the windows of other apps. Tiller also reads the leader key in every app.';
+
+  // Variant 1: compact alert.
+  const alertWin = st => {
+    const done = st === 'granted';
+    const icon = done ? `<span class="iconwrap">${appIcon(56)}<span class="okmark">✓</span></span>` : appIcon(56);
+    const title = done ? 'Tiller is ready' : 'Tiller needs the Accessibility permission';
+    const text = done ? `<p>Press ${keys} to start leader key mode.</p>` : `<p>${why}</p>`;
+    const status = st === 'waiting' ? `<div class="status muted">${spinner}Waiting for the permission…</div>` : '';
+    const btns = done ? `<div class="status muted" style="margin-top:12px">This window closes in a moment.</div>`
+      : `<div class="btns"><span class="btn wide ${st === 'launch' ? 'pri' : ''}">Open System Settings</span><span class="btn wide">Quit Tiller</span></div>`;
+    return `<div class="win alert">${icon}<h1>${title}</h1>${text}${status}${btns}</div>`;
+  };
+
+  // Variant 2: onboarding window with an illustration of the System Settings switch.
+  const cursor = `<svg class="cursor" viewBox="0 0 14 18"><path d="M1 1 L1 15 L4.6 11.6 L7 17 L9.4 16 L7 10.6 L12 10.6 Z" fill="#111" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+  const sysArt = st => `<div class="art"><div class="sys"><div class="sb">
+        <div class="sbi"><b style="background:#8e8e93"></b>General</div><div class="sbi"><b style="background:#0a84ff"></b>Appearance</div>
+        <div class="sbi on"><b style="background:#3478f6"></b>Privacy &amp; Security</div><div class="sbi"><b style="background:#636366"></b>Desktop &amp; Dock</div></div>
+      <div class="pane"><div class="crumb">‹ Accessibility</div><div class="list">
+        <div class="li"><b style="width:14px;height:14px;border-radius:4px;background:var(--dim);display:block"></b><span class="ph" style="width:70px"></span><span class="sw"><i></i></span></div>
+        <div class="li me ${st === 'waiting' ? 'ring' : ''}">${appIcon(15)}<span style="font-weight:600">Tiller</span><span class="sw ${st === 'granted' ? 'on' : ''}"><i></i></span>${st === 'waiting' ? cursor : ''}</div>
+        <div class="li"><b style="width:14px;height:14px;border-radius:4px;background:var(--dim);display:block"></b><span class="ph" style="width:54px"></span><span class="sw on"><i></i></span></div>
+      </div></div></div></div>`;
+  const onbWin = st => {
+    const done = st === 'granted';
+    const head = done ? `<h1>Tiller is ready</h1><p class="lead">The Accessibility permission is granted. Press ${keys} to start leader key mode.</p>`
+      : `<h1>Turn on Accessibility for Tiller</h1><p class="lead">Tiller needs the Accessibility permission for two things.</p>`;
+    const reasons = `<div class="reason"><span class="ri">◳</span><div><b>Move and resize windows</b><span>Tiller puts the windows of other apps into containers.</span></div></div>
+      <div class="reason"><span class="ri">⌘</span><div><b>Read the leader key</b><span>The leader key works in every app.</span></div></div>`;
+    const foot = done ? `<div class="foot"><span class="status muted">${ok}This window closes in a moment.</span></div>`
+      : `<div class="foot">${st === 'waiting' ? `<span class="status muted">${spinner}Waiting for the permission…</span>` : ''}<span class="grow"></span>
+          <span class="btn">Quit Tiller</span><span class="btn ${st === 'launch' ? 'pri' : ''}">Open System Settings</span></div>`;
+    return `<div class="win onb">${lights}${sysArt(st)}<div class="body">${head}${done ? '' : reasons}</div>${foot}</div>`;
+  };
+
+  // Variant 3: step list with a live check mark.
+  const stepsWin = st => {
+    const s1 = st === 'launch' ? 'cur' : 'done';
+    const s2 = st === 'granted' ? 'done' : st === 'waiting' ? 'cur' : 'todo';
+    const s3 = st === 'granted' ? 'done' : 'todo';
+    const n = (cls, num) => `<span class="n">${cls === 'done' ? '✓' : num}</span>`;
+    const step2Right = st === 'waiting' ? `<span class="status muted">${spinner}Waiting…</span>` : '';
+    return `<div class="win steps">${lights}<div class="head">${appIcon(44)}<div><h1>Set up Tiller</h1><p>${why}</p></div></div>
+      <div class="group">
+        <div class="step ${s1}">${n(s1, 1)}<div class="t"><b>Open System Settings</b><span>Privacy &amp; Security → Accessibility</span></div>
+          ${st === 'granted' ? '' : `<span class="btn ${st === 'launch' ? 'pri' : ''}">${st === 'launch' ? 'Open' : 'Open again'}</span>`}</div>
+        <div class="step ${s2}">${n(s2, 2)}<div class="t"><b>Turn on Tiller</b><span>Use the switch next to Tiller in the list.</span></div>${step2Right}</div>
+        <div class="step final ${s3}">${n(s3, 3)}<div class="t"><b>Done</b><span>${st === 'granted' ? `Press ${keys} to start leader key mode.` : 'Tiller starts at once. A relaunch isn\'t necessary.'}</span></div></div>
+      </div>
+      <div class="foot2">${st === 'granted' ? '<span class="muted">This window closes in a moment.</span>' : '<span></span><span class="btn">Quit Tiller</span>'}</div></div>`;
+  };
+
+  const caps = { launch: 'At launch', waiting: 'After a click on the button, while Tiller waits for the permission', granted: 'Just after the permission is granted' };
+  const states = make => ['launch', 'waiting', 'granted'].map(s => `<div class="state"><span class="cap">${caps[s]}</span>${make(s)}</div>`).join('');
+  const variants = [
+    ['Variant 1: compact alert', 'A small alert window with the app icon and stacked buttons, as in the macOS alerts. The button changes from teal to grey after the first click.', alertWin],
+    ['Variant 2: onboarding window with an illustration', 'A larger window. The top half shows the Accessibility list of System Settings, with the Tiller switch. The switch in the picture turns on when the permission is granted.', onbWin],
+    ['Variant 3: step list', 'Three numbered steps. Each step gets a green check mark when it is done. Step 2 gets its check mark when macOS grants the permission.', stepsWin],
+  ];
+  document.getElementById('root').innerHTML = variants.map(([t, n, make]) => `<div class="mock"><p class="label">${t}</p><p class="note">${n}</p>
+      <p class="tag">Dark</p><div class="desk dark">${states(make)}</div><p class="tag">Light</p><div class="desk light">${states(make)}</div></div>`).join('');
+</script>
+</body>
+</html>

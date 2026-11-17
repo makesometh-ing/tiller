@@ -93,16 +93,31 @@ public enum ActionID: String, Codable, CaseIterable, Sendable {
     case focusPreviousContainer, focusNextContainer, toggleAxis
     case focusPreviousWindow, focusNextWindow, toggleFloat
     case raiseFloating
+    case turnOff
 }
 
 /// The leader key and the key of each action in leader key mode.
 public struct Shortcuts: Codable, Equatable, Sendable {
     public var leader: KeyChord?
     public var actions: [ActionID: KeyChord]
+    /// Actions whose chord was cleared. They don't get their standard chord when saved shortcuts are read.
+    public var cleared: Set<ActionID> = []
 
     public init(leader: KeyChord?, actions: [ActionID: KeyChord]) {
         self.leader = leader
         self.actions = actions
+    }
+
+    /// Saved shortcuts don't contain the actions that were added after the save. Each of these actions gets its standard chord,
+    /// if another action doesn't use that chord.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        leader = try c.decodeIfPresent(KeyChord.self, forKey: .leader)
+        actions = try c.decode([ActionID: KeyChord].self, forKey: .actions)
+        cleared = try c.decodeIfPresent(Set<ActionID>.self, forKey: .cleared) ?? []
+        for (id, chord) in Self.standard.actions where actions[id] == nil && !cleared.contains(id) && !actions.values.contains(chord) {
+            actions[id] = chord
+        }
     }
 
     public static let standard = Shortcuts(
@@ -113,7 +128,7 @@ public struct Shortcuts: Codable, Equatable, Sendable {
             .focusPreviousContainer: KeyChord(spec: "k")!, .focusNextContainer: KeyChord(spec: "j")!,
             .toggleAxis: KeyChord(spec: "v")!, .focusPreviousWindow: KeyChord(spec: "h")!,
             .focusNextWindow: KeyChord(spec: "l")!, .toggleFloat: KeyChord(spec: "f")!,
-            .raiseFloating: KeyChord(spec: "r")!,
+            .raiseFloating: KeyChord(spec: "r")!, .turnOff: KeyChord(spec: "q")!,
         ])
 
     public func isLeader(keyCode: UInt16, modifiers: Modifiers) -> Bool {
@@ -130,7 +145,13 @@ public struct Shortcuts: Codable, Equatable, Sendable {
 
     /// Sets the chord of an action. Another action with the same chord loses its chord, so that one chord has one action.
     public mutating func set(_ chord: KeyChord?, for action: ActionID) {
-        if let chord { for (id, other) in actions where other == chord && id != action { actions[id] = nil } }
+        if let chord {
+            for (id, other) in actions where other == chord && id != action {
+                actions[id] = nil
+                cleared.insert(id)
+            }
+        }
         actions[action] = chord
+        if chord == nil { cleared.insert(action) } else { cleared.remove(action) }
     }
 }

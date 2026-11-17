@@ -1,7 +1,20 @@
 import AppKit
 import TillerCore
 
-/// The saved shortcuts and the "Show the key bar" setting. Read and written on the main thread.
+/// Where the Tiller icon is shown: the menu bar, the Dock or both.
+enum ShowIn: String, CaseIterable, Identifiable {
+    case menuBar, dock, both
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .menuBar: "Menu bar"
+        case .dock: "Dock"
+        case .both: "Both"
+        }
+    }
+}
+
+/// The saved shortcuts and the settings of the General page and the Shortcuts page. Read and written on the main thread.
 final class ShortcutStore: ObservableObject {
     @Published private(set) var shortcuts: Shortcuts
     /// When false, leader key mode shows the containers and window pills without the key bar. On by default.
@@ -12,6 +25,21 @@ final class ShortcutStore: ObservableObject {
         }
     }
     private static let showKeyBarKey = "showKeyBar"
+    @Published var showIn: ShowIn {
+        didSet {
+            defaults.set(showIn.rawValue, forKey: Self.showInKey)
+            Log.write("setting showIn=\(showIn.rawValue)")
+        }
+    }
+    private static let showInKey = "showIn"
+    /// When false, the leader key goes to the focused app and windows don't move. On by default.
+    @Published var enabled: Bool {
+        didSet {
+            defaults.set(enabled, forKey: Self.enabledKey)
+            Log.write("setting enabled=\(enabled)")
+        }
+    }
+    private static let enabledKey = "enabled"
     private let defaults: UserDefaults
     private static let key = "shortcuts"
 
@@ -23,6 +51,8 @@ final class ShortcutStore: ObservableObject {
         if proof {
             defaults.removeObject(forKey: Self.key)
             defaults.removeObject(forKey: Self.showKeyBarKey)
+            defaults.removeObject(forKey: Self.showInKey)
+            defaults.removeObject(forKey: Self.enabledKey)
         }
         var shortcuts = defaults.data(forKey: Self.key).flatMap { try? JSONDecoder().decode(Shortcuts.self, from: $0) } ?? .standard
         func value(_ name: String) -> String? {
@@ -36,6 +66,8 @@ final class ShortcutStore: ObservableObject {
         }
         self.shortcuts = shortcuts
         showKeyBar = defaults.object(forKey: Self.showKeyBarKey) as? Bool ?? true
+        showIn = defaults.string(forKey: Self.showInKey).flatMap(ShowIn.init) ?? .menuBar
+        enabled = defaults.object(forKey: Self.enabledKey) as? Bool ?? true
     }
 
     func setLeader(_ chord: KeyChord?) {
@@ -87,6 +119,7 @@ extension ActionID {
         case .focusNextWindow: .focusWindow(1)
         case .toggleFloat: .toggleFloat
         case .raiseFloating: .raiseFloating
+        case .turnOff: .turnOff
         }
     }
 
@@ -103,6 +136,7 @@ extension ActionID {
         case .focusNextWindow: "Focus next window"
         case .toggleFloat: "Float or tile"
         case .raiseFloating: "Raise floating windows"
+        case .turnOff: "Turn Tiller off"
         }
     }
 }

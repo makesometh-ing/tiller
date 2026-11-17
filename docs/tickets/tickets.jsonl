@@ -1,0 +1,55 @@
+{"id": "F01", "title": "Tech stack and build", "type": "feature", "status": "done", "file": "docs/tickets/F01-tech-stack-and-build.md"}
+{"id": "F02", "title": "Proof bundles and the end-to-end test runner", "type": "feature", "status": "done", "file": "docs/tickets/F02-proof-bundles.md"}
+{"id": "F03", "title": "Container layouts: the four must-have layouts", "type": "feature", "status": "done", "file": "docs/tickets/F03-container-layouts.md"}
+{"id": "F05", "title": "Horizontal carousel", "type": "feature", "status": "done", "file": "docs/tickets/F05-horizontal-carousel.md"}
+{"id": "F06", "title": "Vertical carousel and the V key", "type": "feature", "status": "done", "file": "docs/tickets/F06-vertical-carousel.md"}
+{"id": "F07", "title": "Leader key mode", "type": "feature", "status": "done", "file": "docs/tickets/F07-leader-key-mode.md"}
+{"id": "F08", "title": "Focus keys: H, L, J and K", "type": "feature", "status": "done", "file": "docs/tickets/F08-focus-keys.md"}
+{"id": "F09", "title": "One workspace for each screen", "type": "feature", "status": "done", "file": "docs/tickets/F09-workspace-per-screen.md"}
+{"id": "F10", "title": "Window rule: tiled, floating and ignored windows", "type": "feature", "status": "done", "file": "docs/tickets/F10-window-rule.md"}
+{"id": "F11", "title": "Floating windows: the F and R keys", "type": "feature", "status": "done", "file": "docs/tickets/F11-floating-windows.md"}
+{"id": "F14", "title": "Leader key overlay: containers and window pills", "type": "feature", "status": "done", "file": "docs/tickets/F14-leader-key-overlay.md"}
+{"id": "F15", "title": "Key bar, key list and the Show the key bar setting", "type": "feature", "status": "done", "file": "docs/tickets/F15-key-bar.md"}
+{"id": "F16", "title": "Theme, light and dark appearance, flat key caps", "type": "feature", "status": "done", "file": "docs/tickets/F16-theme-and-key-caps.md"}
+{"id": "F18", "title": "Settings window and shortcut recorder", "type": "feature", "status": "done", "file": "docs/tickets/F18-settings-window.md"}
+{"id": "F19", "title": "Hyper key chords", "type": "feature", "status": "done", "file": "docs/tickets/F19-hyper-key.md"}
+{"id": "F25", "title": "Diagnostic tools: window dump and focus test", "type": "feature", "status": "done", "file": "docs/tickets/F25-diagnostic-tools.md"}
+{"id": "R01", "title": "Research: child windows in other tiling apps", "type": "research", "status": "done", "file": "docs/tickets/R01-child-windows-research.md"}
+{"id": "B01", "title": "Test windows merged into one window with tabs", "type": "bug", "status": "done", "file": "docs/tickets/B01-test-windows-merged-into-tabs.md"}
+{"id": "B02", "title": "Windows with a fixed size and windows not on screen were tiled", "type": "bug", "status": "done", "file": "docs/tickets/B02-fixed-size-and-off-screen-windows-tiled.md"}
+{"id": "B03", "title": "Screen recording of a proof run wasn't saved", "type": "bug", "status": "done", "file": "docs/tickets/B03-screen-recording-not-saved.md"}
+{"id": "B04", "title": "A floated window kept its carousel frame and covered the other windows", "type": "bug", "status": "done", "file": "docs/tickets/B04-floated-window-covered-others.md"}
+{"id": "B05", "title": "A proof run left your Mac in light mode", "type": "bug", "status": "done", "file": "docs/tickets/B05-proof-left-light-mode.md"}
+{"id": "B06", "title": "The settings window opened behind other windows", "type": "bug", "status": "done", "file": "docs/tickets/B06-settings-window-behind.md"}
+{"id": "B07", "title": "The key bar cut the Layout label", "type": "bug", "status": "done", "file": "docs/tickets/B07-key-bar-label-cut.md"}
+{"id": "B08", "title": "The pill of a covered floating window was shown", "type": "bug", "status": "done", "file": "docs/tickets/B08-covered-floating-pill-shown.md"}
+{"id": "B09", "title": "A Hyper chord was shown as \"Hyper\"", "type": "bug", "status": "done", "file": "docs/tickets/B09-hyper-shown-as-text.md"}
+{"id": "B10", "title": "Dark window-stack icon on the chip, and V in the key bar", "type": "bug", "status": "done", "file": "docs/tickets/B10-chip-icon-and-v-in-key-bar.md"}
+{"id": "B12", "title": "Your typing during a proof run failed the key check", "type": "bug", "status": "done", "file": "docs/tickets/B12-typing-during-proof-failed-run.md"}
+{"id": "B11", "title": "A proof run saves the key bar position in your defaults", "type": "bug", "status": "todo", "priority": "P1", "order": 3, "depends_on": [], "blocked_by": [], "file": "docs/tickets/B11-key-bar-position-saved-in-proof-runs.md"}
+{"id": "F23", "title": "Debug log and diagnostics", "type": "feature", "status": "todo", "priority": "P1", "order": 4, "depends_on": [], "blocked_by": ["Approval of 3 About page mockups"], "file": "docs/tickets/F23-debug-log.md"}
+{"id": "F13", "title": "Windows that open after a layout is applied", "type": "feature", "status": "todo", "priority": "P1", "order": 5, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F13-new-windows.md"}
+{"id": "F33", "title": "Move a window to another container", "type": "feature", "status": "todo", "priority": "P1", "order": 6, "depends_on": ["F13"], "blocked_by": [], "file": "docs/tickets/F33-move-window-between-containers.md"}
+{"id": "F28", "title": "Workspace state across layouts and launches", "type": "feature", "status": "todo", "priority": "P1", "order": 7, "depends_on": ["F13", "F33"], "blocked_by": [], "file": "docs/tickets/F28-workspace-state.md"}
+{"id": "F34", "title": "One tile for each native tab group", "type": "feature", "status": "todo", "priority": "P1", "order": 8, "depends_on": ["F13"], "blocked_by": [], "file": "docs/tickets/F34-native-tabs.md"}
+{"id": "F24", "title": "Latency of frame changes in slow apps", "type": "feature", "status": "todo", "priority": "P1", "order": 9, "depends_on": ["F13"], "blocked_by": [], "file": "docs/tickets/F24-latency.md"}
+{"id": "F29", "title": "Leader key mode edge cases", "type": "feature", "status": "todo", "priority": "P1", "order": 10, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F29-leader-key-mode-edge-cases.md"}
+{"id": "F12", "title": "Peek: the P key", "type": "feature", "status": "todo", "priority": "P1", "order": 11, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F12-peek.md"}
+{"id": "F21", "title": "Open at login", "type": "feature", "status": "todo", "priority": "P2", "order": 12, "depends_on": ["F32"], "blocked_by": [], "file": "docs/tickets/F21-open-at-login.md"}
+{"id": "F32", "title": "Show Tiller in the menu bar, the Dock or both", "type": "feature", "status": "done", "priority": "P1", "order": 1, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F32-menu-bar-and-dock.md"}
+{"id": "F20", "title": "Global shortcuts: a second shortcut for each action", "type": "feature", "status": "todo", "priority": "P2", "order": 14, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F20-global-shortcuts.md"}
+{"id": "F22", "title": "Enable and disable Tiller from the menu bar", "type": "feature", "status": "done", "priority": "P1", "order": 2, "depends_on": ["F32"], "blocked_by": [], "file": "docs/tickets/F22-enable-disable.md"}
+{"id": "F30", "title": "Spacing settings", "type": "feature", "status": "todo", "priority": "P2", "order": 16, "depends_on": ["F21"], "blocked_by": ["Approval of 3 spacing settings mockups"], "file": "docs/tickets/F30-spacing-settings.md"}
+{"id": "F27", "title": "Multiple screens", "type": "feature", "status": "todo", "priority": "P2", "order": 17, "depends_on": ["F13", "F28"], "blocked_by": [], "file": "docs/tickets/F27-multiple-screens.md"}
+{"id": "F31", "title": "Keyboard layouts other than US", "type": "feature", "status": "todo", "priority": "P2", "order": 18, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F31-keyboard-layouts.md"}
+{"id": "F35", "title": "Accessibility permission window at the first launch", "type": "feature", "status": "todo", "priority": "P2", "order": 19, "depends_on": [], "blocked_by": ["Approval of 3 permission window mockups"], "file": "docs/tickets/F35-accessibility-permission-window.md"}
+{"id": "F17", "title": "App icon and menu bar icon", "type": "feature", "status": "blocked", "priority": "P3", "order": 20, "depends_on": [], "blocked_by": ["Answer about the use of actool from Xcode in scripts/build.sh"], "file": "docs/tickets/F17-icons.md"}
+{"id": "F36", "title": "Build from source on any Mac", "type": "feature", "status": "todo", "priority": "P3", "order": 21, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F36-build-from-source.md"}
+{"id": "F37", "title": "Signed and notarized release on GitHub Releases", "type": "feature", "status": "blocked", "priority": "P3", "order": 22, "depends_on": ["F36", "F17", "F35"], "blocked_by": ["Apple Developer Program membership", "GitHub repository"], "file": "docs/tickets/F37-github-release.md"}
+{"id": "F04", "title": "Container layouts: the nice-to-have layouts", "type": "feature", "status": "todo", "priority": "P4", "order": 23, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F04-nice-to-have-layouts.md"}
+{"id": "F26", "title": "More than one leader key layer", "type": "feature", "status": "todo", "priority": "P4", "order": 24, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F26-multiple-layers.md"}
+{"id": "F38", "title": "Copy a container layout to another screen", "type": "feature", "status": "todo", "priority": "P4", "order": 25, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F38-copy-layout-to-another-screen.md"}
+{"id": "F39", "title": "Appearance setting: light, dark or system", "type": "feature", "status": "todo", "priority": "P4", "order": 26, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F39-appearance-setting.md"}
+{"id": "F40", "title": "Themes", "type": "feature", "status": "todo", "priority": "P4", "order": 27, "depends_on": [], "blocked_by": [], "file": "docs/tickets/F40-themes.md"}
+{"id": "B13", "title": "The leader key from Hyperkey is recorded and detected as ⌘", "type": "bug", "status": "todo", "priority": "P1", "order": 0, "depends_on": [], "blocked_by": ["Physical key test with Hyperkey"], "file": "docs/tickets/B13-hyperkey-leader-recorded-as-command.md"}
+{"id": "F41", "title": "Permissions page in the settings", "type": "feature", "status": "todo", "priority": "P2", "order": 19, "depends_on": ["F32"], "blocked_by": ["Approval of 3 Permissions page mockups"], "file": "docs/tickets/F41-permissions-page.md"}

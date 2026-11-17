@@ -39,7 +39,7 @@ The direction of a carousel: horizontal carousel or vertical carousel.
 _Avoid_: Axis, orientation
 
 **Focused window**:
-The window in front of a carousel, which receives the key presses. It is called F in the carousel rules.
+The window in front of a carousel. It receives the key presses. It is called F in the carousel rules.
 _Avoid_: Active window, current window
 
 **Focused container**:
@@ -47,7 +47,7 @@ The container that contains the focused window.
 _Avoid_: Active container, selected container
 
 **Peek**:
-A temporary state of one tiled window, in which it fills the workspace. The window goes back to its container when peek ends.
+A temporary state of one tiled window. In peek, the window fills the workspace. The window goes back to its container when peek ends.
 _Avoid_: Zoom, full screen, maximize
 
 ## Spacing
@@ -119,15 +119,15 @@ All the labels that are shown on the screen in leader key mode.
 _Avoid_: HUD
 
 **Container chip**:
-The label on the top edge of a container, which shows the carousel mode and the number of windows.
+The label on the top edge of a container. It shows the carousel mode and the number of windows.
 _Avoid_: Pip, container pill, badge
 
 **Window pill**:
-The label at the bottom-right corner of a window, which shows the app and the window kind.
+The label at the bottom-right corner of a window. It shows the app and the window kind.
 _Avoid_: Status line, window badge
 
 **Key bar**:
-The bar with the action keys of leader key mode, grouped by what they act on.
+The bar with the action keys of leader key mode. The action keys are grouped by what they act on.
 _Avoid_: Cheat sheet, shortcut bar
 
 **Key list**:
@@ -137,5 +137,5 @@ _Avoid_: Help screen, cheat sheet
 ## Work
 
 **Proof bundle**:
-The screenshots, screen recordings, logs and test output that show that a task works. A task is done only with a proof bundle.
+The screenshots, screen recordings, logs and test output for a task. They show that the task works. A task is done only with a proof bundle.
 _Avoid_: Evidence, artifacts

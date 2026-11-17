@@ -1,5 +1,7 @@
 import AppKit
 import ApplicationServices
+import Combine
+import SwiftUI
 import TillerCore
 
 /// Launch arguments:
@@ -18,6 +20,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var permissionItem: NSMenuItem!
     private var trustTimer: Timer?
+    private var showInObserver: AnyCancellable?
+    private var enabledObserver: AnyCancellable?
     private let proofMode = CommandLine.arguments.contains("--proof")
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -35,6 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         icon?.accessibilityDescription = "Tiller"
         statusItem.button?.image = icon
         let menu = NSMenu()
+        let switchItem = NSMenuItem()
+        switchItem.view = NSHostingView(rootView: MenuSwitchRow(store: store))
+        switchItem.view?.frame.size = switchItem.view?.fittingSize ?? .zero
+        switchItem.view?.autoresizingMask = .width
+        menu.addItem(switchItem)
+        menu.addItem(.separator())
         permissionItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         menu.addItem(permissionItem)
         menu.addItem(.separator())
@@ -45,13 +55,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Quit Tiller", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         statusItem.menu = menu
 
+        // The app menu is shown in the menu bar when the activation policy is `.regular`.
+        let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",").target = self
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit Tiller", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        let appItem = NSMenuItem()
+        appItem.submenu = appMenu
+        NSApp.mainMenu = NSMenu()
+        NSApp.mainMenu?.addItem(appItem)
+        showInObserver = store.$showIn.sink { [weak self] in self?.apply($0) }
+        enabledObserver = store.$enabled.dropFirst().sink { [weak self] enabled in
+            guard let self else { return }
+            if enabled { controller.rearrange() }
+            // Waits for the moves. The report is sent only in a proof run.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "enabled=\(enabled)") }
+        }
+
         leader.shortcuts = { [store] in store.shortcuts }
         leader.onLayerChange = { [weak self] active in
             Log.write("layer \(active ? "start" : "end")")
             // Leave the event tap callback first. Panel work in the callback delays all key presses.
             DispatchQueue.main.async { self?.layerChanged(active) }
         }
-        leader.onAction = { [controller] action, received in controller!.perform(action, received: received) }
+        leader.isEnabled = { [store] in store.enabled }
+        leader.onToggle = { [store] in store.enabled.toggle() }
+        leader.onAction = { [controller, store] action, received in
+            if action == .turnOff { store.enabled = false } else { controller!.perform(action, received: received) }
+        }
         leader.onCancel = { [weak self] in self?.controller.reportCurrentState(action: "cancel") }
         leader.onKeyList = { [weak self] in
             DispatchQueue.main.async {
@@ -78,6 +109,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() { settings.show() }
+
+    @objc private func toggleEnabled() { store.enabled.toggle() }
+
+    private func apply(_ showIn: ShowIn) {
+        statusItem.isVisible = showIn != .dock
+        NSApp.setActivationPolicy(showIn == .menuBar ? .accessory : .regular)
+        Log.write("showIn=\(showIn.rawValue) statusItem=\(statusItem.isVisible) policy=\(NSApp.activationPolicy().rawValue)")
+        // A change to `.accessory` deactivates the app after this function returns. The settings window is then behind other apps.
+        // On the next run loop pass the app is still active, so the window is shown again 0.2 seconds later.
+        if settings.isOpen { DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [settings] in settings.show(page: settings.model.page) } }
+    }
+
+    /// A click on the Dock icon, or `open Tiller.app` while Tiller runs.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        settings.show()
+        return false
+    }
+
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let enable = menu.addItem(withTitle: "Enable Tiller", action: #selector(toggleEnabled), keyEquivalent: "")
+        enable.target = self
+        enable.state = store.enabled ? .on : .off
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: "").target = self
+        return menu
+    }
 
     private func layerChanged(_ active: Bool) {
         guard active else { overlay.hide(); return }
@@ -159,7 +216,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 // A key press without the leader key, for example the chord for a field that records.
                 guard let chord = KeyChord(spec: String(key.split(separator: ":", maxSplits: 1)[1])) else { return }
                 Self.post(chord)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "chord:\(chord.spec) leader=\(self.store.shortcuts.leader?.spec ?? "none") layer=\(self.leader.isLayerActive)") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "chord:\(chord.spec) leader=\(self.store.shortcuts.leader?.spec ?? "none") layer=\(self.leader.isLayerActive) enabled=\(self.store.enabled)") }
             default:
                 guard let chord = KeyChord(spec: key) else { return }
                 // A key after a `leader` step goes to the layer that the `leader` step started.

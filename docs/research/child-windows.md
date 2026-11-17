@@ -13,7 +13,7 @@ Sources were read at these commits:
 | AeroSpace | Other windows | Subrole isn't `AXStandardWindow`, or the fullscreen button is missing or disabled. 11 apps are excepted. (`Sources/AppBundle/model/AxUiElementWindowType.swift`) | Popups: non-normal window level for some apps, accessory apps without a close button, and other app-specific cases. |
 | yabai | Root window, role `AXWindow`, subrole `AXStandardWindow`, normal window level, movable, not sticky, minimized or hidden. (`src/window_manager.c`) | Child windows. Windows that can't be resized and are 500 points or less in width or height. (`src/window.c`) | `AXUnknown` windows. `AXPopover` windows. |
 | i3 | Other windows | Dialog, utility, toolbar, notification and splash types. Modal windows. Fixed-size windows. Windows with `transient_for` or a leader window. (`src/manage.c`) | Dock windows aren't floated. |
-| Glide | Role `AXWindow` with subrole `AXStandardWindow` and a settable size | Other subroles. Size not settable. System Preferences. (`src/actor/layout.rs`) | Window server layer isn't 0. Firefox Picture-in-Picture. |
+| Glide | Role `AXWindow` with subrole `AXStandardWindow` and a settable size | Other subroles. Size not settable. System Preferences. (`src/actor/layout.rs`) | Windows with a window server layer other than 0. Firefox Picture-in-Picture windows. |
 
 ## User control
 
@@ -31,7 +31,7 @@ Sources were read at these commits:
 
 ## Floating windows above tiled windows
 
-- yabai puts tiled windows in a lower layer through its scripting addition. `--sub-layer`, `--raise` and `--lower` need SIP partly disabled. (`doc/yabai.asciidoc`)
+- yabai moves tiled windows to a lower layer with its scripting addition. `--sub-layer`, `--raise` and `--lower` need SIP partly disabled. (`doc/yabai.asciidoc`)
 - Glide documents that floating windows can't be kept on top without disabling security protection. `toggle_focus_floating` raises all floating windows. (`glide.default.toml`)
 - i3 (Linux) keeps floating windows on top.
 
