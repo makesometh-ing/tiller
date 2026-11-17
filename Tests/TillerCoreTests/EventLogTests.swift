@@ -92,3 +92,46 @@ import Testing
     #expect(text.split(separator: "\n").count == 1)
     #expect(text.contains("action.done"))
 }
+
+@Test func debugEventsAreWrittenToTheFileWhenDebugLoggingIsOn() throws {
+    let dir = FileManager.default.temporaryDirectory.appending(path: "tiller-log-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let log = EventLog(file: LogFile(directory: dir, name: "tiller"), subsystem: "com.tiller.Tiller.tests")
+    log.set(debugToFile: true, titles: false)
+    log.log(.axCall, ["function": "setFrame", "ms": .ms(1)])
+    log.set(debugToFile: false, titles: false)
+    log.log(.axCall, ["function": "setFrame", "ms": .ms(2)])
+    log.flush()
+    let lines = try String(contentsOf: log.fileURLs[0], encoding: .utf8).split(separator: "\n")
+    #expect(lines.count == 1)
+    #expect(lines[0].contains("\"ms\":1"))
+}
+
+@Test func windowTitlesAreLoggedOnlyWhenTheSettingIsOn() throws {
+    let dir = FileManager.default.temporaryDirectory.appending(path: "tiller-log-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let log = EventLog(file: LogFile(directory: dir, name: "tiller"), subsystem: "com.tiller.Tiller.tests")
+    let fields: [String: LogValue] = ["windowId": 7, "title": "Salary review.xlsx", "titles": ["Chat with Ann"],
+                                      "nested": [["windowId": 8, "title": "Inbox"]]]
+    log.log(.windowClassified, fields)
+    log.set(debugToFile: false, titles: true)
+    log.log(.windowClassified, fields)
+    log.flush()
+    let lines = try String(contentsOf: log.fileURLs[0], encoding: .utf8).split(separator: "\n").map(String.init)
+    #expect(lines.count == 2)
+    for title in ["Salary review.xlsx", "Chat with Ann", "Inbox"] {
+        #expect(!lines[0].contains(title))
+        #expect(lines[1].contains(title))
+    }
+    #expect(lines[0].contains("\"windowId\":8"))
+}
+
+@Test func debugLoggingTurnsOffAfterTwentyFourHours() {
+    let now = Date()
+    #expect(DebugLogging.hoursLeft(until: nil, now: now) == nil)
+    #expect(DebugLogging.hoursLeft(until: now.addingTimeInterval(DebugLogging.duration), now: now) == 24)
+    #expect(DebugLogging.hoursLeft(until: now.addingTimeInterval(DebugLogging.duration), now: now.addingTimeInterval(3601)) == 23)
+    #expect(DebugLogging.hoursLeft(until: now.addingTimeInterval(1), now: now) == 1)
+    #expect(DebugLogging.hoursLeft(until: now, now: now) == nil)
+    #expect(DebugLogging.hoursLeft(until: now.addingTimeInterval(DebugLogging.duration), now: now.addingTimeInterval(DebugLogging.duration + 1)) == nil)
+}

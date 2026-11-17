@@ -93,10 +93,19 @@
       ${debugRow(true)}${titlesRow}</div>
       <div class="sec">Diagnostics</div><div class="group"><div class="row"><span class="name">Diagnostics file<span class="sub">Written to the Desktop. Send it with a bug report.</span></span><span class="btn primary">Export Diagnostics…</span></div></div>`);
 
+  // Variant 4, approved: the "Diagnostics" group of variant 2, after the "Log" group of variant 3.
+  const v4 = page(`${identity}
+      <div class="sec" style="margin-top:18px">Log</div><div class="group">
+      <div class="row"><span class="name">Log file<span class="sub mono">~/Library/Logs/Tiller · 3 files · 2.1 MB</span></span><span class="link">Show in Finder</span></div></div>
+      <div class="sec">Diagnostics</div><div class="group">${debugRow(false)}${titlesRow}
+      <div class="row"><span class="name">Diagnostics file<span class="sub">The log, the settings, the windows and the workspace of each screen.</span></span><span class="btn">Export Diagnostics…</span></div></div>
+      <div class="help">The zip file is written to the Desktop and shown in Finder. Send it with a bug report.</div>`);
+
   const variants = [
     ['Variant 1: button under the version', 'The About page keeps the icon, the name and the version. "Export Diagnostics…" is a standard button under the version, with one help line. "Debug logging" and "Include window titles in logs" stay on the General page, as the PRD describes.', v1],
     ['Variant 2: "Diagnostics" group on the About page', 'A "Diagnostics" group under the version with the "Debug logging" switch, the "Include window titles in logs" switch and the export row. All diagnostics settings are on one page. The PRD then moves the two switches from the General page to the About page.', v2],
     ['Variant 3: "Log" group and a teal export button', 'A small header row. A "Log" group shows the log file path and size with "Show in Finder", and the two switches. "Debug logging" is shown on, with the time until it turns off. The export button is teal, in its own "Diagnostics" group.', v3],
+    ['Variant 4, approved: "Diagnostics" group with the "Log" group', 'The icon, the name and the version at the top. The "Log" group of variant 3: the log folder, the file count and the total size, with a teal "Show in Finder". Then the "Diagnostics" group of variant 2: the "Debug logging" switch, the "Include window titles in logs" switch and the export row. The two switches are on the About page, not on the General page.', v4],
   ];
   // window.ONLY = [variant index, 'dark' or 'light'] renders one window without the page frame.
   if (window.ONLY) { const [i, t] = window.ONLY; document.getElementById('root').innerHTML = `<div class="desk ${t}" style="width:auto">${variants[i][2]}</div>`; }

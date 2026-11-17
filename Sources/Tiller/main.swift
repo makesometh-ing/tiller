@@ -122,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+        settings.model.exportDiagnostics = { [weak self] completion in self?.exportToDesktop(completion: completion) }
         if proofMode { setUpProof() }
 
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
@@ -142,9 +143,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func toggleEnabled() { store.setEnabled(!store.enabled, source: "dock") }
 
     /// Writes the diagnostics zip to the Desktop and shows it in Finder.
-    @objc private func exportDiagnosticsToDesktop() {
-        exportDiagnostics(to: FileManager.default.homeDirectoryForCurrentUser.appending(path: "Desktop")) { url in
+    @objc private func exportDiagnosticsToDesktop() { exportToDesktop {} }
+
+    /// In a proof run, the path of the zip is sent to the proof runner.
+    private func exportToDesktop(completion: @escaping () -> Void) {
+        exportDiagnostics(to: FileManager.default.homeDirectoryForCurrentUser.appending(path: "Desktop")) { [controller] url in
             if let url { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+            controller?.reportCurrentState(action: "export-button zip=\(url?.path ?? "failed")")
+            completion()
         }
     }
 
@@ -152,8 +158,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func exportDiagnostics(to directory: URL, completion: @escaping (URL?) -> Void) {
         let system = Diagnostics.systemFields(screens: ScreenInfo.all())
         let settings = store.logFields
+        let titles = store.logTitles
         DispatchQueue.global(qos: .userInitiated).async { [controller] in
-            let url = Diagnostics.export(to: directory, system: system, settings: settings, controller: controller!)
+            let url = Diagnostics.export(to: directory, system: system, settings: settings, titles: titles, controller: controller!)
             DispatchQueue.main.async { completion(url) }
         }
     }
@@ -285,7 +292,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let leaderChord { Self.post(leaderChord) }
             case _ where key == "settings" || key.hasPrefix("settings:"):
                 self.settings.show(page: SettingsPage(rawValue: String(key.dropFirst("settings:".count))) ?? .general)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.controller.reportCurrentState(action: "settings") }
+                // The proof runner takes a screenshot of the window with this number.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    self.controller.reportCurrentState(action: "settings:\(self.settings.model.page.rawValue) window=\(self.settings.windowNumber)")
+                }
+            case "toggle:debugLogging":
+                // The same change as a click on the "Debug logging" switch.
+                self.store.setDebugLogging(!self.store.debugLogging)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "debugLogging=\(self.store.debugLogging)") }
+            case "expire:debugLogging":
+                // Debug logging on for 1 second instead of 24 hours. The timer then turns it off.
+                self.store.setDebugLogging(true, duration: 1)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { self.controller.reportCurrentState(action: "debugLogging=\(self.store.debugLogging) after 1 s") }
+            case "toggle:logTitles":
+                // The same change as a click on the "Include window titles in logs" switch.
+                self.store.logTitles.toggle()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "logTitles=\(self.store.logTitles)") }
+            case _ where key.hasPrefix("press:"):
+                // The button action sends the report.
+                let title = String(key.dropFirst("press:".count))
+                if !Self.pressButton(title) { self.controller.reportCurrentState(action: "press:\(title) button-not-found") }
             case "settings-close":
                 self.settings.close()
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "settings-close") }
@@ -317,6 +343,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Self.post(chord)
             }
         }
+    }
+
+    /// Presses the button with `title` in a Tiller window with the Accessibility API, as a click does. Returns false when the button isn't found.
+    /// An Accessibility call to Tiller runs the AppKit code on the calling thread, so call it on the main thread.
+    private static func pressButton(_ title: String) -> Bool {
+        func find(_ e: AXUIElement) -> AXUIElement? {
+            if e.value(kAXRoleAttribute) as? String == kAXButtonRole,
+               [kAXTitleAttribute, kAXDescriptionAttribute].contains(where: { e.value($0) as? String == title }) { return e }
+            return (e.value(kAXChildrenAttribute) as? [AXUIElement] ?? []).lazy.compactMap(find).first
+        }
+        guard let button = find(AXUIElementCreateApplication(getpid())) else { return false }
+        return AXUIElementPerformAction(button, kAXPressAction as CFString) == .success
     }
 
     private static func post(_ chord: KeyChord) {

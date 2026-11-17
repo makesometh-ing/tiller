@@ -154,6 +154,7 @@ After v1: a setting for light, dark or system, and themes.
 
 - "Settings…" (⌘,) in the Tiller menu opens the settings window, in front of the other apps. Mockup: variant 1 in [settings.html](mockups/settings.html).
 - Layout: a sidebar with colored icons, as in the CleanShot settings (`docs/references/ui-cleanshot-settings-*.png`). Pages: General, Shortcuts and About. A Permissions page is planned, see section 4 "Platform and build".
+- About page: the version, the log file, "Debug logging", "Include window titles in logs" and "Export Diagnostics…". See section 13 "Logging and diagnostics", "About page".
 - Shortcuts page, as variant 3 in [settings-v2.html](mockups/settings-v2.html) with variant 1 in [exit-leader-key-mode.html](mockups/exit-leader-key-mode.html): a segmented control in the title row with "Leader key mode" and "Global". It has the theme accent color, as "Show Tiller in". Under it, a "Global shortcuts" group with the leader key field, the "Turn Tiller on and off" field and "Show the key bar". Then one group for each section of the key bar, with one field for each action.
 - With "Leader key mode", each field is the key in leader key mode, with an "Exit after" checkbox column. The checkbox of "Turn Tiller off" is checked and disabled. With "Global", each field is the global shortcut of the action, without the checkbox column.
 - Global shortcuts: each action has a global shortcut. A global shortcut does its action without the leader key, in every app and also in leader key mode. The focused app doesn't receive it. Leader key mode doesn't start or end, except that the "Turn Tiller off" shortcut ends it. Global shortcuts are empty by default.
@@ -217,7 +218,7 @@ Events are encoded and written on one background queue. A log call takes 0.002 m
 |---|---|---|
 | `error` | Yes | An Accessibility call failed, an event tap was disabled, a frame didn't match the target frame after a move, an action took more than 100 ms. |
 | `info` | Yes | Launch, settings changes, each action with its timings, each new window classification, leader key mode, the overlay. |
-| `debug` | No | Each Accessibility call to set a window frame, with its time. Only `log stream --level debug` shows these events. The unified log doesn't store them. |
+| `debug` | Only while "Debug logging" is on | Each Accessibility call to set a window frame, with its time. With "Debug logging" off, only `log stream --level debug` shows these events. The unified log doesn't store them. |
 
 ### Event format
 
@@ -232,13 +233,13 @@ Each line of the JSON Lines file is one object:
 - `session`: a random id for each launch. It is used to separate the events of two launches in one file.
 - Times in the fields are in milliseconds, rounded to 0.01 ms. A frame is `[x, y, width, height]` in Accessibility coordinates.
 
-`scripts/check-log.py <file>` checks that each line is one JSON object with these keys, a known event, its category and the required fields of the event. It prints the number of lines of each event.
+`scripts/check-log.py <file>` checks that each line is one JSON object with these keys, a known event, its category and the required fields of the event. A window title is allowed only while "Include window titles in logs" is on in the session of the line. A `debug` line is allowed only while "Debug logging" is on in the session of the line. The script prints the number of lines of each event and the number of lines with window titles.
 
 ### Events
 
 #### lifecycle
 
-- `app.launch`: Tiller version and build, macOS version, Mac model, Accessibility permission, the screens (display UUID, frame, desktop frame, scale), the process id, the proof mode, and all settings: leader key, the shortcut to turn Tiller on and off, each action key, each "Exit after" value, "Show the key bar", "Show Tiller in", the enabled state and the spacing values.
+- `app.launch`: Tiller version and build, macOS version, Mac model, Accessibility permission, the screens (display UUID, frame, desktop frame, scale), the process id, the proof mode, and all settings: leader key, the shortcut to turn Tiller on and off, each action key, each "Exit after" value, "Show the key bar", "Show Tiller in", the enabled state, the spacing values, "Debug logging" with the time it turns off, and "Include window titles in logs".
 - `app.enabled` and `app.disabled`: the source: `menu`, `settings`, `dock`, `globalShortcut` or `leaderKey` (`Q`).
 - `tap.started`: whether the key event tap and the mouse event tap started.
 - `tap.disabled` (`error`): the tap (`keys` or `mouse`), the reason (`timeout` or `userInput`) and the time since the last key press. A timeout means a callback took too long.
@@ -263,18 +264,18 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
   - `totalMs`: from the key press in the event tap to the end of the action.
 - The action `focus-change` is the arrangement after a click or another focus change by the user. It also has the trigger (`click` or `other`), the container and the time from the click to the notification. Its `totalMs` is from the click. The action `rearrange` is the arrangement after Tiller is turned on.
 - `action.slow` (`error`): the same fields as `action.done`. It is written in addition to `action.done` when `totalMs` is more than 100 ms.
-- `action.focus`: written 150 ms after each focus action, from another queue: the ring order (bundle id and window id), the focused window stored in the workspace, the system focused window before the action, the ring index before and after, the window that got focus, the AXError values of `AXMain`, `AXRaise` and `AXFrontmost`, the result of `activate()`, and the system focused window and frontmost app after the action.
+- `action.focus`: written 150 ms after each focus action, from another queue: the ring order (bundle id and window id), the window titles in ring order (`titles`, only with "Include window titles in logs" on), the focused window stored in the workspace, the system focused window before the action, the ring index before and after, the window that got focus, the AXError values of `AXMain`, `AXRaise` and `AXFrontmost`, the result of `activate()`, and the system focused window and frontmost app after the action.
 
 #### window
 
-- `window.classified`: written the first time a window id is read with a kind. A window is logged again when its kind changes. Bundle id, app name, window id, subrole, minimized, size settable, on screen, window layer, modal, parent is the app, and the result (tiled, floating or ignored). These are the inputs of the window rule. The event shows why an app window is tiled or floats.
+- `window.classified`: written the first time a window id is read with a kind. A window is logged again when its kind changes. Bundle id, app name, window id, the title (only with "Include window titles in logs" on), subrole, minimized, size settable, on screen, window layer, modal, parent is the app, and the result (tiled, floating or ignored). These are the inputs of the window rule. The event shows why an app window is tiled or floats.
 - `window.frameMismatch` (`error`): the frames of the moved windows are read 150 ms after the move, on another queue. The event is written when a frame differs from the target frame by more than 1 point. Bundle id, window id, target frame and actual frame. It shows apps with a minimum size, or apps that move their windows back.
 - `window.closed`: the window id, the screen and the container of a window that was removed from its carousel because it doesn't exist.
 
 #### ax
 
 - `ax.error` (`error`): the Accessibility function, the attribute, the `AXError` code and the bundle id. It is written for a failed window list read (for example `kAXErrorCannotComplete` from a hung app, with the time of the call), a failed size or position set, and a failed focus notification observer.
-- `ax.call` (`debug`): each frame set of a window, with its time.
+- `ax.call` (`debug`): each frame set of a window, with its time. It is written to the file only while "Debug logging" is on.
 
 #### overlay
 
@@ -283,7 +284,7 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
 
 #### settings
 
-- `settings.changed`: the setting and the new value: `showKeyBar`, `showIn`, `leader`, `toggle`, `key.<action id>`, `global.<action id>` or `exitAfter.<action id>`. A chord that a shortcut field doesn't save is logged with the setting `refused`, the field and the shortcut that uses the chord. Chords are logged as text, for example `ctrl+opt+shift+cmd+l`.
+- `settings.changed`: the setting and the new value: `showKeyBar`, `showIn`, `leader`, `toggle`, `key.<action id>`, `global.<action id>`, `exitAfter.<action id>`, `logTitles` or `debugLogging`. `debugLogging` also has `until`, the time it turns off, and `reason`: `settings`, or `expired` when the 24 hours end. A chord that a shortcut field doesn't save is logged with the setting `refused`, the field and the shortcut that uses the chord. Chords are logged as text, for example `ctrl+opt+shift+cmd+l`.
 - `diagnostics.exported`: the path of the zip and the time of the export.
 
 #### display
@@ -292,24 +293,32 @@ Tiller logs only the leader key and the keys in leader key mode. Text typed by t
 
 ### Window titles
 
-Window titles can contain private text, for example a document name or a chat name. Titles aren't logged. Each window is logged with its window id and bundle id.
+Window titles can contain private text, for example a document name or a chat name. Each window is logged with its window id and bundle id. Titles are logged only while "Include window titles in logs" is on. `EventLog` removes the `title` and `titles` fields of each event, at each depth, before the event is encoded. The unified log then doesn't contain titles too.
 
 ### Export diagnostics
 
-"Export Diagnostics…" in the menu bar menu, and in the Tiller app menu with "Show Tiller in" set to "Dock", writes `Tiller-Diagnostics-<date>.zip` to the Desktop. The zip is then shown in Finder. The export takes about 1.3 seconds. The zip contains:
+"Export Diagnostics…" in the menu bar menu, in the Tiller app menu with "Show Tiller in" set to "Dock", and on the About page writes `Tiller-Diagnostics-<date>.zip` to the Desktop. The zip is then shown in Finder. The export takes about 1.3 seconds. The zip contains:
 
 - `state.json`: Tiller version and build, macOS version, Mac model, Accessibility permission, the screens (display UUID, frame, desktop frame, scale), the session id and the export time.
 - `tiller.jsonl`, and `tiller.1.jsonl` and `tiller.2.jsonl` when they exist.
 - `unified-log.txt`: the unified log entries of the Tiller process of the last 2 hours: `log show --last 2h --info --debug --predicate 'subsystem == "com.tiller.Tiller" AND process == "Tiller"'`.
-- `windows.json`: the attributes and the window rule result of every window, without titles. This is the same data as `Tiller --dump-windows`.
+- `windows.json`: the attributes and the window rule result of every window. Titles are written only while "Include window titles in logs" is on. This is the same data as `Tiller --dump-windows`.
 - `settings.json`: the same settings as in `app.launch`.
 - `workspaces.json`: the workspace of each screen (layout, focused container, and the frame, carousel mode, focused index and windows of each container, and the saved carousel modes of each layout), the floating windows, and the windows floated with `F`.
 
-Planned for v1:
+### About page
 
-- The About page of the settings window has an "Export Diagnostics…" button. It writes the same zip as the menu item. Mockups: [about-page.html](mockups/about-page.html), waiting for approval.
-- Settings → General → "Debug logging" writes `debug` events to the file. It is turned off after 24 hours. This prevents debug logging from staying on by mistake.
-- Settings → General → "Include window titles in logs" adds the titles to the log events and to the diagnostics zip.
+Variant 4 in [about-page.html](mockups/about-page.html). Colors and fonts are read from `Theme.current`. From the top:
+
+- The app icon, "Tiller" and "Version <version> (<build>)".
+- "Log" group: the "Log file" row with the log folder, the file count and the total size, for example `~/Library/Logs/Tiller · 3 files · 2.1 MB`, in a monospaced font. These values are read each time the About page is shown, and after an export. "Show in Finder" is teal. It shows `tiller.jsonl` in Finder.
+- "Diagnostics" group:
+  - "Debug logging" switch: "Logs each Accessibility call. Turns off after 24 hours." With the switch on, `debug` events are written to the file too. A teal badge after the title shows the hours until it turns off, for example "24 h left". After 24 hours a timer turns it off. This prevents debug logging from staying on by mistake. The time it turns off is saved, so it stays on after a relaunch until that time. Off by default.
+  - "Include window titles in logs" switch: "Titles can contain private text, for example a document name." With the switch on, titles are added to `window.classified`, to `action.focus` and to `windows.json`. Off by default.
+  - "Diagnostics file" row with the "Export Diagnostics…" button. It writes the same zip as the menu item, to the Desktop, and shows it in Finder. The button shows "Exporting…" and is disabled until the zip is written.
+- Help text: "The zip file is written to the Desktop and shown in Finder. Send it with a bug report."
+
+The two switches are saved in the Tiller defaults (the proof defaults domain in a proof run). They aren't on the General page.
 
 ## 14. Latency
 
@@ -335,6 +344,9 @@ Planned for v1:
 - `build/tiller-proof` runs the end-to-end test. In proof mode, Tiller manages only the windows of the apps in `--only-bundle-ids`. Proof runs use the defaults domain `com.tiller.Tiller.proof`. It is emptied when a proof run starts Tiller. A proof run doesn't change the settings or the key bar position in the Tiller defaults.
 - `--global <action id>=<spec>,...` sets global shortcuts for a proof run. A `global:<chord>` step posts the chord without the leader key. Only the action sends the report. `shortcuts-mode:leader` and `shortcuts-mode:global` switch the Shortcuts page. `record:global:<action id>` starts the recording of a global shortcut field.
 - A `click:` proof step posts a mouse down and a mouse up at the visible point of a window nearest to its center. `click:next` and `click:previous` click the windows after and before the focused window in the focused carousel. `click:container<n>` clicks the focused window of container n. `click:floating` clicks the front floating window.
+- A `settings:<page>` step opens the settings window on that page. The proof runner then also captures the settings window alone, as `screenshots/<step>-settings-window.png`.
+- `toggle:debugLogging` and `toggle:logTitles` make the same change as a click on the "Debug logging" switch and the "Include window titles in logs" switch. `expire:debugLogging` turns debug logging on for 1 second. The timer then turns it off.
+- `press:<title>` presses the button with that title in a Tiller window, with the Accessibility press action. The button action sends the report. `press:Export Diagnostics…` writes the zip to the Desktop. The proof runner moves the zip into the proof bundle.
 - `Tiller --dump-windows <path>` writes the attributes and the kind of every window.
 - `Tiller --focus-test <bundle id> <window id> <method> <path>` tests one focus method.
 - The unit tests are in `Tests/TillerCoreTests/`.

@@ -22,6 +22,10 @@ struct Theme {
     var keyFont: Font
     var chipFont: Font
     var pillFont: Font
+    /// The second line of a settings row.
+    var detailFont: Font
+    /// A file path in a settings row.
+    var pathFont: Font
 
     static var current = Theme.standard
 
@@ -43,7 +47,9 @@ struct Theme {
         barFont: .system(size: 11),
         keyFont: .system(size: 10.5, weight: .medium),
         chipFont: .system(size: 11, weight: .semibold),
-        pillFont: .system(size: 10))
+        pillFont: .system(size: 10),
+        detailFont: .system(size: 10.5),
+        pathFont: .system(size: 10.5, design: .monospaced))
 
     private static func dynamic(light: UInt32, dark: UInt32, alpha: CGFloat = 1) -> Color {
         dynamic(light: light, dark: dark, lightAlpha: alpha, darkAlpha: alpha)

@@ -380,6 +380,7 @@ final class Controller {
                 }
                 Log.event(.actionFocus, [
                     "action": .string(name), "order": .array(container.windows.map(label)), "storedFocused": label(storedFocused),
+                    "titles": .array(container.windows.map { .string(refs[$0]?.title ?? "") }),
                     "systemFocusedBefore": label(focused), "indexBefore": .int(startIndex), "indexAfter": .int(container.focusedIndex),
                     "from": label(startFocused), "raised": label(raised), "ax": .string(axResult),
                     "systemFocusedAfter": label(ax.focusedWindowID()),

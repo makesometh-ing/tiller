@@ -14,6 +14,7 @@ Each HTML file shows 3 or more variants of one design, in the light and the dark
 | "Show Tiller in" on the General page | [general-page.html](general-page.html) | Variant 2 | F32 |
 | Menu bar menu | [menu-bar-menu-v2.html](menu-bar-menu-v2.html) | Variant A | F22 |
 | "Exit after" column and "Global shortcuts" group on the Shortcuts page | [exit-leader-key-mode.html](exit-leader-key-mode.html) | Variant 1 | F42, F20 |
+| About page | [about-page.html](about-page.html) | Variant 4: the "Log" group of variant 3, then the "Diagnostics" group of variant 2 | F23 |
 
 ## Designs waiting for approval
 
@@ -21,4 +22,3 @@ Each HTML file shows 3 or more variants of one design, in the light and the dark
 |---|---|---|
 | Accessibility permission window at the first launch | [permission-window.html](permission-window.html) | F35 |
 | Permissions page in the settings | [permissions-page.html](permissions-page.html) | F41 |
-| About page with "Export Diagnostics…", and the "Debug logging" and "Include window titles in logs" switches | [about-page.html](about-page.html) | F23 |

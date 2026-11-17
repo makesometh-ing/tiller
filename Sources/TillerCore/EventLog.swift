@@ -94,6 +94,26 @@ public enum LogValue: Encodable, Equatable, Sendable, ExpressibleByStringLiteral
         case .null: try c.encodeNil()
         }
     }
+
+    /// The value without the `title` and `titles` keys, at each depth.
+    public var withoutTitles: LogValue {
+        switch self {
+        case .object(let o): .object(o.filter { $0.key != "title" && $0.key != "titles" }.mapValues(\.withoutTitles))
+        case .array(let a): .array(a.map(\.withoutTitles))
+        default: self
+        }
+    }
+}
+
+/// "Debug logging" turns off 24 hours after it is turned on, so that it doesn't stay on by mistake.
+public enum DebugLogging {
+    public static let duration: TimeInterval = 24 * 60 * 60
+
+    /// The hours until debug logging turns off, rounded up. nil when it is off.
+    public static func hoursLeft(until: Date?, now: Date) -> Int? {
+        guard let until, until > now else { return nil }
+        return Int((until.timeIntervalSince(now) / 3600).rounded(.up))
+    }
 }
 
 /// One line of the JSON Lines log.
@@ -200,6 +220,9 @@ public final class EventLog: @unchecked Sendable {
     private let file: LogFile
     private let queue = DispatchQueue(label: "tiller.log", qos: .utility)
     private let loggers: [LogCategory: Logger]
+    /// Read and written on `queue`.
+    private var debugToFile = false
+    private var titles = false
 
     /// The unit tests use another `subsystem`, so that their events aren't in the diagnostics zip.
     public init(file: LogFile, subsystem: String = EventLog.subsystem) {
@@ -209,11 +232,17 @@ public final class EventLog: @unchecked Sendable {
 
     public var fileURLs: [URL] { queue.sync { file.urls } }
 
+    /// `debugToFile` writes `debug` events to the file too. Without `titles`, the `title` and `titles` fields are removed from each event.
+    /// The settings apply to the events logged after this call.
+    public func set(debugToFile: Bool, titles: Bool) {
+        queue.async { self.debugToFile = debugToFile; self.titles = titles }
+    }
+
     public func log(_ name: LogEventName, level: LogLevel? = nil, _ fields: [String: LogValue] = [:]) {
         let event = LogEvent(name: name, level: level, session: session, fields: fields)
-        // `debug` events are written only to the unified log.
-        let toFile = event.level != .debug
-        queue.async { [file, loggers] in
+        queue.async { [self] in
+            var event = event
+            if !titles, case .object(let fields) = LogValue.object(event.fields).withoutTitles { event.fields = fields }
             let line = event.jsonLine()
             let logger = loggers[event.cat]!
             switch event.level {
@@ -221,7 +250,7 @@ public final class EventLog: @unchecked Sendable {
             case .info: logger.info("\(line, privacy: .public)")
             case .debug: logger.debug("\(line, privacy: .public)")
             }
-            if toFile { file.append(line) }
+            if event.level != .debug || debugToFile { file.append(line) }
         }
     }
 

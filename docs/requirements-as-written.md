@@ -502,3 +502,9 @@ On "F20: Global shortcuts: a second shortcut for each action":
 > 1. in leader key mode, clicking an app window should focus it and exit leader key mode
 > 2. clicking a window BEHIND the focused window, should focus it and TILE IT. (like pressing h or l in leader key mode to go to the next window)
 > 3. carousel mode (horizontal or vertical) should not be reset when switching between layouts. if I've in vertical carousel mode in layout 1, and I got to layout 2 and back to layout 1, it should still be in vertical carousel mode
+
+## 23. About page design
+
+Written on screenshots of the "Diagnostics" group of variant 2 and the "Log" group of variant 3 in [about-page.html](mockups/about-page.html):
+
+> "Diagnostics" - great, but I also want this part of "Logs"

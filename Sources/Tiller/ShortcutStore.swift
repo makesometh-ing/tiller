@@ -48,6 +48,38 @@ final class ShortcutStore: ObservableObject {
         enabled = on
     }
     private static let enabledKey = "enabled"
+    /// "Debug logging" is on until this time. nil when it is off.
+    @Published private(set) var debugLoggingUntil: Date?
+    private static let debugLoggingUntilKey = "debugLoggingUntil"
+    private var debugLoggingTimer: Timer?
+    var debugLogging: Bool { DebugLogging.hoursLeft(until: debugLoggingUntil, now: Date()) != nil }
+    /// "Include window titles in logs". Off by default.
+    @Published var logTitles: Bool {
+        didSet {
+            defaults.set(logTitles, forKey: Self.logTitlesKey)
+            applyLogSettings()
+            Log.event(.settingsChanged, ["setting": "logTitles", "value": .bool(logTitles)])
+        }
+    }
+    private static let logTitlesKey = "logTitles"
+
+    /// Turns debug logging on for `duration`, or off. `reason` is `settings`, or `expired` when the timer turns it off.
+    func setDebugLogging(_ on: Bool, duration: TimeInterval = DebugLogging.duration, reason: String = "settings") {
+        debugLoggingUntil = on ? Date().addingTimeInterval(duration) : nil
+        defaults.set(debugLoggingUntil, forKey: Self.debugLoggingUntilKey)
+        applyLogSettings()
+        Log.event(.settingsChanged, ["setting": "debugLogging", "value": .bool(on), "reason": .string(reason),
+                                     "until": debugLoggingUntil.map { .string(Date.ISO8601FormatStyle().format($0)) } ?? .null])
+    }
+
+    /// Sets the log settings and the timer that turns debug logging off.
+    private func applyLogSettings() {
+        Log.shared.set(debugToFile: debugLogging, titles: logTitles)
+        debugLoggingTimer?.invalidate()
+        guard let until = debugLoggingUntil else { return }
+        debugLoggingTimer = Timer(fire: until, interval: 0, repeats: false) { [weak self] _ in self?.setDebugLogging(false, reason: "expired") }
+        RunLoop.main.add(debugLoggingTimer!, forMode: .common)
+    }
     /// The Tiller defaults, or the proof defaults domain in a proof run.
     let defaults: UserDefaults
     private static let key = "shortcuts"
@@ -78,6 +110,10 @@ final class ShortcutStore: ObservableObject {
         showKeyBar = defaults.object(forKey: Self.showKeyBarKey) as? Bool ?? true
         showIn = defaults.string(forKey: Self.showInKey).flatMap(ShowIn.init) ?? .menuBar
         enabled = defaults.object(forKey: Self.enabledKey) as? Bool ?? true
+        logTitles = defaults.bool(forKey: Self.logTitlesKey)
+        // A time in the past is cleared at once by the timer.
+        debugLoggingUntil = defaults.object(forKey: Self.debugLoggingUntilKey) as? Date
+        applyLogSettings()
     }
 
     func setLeader(_ chord: KeyChord?) {
@@ -122,6 +158,9 @@ final class ShortcutStore: ObservableObject {
             "showKeyBar": .bool(showKeyBar),
             "showIn": .string(showIn.rawValue),
             "enabled": .bool(enabled),
+            "debugLogging": .bool(debugLogging),
+            "debugLoggingUntil": debugLoggingUntil.map { .string(Date.ISO8601FormatStyle().format($0)) } ?? .null,
+            "logTitles": .bool(logTitles),
             "spacing": ["workspaceMargin": .double(spacing.workspaceMargin), "containerMargin": .double(spacing.containerMargin),
                         "carouselSpacing": .double(spacing.carouselSpacing)],
         ]

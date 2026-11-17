@@ -117,7 +117,7 @@ for (index, key) in steps.enumerated() {
     lastResult = nil
     center.postNotificationName(.init("com.tiller.proof.press"), object: nil, userInfo: ["key": key], deliverImmediately: true)
     // The diagnostics export reads the unified log, which takes some seconds.
-    let stepDeadline = Date().addingTimeInterval(key.hasPrefix("export-diagnostics") ? 60 : 5)
+    let stepDeadline = Date().addingTimeInterval(key.hasPrefix("export-diagnostics") || key.hasPrefix("press:") ? 60 : 5)
     while lastResult == nil && Date() < stepDeadline { wait(0.02) }
     guard let report = lastResult else { fail("Tiller didn't send a result for key \(key) in 5 seconds.") }
 
@@ -162,7 +162,17 @@ for (index, key) in steps.enumerated() {
     results.append(StepResult(step: index + 1, key: key, passed: problems.isEmpty, problems: problems, report: report))
     print("\(index + 1) \(key) \(report.action) moved=\(report.movedWindows) latencyMs=\(String(format: "%.1f", report.latencyMs)) \(problems.isEmpty ? "PASS" : "FAIL \(problems)")")
     wait(0.8)
-    screenshot(String(format: "%02d-%@-%@", index + 1, key, report.action.replacingOccurrences(of: ":", with: "-")).replacingOccurrences(of: "/", with: "_"))
+    let shot = String(format: "%02d-%@-%@", index + 1, key, report.action.replacingOccurrences(of: ":", with: "-")).replacingOccurrences(of: "/", with: "_")
+    screenshot(shot)
+    // A `settings` step reports the window number of the settings window. The window is also captured alone.
+    if key.hasPrefix("settings"), let number = report.action.split(separator: " ").first(where: { $0.hasPrefix("window=") })?.dropFirst("window=".count) {
+        run("/usr/sbin/screencapture", ["-x", "-o", "-l", String(number), out.appending(path: "screenshots/\(String(format: "%02d", index + 1))-settings-window.png").path])
+    }
+    // The "Export Diagnostics…" button writes the zip to the Desktop. The zip is moved into the proof bundle.
+    if let range = report.action.range(of: "zip=/") {
+        let zip = URL(filePath: String(report.action[report.action.index(range.lowerBound, offsetBy: 4)...]))
+        try? FileManager.default.moveItem(at: zip, to: out.appending(path: zip.lastPathComponent))
+    }
 }
 
 while video.isRunning { wait(0.2) }

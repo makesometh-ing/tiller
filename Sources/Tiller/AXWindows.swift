@@ -82,7 +82,7 @@ final class AXWindows {
                 guard let id = element.windowID, let frame = element.frame else { continue }
                 let traits = Self.traits(element, id: id, order: order)
                 let kind = traits.kind
-                logClassified(traits, id: id, app: app)
+                logClassified(traits, id: id, app: app, element: element)
                 guard kind != .ignored else { continue }
                 refs.append(WindowRef(id: id, element: element, app: appElement, pid: app.processIdentifier,
                                       frame: frame, title: element.value(kAXTitleAttribute) as? String ?? "", kind: kind))
@@ -92,14 +92,15 @@ final class AXWindows {
     }
 
     /// Writes `window.classified` the first time a window id is read with a kind. The event shows why a window is tiled, floats or is ignored.
-    private func logClassified(_ t: WindowTraits, id: WindowID, app: NSRunningApplication) {
+    /// The title is removed by `EventLog` when "Include window titles in logs" is off.
+    private func logClassified(_ t: WindowTraits, id: WindowID, app: NSRunningApplication, element: AXUIElement) {
         let key = "\(id):\(t.kind)"
         guard classifiedLock.withLock({ classified.insert(key).inserted }) else { return }
         Log.event(.windowClassified, [
             "bundleId": .string(app.bundleIdentifier ?? ""), "app": .string(app.localizedName ?? ""), "windowId": .int(Int(id)),
             "subrole": t.subrole.map(LogValue.string) ?? .null, "minimized": .bool(t.minimized), "sizeSettable": .bool(t.sizeSettable),
             "onScreen": .bool(t.onScreen), "layer": .int(t.layer), "modal": .bool(t.modal), "parentIsApp": .bool(t.parentIsApp),
-            "kind": .string("\(t.kind)"),
+            "kind": .string("\(t.kind)"), "title": .string(element.value(kAXTitleAttribute) as? String ?? ""),
         ])
     }
 

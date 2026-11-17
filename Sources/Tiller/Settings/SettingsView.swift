@@ -43,7 +43,14 @@ enum ShortcutsMode: String, CaseIterable, Identifiable {
 final class SettingsModel: ObservableObject {
     let store: ShortcutStore
     let leaderKey: LeaderKey
-    @Published var page: SettingsPage = .general
+    @Published var page: SettingsPage = .general {
+        didSet { if page == .about { readLogFiles() } }
+    }
+    /// The log folder, the file count and the total size, for example `~/Library/Logs/Tiller · 3 files · 2.1 MB`.
+    @Published private(set) var logFiles = ""
+    @Published private(set) var exporting = false
+    /// Writes the diagnostics zip to the Desktop and shows it in Finder. Set by the app delegate. It calls `completion` on the main thread.
+    var exportDiagnostics: (_ completion: @escaping () -> Void) -> Void = { $0() }
     @Published private(set) var recording: RecordTarget?
     @Published var shortcutsMode: ShortcutsMode = .leader
     /// A field that didn't save the recorded chord, and the text that the field shows for 2 seconds.
@@ -59,6 +66,21 @@ final class SettingsModel: ObservableObject {
         recording = target
         leaderKey.recorder = { [weak self] chord in
             DispatchQueue.main.async { self?.finish(target, chord) }
+        }
+    }
+
+    func readLogFiles() {
+        let urls = Log.shared.fileURLs
+        let bytes = urls.reduce(0) { $0 + ((try? FileManager.default.attributesOfItem(atPath: $1.path)[.size] as? Int) ?? 0) }
+        let folder = Log.directory.path.replacingOccurrences(of: FileManager.default.homeDirectoryForCurrentUser.path, with: "~")
+        logFiles = "\(folder) · \(urls.count) \(urls.count == 1 ? "file" : "files") · \(ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file))"
+    }
+
+    func export() {
+        exporting = true
+        exportDiagnostics { [weak self] in
+            self?.exporting = false
+            self?.readLogFiles()
         }
     }
 
@@ -136,7 +158,7 @@ struct SettingsView: View {
                         switch model.page {
                         case .general: GeneralPage(store: model.store)
                         case .shortcuts: ShortcutsPage(model: model, store: model.store)
-                        case .about: AboutPage()
+                        case .about: AboutPage(model: model, store: model.store)
                         }
                     }
                     .padding(.horizontal, 22).padding(.bottom, 22)
@@ -376,14 +398,81 @@ private struct HelpText: View {
     }
 }
 
+/// `docs/mockups/about-page.html`, variant 4: the "Log" group, then the "Diagnostics" group.
 struct AboutPage: View {
+    @ObservedObject var model: SettingsModel
+    @ObservedObject var store: ShortcutStore
+
     var body: some View {
-        VStack(spacing: 8) {
-            Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 96, height: 96)
-            Text("Tiller").font(.system(size: 18, weight: .bold))
-            Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")").foregroundStyle(.secondary)
+        let theme = Theme.current
+        let info = Bundle.main.infoDictionary ?? [:]
+        VStack(alignment: .leading, spacing: 6) {
+            VStack(spacing: 0) {
+                Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 84, height: 84)
+                Text("Tiller").font(.system(size: 18, weight: .bold)).padding(.top, 10)
+                Text("Version \(info["CFBundleShortVersionString"] as? String ?? "") (\(info["CFBundleVersion"] as? String ?? ""))")
+                    .foregroundStyle(theme.secondaryText).padding(.top, 3)
+            }
+            .frame(maxWidth: .infinity).padding(.top, 14).padding(.bottom, 8)
+            SettingsHeader(text: "Log")
+            SettingsGroup {
+                DetailRow(title: "Log file", detail: Text(model.logFiles).font(theme.pathFont), showsDivider: false) {
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([Log.shared.fileURLs.first ?? Log.directory])
+                    }
+                    .buttonStyle(.plain).font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.accent)
+                }
+            }
+            SettingsHeader(text: "Diagnostics")
+            SettingsGroup {
+                let hoursLeft = DebugLogging.hoursLeft(until: store.debugLoggingUntil, now: Date())
+                DetailRow(title: "Debug logging", badge: hoursLeft.map { "\($0) h left" },
+                          detail: Text("Logs each Accessibility call. Turns off after 24 hours.")) {
+                    Toggle("Debug logging", isOn: Binding(get: { hoursLeft != nil }, set: { store.setDebugLogging($0) }))
+                        .toggleStyle(.switch).labelsHidden().tint(theme.accent)
+                }
+                DetailRow(title: "Include window titles in logs", detail: Text("Titles can contain private text, for example a document name.")) {
+                    Toggle("Include window titles in logs", isOn: $store.logTitles).toggleStyle(.switch).labelsHidden().tint(theme.accent)
+                }
+                DetailRow(title: "Diagnostics file", detail: Text("The log, the settings, the windows and the workspace of each screen."),
+                          showsDivider: false) {
+                    Button(model.exporting ? "Exporting…" : "Export Diagnostics…") { model.export() }.disabled(model.exporting)
+                }
+            }
+            HelpText(text: "The zip file is written to the Desktop and shown in Finder. Send it with a bug report.").padding(.horizontal, -10)
         }
-        .frame(maxWidth: .infinity).padding(.top, 60)
+    }
+}
+
+/// A settings row with a second line of grey text under the title, and an optional teal badge after the title.
+private struct DetailRow<Accessory: View>: View {
+    let title: String
+    var badge: String?
+    let detail: Text
+    var showsDivider = true
+    @ViewBuilder var accessory: Accessory
+
+    var body: some View {
+        let theme = Theme.current
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(title)
+                        if let badge {
+                            Text(badge).font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.accent)
+                                .padding(.horizontal, 5).padding(.vertical, 1)
+                                .background(theme.accent.opacity(0.16), in: RoundedRectangle(cornerRadius: 4))
+                        }
+                    }
+                    detail.font(theme.detailFont).foregroundStyle(theme.secondaryText)
+                }
+                Spacer()
+                accessory
+            }
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            if showsDivider { Divider().padding(.leading, 12) }
+        }
     }
 }
 
@@ -395,6 +484,8 @@ final class SettingsWindowController {
     init(model: SettingsModel) { self.model = model }
 
     var isOpen: Bool { window?.isVisible == true }
+    /// The window server number of the settings window. The proof runner takes a screenshot of this window.
+    var windowNumber: Int { window?.windowNumber ?? 0 }
 
     func show(page: SettingsPage = .general) {
         model.page = page

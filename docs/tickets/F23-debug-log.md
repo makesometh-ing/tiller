@@ -12,38 +12,25 @@ Source: [requirements-as-written.md, sections 11 and 13](../requirements-as-writ
 
 The behaviour is described in [PRD.md, section 13 "Logging and diagnostics"](../PRD.md#13-logging-and-diagnostics).
 
-- `EventLog` and `LogFile` in `Sources/TillerCore/EventLog.swift` write each event to the unified log, subsystem `com.tiller.Tiller`, and to `~/Library/Logs/Tiller/tiller.jsonl`. The file rotates at 5 MB. 3 files are kept. Events are encoded and written on one background queue. A log call takes 0.0017 ms on the calling queue.
-- `LogEventName` lists the 22 events, with the category and the level of each. `tiller.log` isn't written.
-- `debug` events (`ax.call`) are written only to the unified log.
-- Window titles aren't logged. The window dump in the diagnostics zip doesn't contain titles.
-- "Export Diagnostics…" in the menu bar menu and in the Tiller app menu writes `Tiller-Diagnostics-<date>.zip` to the Desktop and shows it in Finder. `Diagnostics.export` in `Sources/Tiller/Diagnostics.swift` writes it.
-- `scripts/check-log.py` checks each line of a log file: valid JSON, the required keys, a known event, its category and the required fields of the event.
-- The `export-diagnostics:<dir>` proof step writes the zip to a folder without Finder.
+- `EventLog` and `LogFile` in `Sources/TillerCore/EventLog.swift` write each event to the unified log, subsystem `com.tiller.Tiller`, and to `~/Library/Logs/Tiller/tiller.jsonl`. The file rotates at 5 MB. 3 files are kept. Events are encoded and written on one background queue. A log call takes 0.002 ms on the calling queue.
+- `LogEventName` lists the 23 events, with the category and the level of each.
+- `debug` events (`ax.call`) are written to the file only while "Debug logging" is on.
+- `EventLog` removes the `title` and `titles` fields of each event while "Include window titles in logs" is off. `window.classified` has the window title. `action.focus` has the titles of the windows in ring order.
+- "Export Diagnostics…" in the menu bar menu, in the Tiller app menu and on the About page writes `Tiller-Diagnostics-<date>.zip` to the Desktop and shows it in Finder. `Diagnostics.export` in `Sources/Tiller/Diagnostics.swift` writes it. `windows.json` in the zip has the window titles only while "Include window titles in logs" is on.
+- The About page, `AboutPage` in `Sources/Tiller/Settings/SettingsView.swift`, is variant 4 in [about-page.html](../mockups/about-page.html): the icon, the name and the version, the "Log" group, then the "Diagnostics" group.
+  - "Log file" shows the log folder, the file count and the total size. The values are read each time the page is shown and after an export. "Show in Finder" shows `tiller.jsonl` in Finder.
+  - "Debug logging" is saved as the time it turns off, `debugLoggingUntil`, in the Tiller defaults. A timer turns it off after 24 hours. A badge shows the hours left.
+  - "Include window titles in logs" is saved as `logTitles` in the Tiller defaults.
+  - "Export Diagnostics…" calls the same export as the menu item.
+- `scripts/check-log.py` checks each line of a log file: valid JSON, the required keys, a known event, its category and the required fields of the event. A window title is allowed only while "Include window titles in logs" is on in the session. A `debug` line is allowed only while "Debug logging" is on in the session.
+- Proof steps: `export-diagnostics:<dir>` writes the zip to a folder without Finder. `toggle:debugLogging`, `toggle:logTitles` and `expire:debugLogging` change the switches. `press:<title>` presses a button with the Accessibility press action. A `settings:<page>` step also captures the settings window alone.
 - Tiller quits through `applicationWillTerminate` on SIGTERM, so `app.terminate` and the queued events are written.
-- Mockups of the About page: [about-page.html](../mockups/about-page.html), 3 variants in the light and the dark appearance. Each variant shows the "Export Diagnostics…" button and the place of the "Debug logging" and "Include window titles in logs" switches.
 
 ## Proof
 
-[F23-debug-log](../../Tests/Proof/F23-debug-log): a proof run with WeChat and the test windows. All steps pass. `scripts/check-log.py` checked the 77 lines of the run: 0 failed. The diagnostics zip shows WeChat window 10014 as `tiled` and the `setFramesMs` of WeChat and of the test windows for each action. `mockups/about-page.png` is the render of the 3 About page variants.
-
-## What to build
-
-These items wait for the approval of one variant in [about-page.html](../mockups/about-page.html):
-
-- The "Export Diagnostics…" button on the About page. It calls the same export as the menu item.
-- The "Debug logging" switch. It writes `debug` events to the file and turns off after 24 hours.
-- The "Include window titles in logs" switch. It adds titles to `window.classified`, `action.focus` and `windows.json`.
-
-## Acceptance criteria
-
-- [x] Unit tests for the log event encoding and the log file rotation at 5 MB.
-- [ ] A unit test for the "Include window titles in logs" setting.
-- [x] A script checks the log of a run. Each log line is valid JSON with the required fields.
-- [x] A run is made with WeChat and the test windows. Its diagnostics zip shows the window kind of each WeChat window and the `setFramesMs` of each app.
-- [x] Logging adds less than 0.5 ms to the latency of an action.
-- [ ] "Export Diagnostics…" on the About page writes the diagnostics zip, in the light and the dark appearance.
-- [ ] "Debug logging" writes `debug` events to the file and turns off after 24 hours.
-
-## Proof needed
-
-Screenshots of the About page in the light and the dark appearance, the diagnostics zip written by the button, and the unit test output of the window titles setting.
+- [F23-debug-log](../../Tests/Proof/F23-debug-log): a proof run with WeChat and the test windows. All steps pass. `scripts/check-log.py` checked the 77 lines of the run: 0 failed. The diagnostics zip shows WeChat window 10014 as `tiled` and the `setFramesMs` of WeChat and of the test windows for each action.
+- [F23-about-page](../../Tests/Proof/F23-about-page): a proof run in the dark appearance and one in the light appearance. All 14 steps of each run pass.
+  - The settings window screenshots show the About page as in variant 4, with both switches off, then both on with the "24 h left" badge, then both off after the timer turned debug logging off.
+  - The "Export Diagnostics…" button wrote a zip in each run. Each zip has the window titles in `windows.json` and 8 `ax.call` lines in `tiller.jsonl`.
+  - `scripts/check-log.py` checked the 43 lines of each run: 0 failed. The 8 `ax.call` lines were written while "Debug logging" was on. The 3 window moves after the timer turned it off weren't written to the file.
+  - The unit tests for "Debug logging" and "Include window titles in logs" pass: 52 tests passed.

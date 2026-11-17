@@ -29,7 +29,7 @@ enum WindowDump {
         var kind: String
     }
 
-    /// `titles` is false for the diagnostics zip. Window titles can contain private text.
+    /// `titles` is false for the diagnostics zip when "Include window titles in logs" is off. Window titles can contain private text.
     static func write(to path: String, titles: Bool = true) {
         let info = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? []
         var layers: [UInt32: Int] = [:], onScreen: [UInt32: Bool] = [:]

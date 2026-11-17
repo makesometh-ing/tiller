@@ -3,6 +3,8 @@
 
 Usage: scripts/check-log.py <tiller.jsonl> [more files]
 Prints the number of lines of each event, and each line that fails a check. Exits with 1 when a line fails.
+A window title is allowed only while "Include window titles in logs" is on in the session of the line.
+A `debug` line is allowed only while "Debug logging" is on in the session of the line.
 """
 import json
 import re
@@ -41,6 +43,10 @@ EVENTS = {
 ACTION_TIMINGS = {"windowListMs", "focusReadMs", "setFramesMs", "focusMs", "totalMs"}
 
 
+# The settings of each session: {"logTitles": bool, "debugLogging": bool}. Set by app.launch and settings.changed.
+SESSIONS = {}
+
+
 def problems(line):
     try:
         e = json.loads(line)
@@ -69,8 +75,16 @@ def problems(line):
         missing |= ACTION_TIMINGS - set(e["fields"])
     if missing:
         found.append(f"fields missing: {sorted(missing)}")
-    if "title" in json.dumps(e["fields"]):
-        found.append("contains a window title")
+    state = SESSIONS.setdefault(e["session"], {"logTitles": False, "debugLogging": False})
+    if e["event"] == "app.launch":
+        settings = e["fields"].get("settings", {})
+        state.update(logTitles=settings.get("logTitles", False), debugLogging=settings.get("debugLogging", False))
+    if e["event"] == "settings.changed" and e["fields"].get("setting") in state:
+        state[e["fields"]["setting"]] = e["fields"]["value"]
+    if "title" in json.dumps(e["fields"]) and not state["logTitles"]:
+        found.append("contains a window title, and \"Include window titles in logs\" is off")
+    if e["level"] == "debug" and not state["debugLogging"]:
+        found.append("is a debug event, and \"Debug logging\" is off")
     return found
 
 
@@ -78,6 +92,7 @@ def main(paths):
     counts = {}
     failed = 0
     total = 0
+    titled = 0
     for path in paths:
         with open(path, encoding="utf-8") as f:
             for number, line in enumerate(f, 1):
@@ -88,11 +103,13 @@ def main(paths):
                 except Exception:
                     name = "?"
                 counts[name] = counts.get(name, 0) + 1
+                titled += '"title' in line
                 if found:
                     failed += 1
                     print(f"FAIL {path}:{number}: {'; '.join(found)}")
     for name in sorted(EVENTS):
         print(f"{name}\t{counts.get(name, 0)}")
+    print(f"Lines with window titles\t{titled}")
     print(f"{total} lines, {failed} failed: {'PASS' if failed == 0 else 'FAIL'}")
     return 1 if failed else 0
 

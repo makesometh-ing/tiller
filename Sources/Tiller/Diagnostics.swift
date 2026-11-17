@@ -2,7 +2,7 @@ import AppKit
 import ApplicationServices
 import TillerCore
 
-/// Writes the diagnostics zip. Window titles aren't written.
+/// Writes the diagnostics zip.
 enum Diagnostics {
     /// Tiller version and build, macOS version, Mac model, the Accessibility permission and the screens. `screens` is read on the main thread.
     static func systemFields(screens: [ScreenInfo]) -> [String: LogValue] {
@@ -22,7 +22,8 @@ enum Diagnostics {
     }
 
     /// Writes `Tiller-Diagnostics-<date>.zip` to `directory` and returns its URL. Call on a background queue.
-    static func export(to directory: URL, system: [String: LogValue], settings: [String: LogValue], controller: Controller) -> URL? {
+    /// `titles` adds the window titles to `windows.json`.
+    static func export(to directory: URL, system: [String: LogValue], settings: [String: LogValue], titles: Bool, controller: Controller) -> URL? {
         let start = DispatchTime.now()
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmmss"
@@ -39,7 +40,7 @@ enum Diagnostics {
               "state.json")
         write(.object(settings), "settings.json")
         write(controller.workspaceState(), "workspaces.json")
-        WindowDump.write(to: folder.appending(path: "windows.json").path, titles: false)
+        WindowDump.write(to: folder.appending(path: "windows.json").path, titles: titles)
         Log.shared.flush()
         for url in Log.shared.fileURLs { try? FileManager.default.copyItem(at: url, to: folder.appending(path: url.lastPathComponent)) }
         run("/usr/bin/log", ["show", "--last", "2h", "--info", "--debug", "--predicate", "subsystem == \"\(EventLog.subsystem)\" AND process == \"Tiller\""],
