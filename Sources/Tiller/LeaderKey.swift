@@ -15,12 +15,10 @@ enum Action: Equatable {
 }
 
 /// Reads key presses with an event tap. After the leader key, the next key presses don't reach the focused app.
-/// The layer ends after an action, after `Esc` or after a second leader key press.
+/// The layer ends after `Esc`, after a second leader key press, or after an action with the "Exit after" setting on.
 final class LeaderKey {
     static let escapeKeyCode: Int64 = 53
     static let keyListKeyCode: Int64 = 44  // The `/` key. `?` is shift and `/`.
-    // TODO: make the shortcut that turns Tiller off and on recordable.
-    static let toggleChord = KeyChord(spec: "ctrl+opt+cmd+t")!
 
     /// Read on the main thread for each key press, so that changes in the settings apply at once.
     var shortcuts: () -> Shortcuts = { .standard }
@@ -34,9 +32,9 @@ final class LeaderKey {
     var onCancel: () -> Void = {}
     /// Called on the main thread when `?` is pressed. The layer stays active.
     var onKeyList: () -> Void = {}
-    /// When false, only `toggleChord` is stopped. Each other key press goes to the focused app.
+    /// When false, only the `toggle` chord is stopped. Each other key press goes to the focused app.
     var isEnabled: () -> Bool = { true }
-    /// Called on the main thread when `toggleChord` is pressed. Leader key mode ends.
+    /// Called on the main thread when the `toggle` chord is pressed. Leader key mode ends.
     var onToggle: () -> Void = {}
 
     private(set) var isLayerActive = false {
@@ -82,7 +80,8 @@ final class LeaderKey {
             recorder(code == Self.escapeKeyCode && modifiers.isEmpty ? nil : KeyChord(keyCode: UInt16(code), modifiers: modifiers))
             return nil
         }
-        if KeyChord(keyCode: UInt16(code), modifiers: modifiers) == Self.toggleChord {
+        let shortcuts = shortcuts()
+        if KeyChord(keyCode: UInt16(code), modifiers: modifiers) == shortcuts.toggle {
             stoppedKeyUps.insert(code)
             guard event.getIntegerValueField(.keyboardEventAutorepeat) == 0 else { return nil }
             isLayerActive = false
@@ -90,7 +89,6 @@ final class LeaderKey {
             return nil
         }
         guard isEnabled() else { return pass }
-        let shortcuts = shortcuts()
         let isLeader = shortcuts.isLeader(keyCode: UInt16(code), modifiers: modifiers)
         guard isLayerActive || isLeader else { return pass }
 
@@ -105,7 +103,7 @@ final class LeaderKey {
         } else if code == Self.keyListKeyCode {
             onKeyList()
         } else if let id = shortcuts.action(keyCode: UInt16(code), modifiers: modifiers) {
-            isLayerActive = false
+            if shortcuts.exits(after: id) { isLayerActive = false }
             onAction(id.action, received)
         }
         return nil

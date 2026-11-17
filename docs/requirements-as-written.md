@@ -458,3 +458,15 @@ On a screen recording of Tiller in use:
 > when I get to a certain point in the ring buffer (I can't tell if it's the end of the ring buffer or some other bug) the layout gets all messed up and it's just 3 cascaded windows and the carousel messes up (it's the end of the video)
 
 > also, I think as part of the config, we need to decide if a shortcut should exit leader key mode or stay in leader key mode. for switch windows in the container and moving between containers, and moving windows between containers, I think it should stay in leader key mode by default, but there should be a column "exit leader key mode" with a checkbox for each action. what do you think?
+
+## 19. Shortcuts page with the "Exit after" column
+
+On the three Shortcuts page designs in [mockups/exit-leader-key-mode.html](mockups/exit-leader-key-mode.html), with screenshots of variant 1 (a checkbox column with the heading "Exit after"):
+
+> I don't see the leader/global switch  in the  mockups. I don't want that forgotten...
+
+> these are the best designs.
+
+During the proof run:
+
+> I already use `hyper + t` on my mac to open raycast translate. you need a different key for testing

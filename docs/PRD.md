@@ -78,12 +78,13 @@ After v1: Left Busy, Right Busy, Horizontal Split, named custom layouts, and a c
 | | `?` | Open or close the key list |
 | | `Esc` | End leader key mode |
 
+- Each action has an "Exit after" setting on the Shortcuts page. When it is off, leader key mode continues after the action. The overlay is then updated after the action. Off by default for `H`, `L`, `J` and `K`. On by default for the other actions. `Q` always ends leader key mode.
+
 Planned for v1:
 
 - `P`: peek. See section 7 "Windows".
-- `⇧J` and `⇧K` move the focused window to the next or previous container. The moved window becomes the focused window of its new carousel. Focus stays in the old container, on the next window of its carousel.
+- `⇧J` and `⇧K` move the focused window to the next or previous container. The moved window becomes the focused window of its new carousel. Focus stays in the old container, on the next window of its carousel. Their "Exit after" setting is off by default.
 - Leader key mode ends 10 seconds after the last key press. It doesn't end while the key list is open.
-- Each action has an "Exit leader key mode" setting. When it is off, leader key mode continues after the action and the overlay is updated. Off by default for `H`, `L`, `J`, `K`, `⇧J` and `⇧K`. On by default for the other actions. `Q` always ends leader key mode.
 - Leader key mode ends on an app switch, a mouse click and a screen lock.
 - When the event tap doesn't start, the menu bar menu shows the failure. Tiller starts the event tap again every second until it starts.
 - Key names are read from the current keyboard layout. They are read again when the keyboard layout changes. Chords are stored as key codes. A saved chord stays on the same key after a keyboard layout change.
@@ -147,7 +148,7 @@ After v1: a setting for light, dark or system, and themes.
 
 - "Settings…" (⌘,) in the Tiller menu opens the settings window, in front of the other apps. Mockup: variant 1 in [settings.html](mockups/settings.html).
 - Layout: a sidebar with colored icons, as in the CleanShot settings (`docs/references/ui-cleanshot-settings-*.png`). Pages: General, Shortcuts and About. A Permissions page is planned, see section 4 "Platform and build".
-- Shortcuts page: the leader key field, "Show the key bar", and one field for each action.
+- Shortcuts page, as variant 1 in [exit-leader-key-mode.html](mockups/exit-leader-key-mode.html): a "Global shortcuts" group with the leader key field, the "Turn Tiller on and off" field and "Show the key bar". Then one group for each section of the key bar, with one field for each action and an "Exit after" checkbox column. The checkbox of "Turn Tiller off" is checked and disabled.
 - Shortcut field, as in Rectangle Pro (`docs/references/ui-rectanglepro-shortcut-*.png`): the keys in a grey field with a clear button. A click starts recording. The field shows "Press keys…" with a teal edge. The next key press is saved. `Esc` cancels the recording.
 - Each chord can use Hyper. A chord can have only one action.
 - Shortcuts are saved in the Tiller defaults.
@@ -157,17 +158,15 @@ After v1: a setting for light, dark or system, and themes.
 - General page: "Enable Tiller". It is the same setting as the switch in the menu bar menu. It is saved in the Tiller defaults and applied at launch. On by default.
 - Menu bar menu, as variant A in [menu-bar-menu-v2.html](mockups/menu-bar-menu-v2.html): a "Tiller" row with the global shortcut in grey before a switch.
 - When Tiller is off, the leader key and the global shortcuts are sent to the focused app. Windows stay where they are. When Tiller is on again, the windows are arranged again in their containers.
-- The global shortcut to turn Tiller on and off is `⌃⌥⌘ T`. It doesn't require a Hyper key. `⇧⌘T` isn't used. Safari, Chrome, Firefox, VS Code and Finder use it. `⌃⌥T` isn't used. Rectangle uses it. `⌥⌘T` isn't used. Finder uses it. With Tiller off, only the global shortcut, the menu bar menu, the General page and the Dock menu turn Tiller on. The global shortcut can't be recorded yet.
+- The global shortcut to turn Tiller on and off is `⌃⌥⌘ T`. It doesn't require a Hyper key. `⇧⌘T` isn't used. Safari, Chrome, Firefox, VS Code and Finder use it. `⌃⌥T` isn't used. Rectangle uses it. `⌥⌘T` isn't used. Finder uses it. With Tiller off, only the global shortcut, the menu bar menu, the General page and the Dock menu turn Tiller on. The global shortcut can be recorded on the Shortcuts page.
 
 Planned for v1, with mockups in [settings-v2.html](mockups/settings-v2.html), [general-page.html](mockups/general-page.html) and [menu-bar-menu-v2.html](mockups/menu-bar-menu-v2.html):
 
 - Global shortcuts: each action except the leader key has a global shortcut. A global shortcut does its action without the leader key. The focused app doesn't receive it. Global shortcuts are empty by default, except the shortcut to turn Tiller on and off.
 - A global shortcut can't be the same chord as the leader key or as another global shortcut.
 - Shortcuts page: a segmented control at the top of the page shows the action keys ("Leader key mode") or the global shortcuts ("Global").
-- Shortcuts page: an "Exit leader key mode" checkbox column next to the "Leader key mode" fields. See section 6 "Leader key mode".
 - General page: "Open at login", off by default. The switch shows the state from macOS. A change in System Settings is shown in the switch.
 - General page: the workspace margin, the container margin and the carousel spacing. See section 5 "Layouts and carousels".
-- The global shortcut to turn Tiller on and off can be recorded. Its default is `⌃⌥⌘ T`.
 
 ## 12. Icons
 

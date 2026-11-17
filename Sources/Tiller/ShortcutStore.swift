@@ -80,9 +80,20 @@ final class ShortcutStore: ObservableObject {
         save()
     }
 
+    func setToggle(_ chord: KeyChord?) {
+        shortcuts.toggle = chord
+        save()
+    }
+
+    func setExitAfter(_ exits: Bool, for action: ActionID) {
+        shortcuts.exitAfter[action] = exits
+        save()
+    }
+
     private func save() {
         defaults.set(try? JSONEncoder().encode(shortcuts), forKey: Self.key)
-        Log.write("shortcuts saved leader=\(shortcuts.leader?.spec ?? "none") " + shortcuts.actions.map { "\($0.key.rawValue)=\($0.value.spec)" }.sorted().joined(separator: " "))
+        Log.write("shortcuts saved leader=\(shortcuts.leader?.spec ?? "none") toggle=\(shortcuts.toggle?.spec ?? "none") "
+                  + "exitAfter=\(ActionID.allCases.filter(shortcuts.exits(after:)).map(\.rawValue).joined(separator: ",")) " + shortcuts.actions.map { "\($0.key.rawValue)=\($0.value.spec)" }.sorted().joined(separator: " "))
     }
 }
 

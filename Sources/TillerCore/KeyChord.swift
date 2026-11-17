@@ -94,18 +94,41 @@ public enum ActionID: String, Codable, CaseIterable, Sendable {
     case focusPreviousWindow, focusNextWindow, toggleFloat
     case raiseFloating
     case turnOff
+
+    /// The focus actions keep leader key mode by default, so that their keys can be pressed in a row.
+    // TODO: add the actions that move a window to the previous or next container.
+    public var exitsByDefault: Bool {
+        ![.focusPreviousContainer, .focusNextContainer, .focusPreviousWindow, .focusNextWindow].contains(self)
+    }
 }
 
 /// The leader key and the key of each action in leader key mode.
 public struct Shortcuts: Codable, Equatable, Sendable {
     public var leader: KeyChord?
+    /// Turns Tiller off and on, in every app and also while Tiller is off.
+    public var toggle: KeyChord?
     public var actions: [ActionID: KeyChord]
     /// Actions whose chord was cleared. They don't get their standard chord when saved shortcuts are read.
     public var cleared: Set<ActionID> = []
+    /// The "Exit after" setting of each action that was changed on the Shortcuts page.
+    public var exitAfter: [ActionID: Bool] = [:]
 
-    public init(leader: KeyChord?, actions: [ActionID: KeyChord]) {
+    public init(leader: KeyChord?, toggle: KeyChord?, actions: [ActionID: KeyChord]) {
         self.leader = leader
+        self.toggle = toggle
         self.actions = actions
+    }
+
+    enum CodingKeys: CodingKey { case leader, toggle, actions, cleared, exitAfter }
+
+    /// A cleared `toggle` is written as null. Saved shortcuts without the `toggle` key get the standard toggle chord.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(leader, forKey: .leader)
+        try c.encode(toggle, forKey: .toggle)
+        try c.encode(actions, forKey: .actions)
+        try c.encode(cleared, forKey: .cleared)
+        try c.encode(exitAfter, forKey: .exitAfter)
     }
 
     /// Saved shortcuts don't contain the actions that were added after the save. Each of these actions gets its standard chord,
@@ -115,6 +138,8 @@ public struct Shortcuts: Codable, Equatable, Sendable {
         leader = try c.decodeIfPresent(KeyChord.self, forKey: .leader)
         actions = try c.decode([ActionID: KeyChord].self, forKey: .actions)
         cleared = try c.decodeIfPresent(Set<ActionID>.self, forKey: .cleared) ?? []
+        toggle = c.contains(.toggle) ? try c.decodeIfPresent(KeyChord.self, forKey: .toggle) : Self.standard.toggle
+        exitAfter = try c.decodeIfPresent([ActionID: Bool].self, forKey: .exitAfter) ?? [:]
         for (id, chord) in Self.standard.actions where actions[id] == nil && !cleared.contains(id) && !actions.values.contains(chord) {
             actions[id] = chord
         }
@@ -122,6 +147,8 @@ public struct Shortcuts: Codable, Equatable, Sendable {
 
     public static let standard = Shortcuts(
         leader: KeyChord(spec: "ctrl+opt+space"),
+        // ⇧⌘T, ⌃⌥T and ⌥⌘T are used by browsers, Finder and Rectangle.
+        toggle: KeyChord(spec: "ctrl+opt+cmd+t"),
         actions: [
             .layoutFullScreen: KeyChord(spec: "1")!, .layoutVerticalSplit: KeyChord(spec: "2")!,
             .layoutLeftTwoThirds: KeyChord(spec: "3")!, .layoutRightTwoThirds: KeyChord(spec: "4")!,
@@ -130,6 +157,11 @@ public struct Shortcuts: Codable, Equatable, Sendable {
             .focusNextWindow: KeyChord(spec: "l")!, .toggleFloat: KeyChord(spec: "f")!,
             .raiseFloating: KeyChord(spec: "r")!, .turnOff: KeyChord(spec: "q")!,
         ])
+
+    /// True when leader key mode ends after the action. `turnOff` always ends it.
+    public func exits(after action: ActionID) -> Bool {
+        action == .turnOff || (exitAfter[action] ?? action.exitsByDefault)
+    }
 
     public func isLeader(keyCode: UInt16, modifiers: Modifiers) -> Bool {
         leader == KeyChord(keyCode: keyCode, modifiers: modifiers)

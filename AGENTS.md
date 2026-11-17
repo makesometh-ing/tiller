@@ -40,7 +40,7 @@ Tiller is a tiling window manager for macOS. It is a menu bar app.
 - In leader key mode, each window has a small translucent pill at its bottom-right corner: app icon, app name, Tiled or Floating, and the `p` and `f` keys. The pill of a window behind the focused window in a carousel shows only the app icon. The app icon is shown in the visible edge of the window.
 
 - The settings window is variant 1 in `docs/mockups/settings.html`: a sidebar with colored icons, as in the CleanShot settings, and shortcut fields with a clear button, as in Rectangle Pro. The references are in `docs/references/`.
-- The leader key and every key in leader key mode can be recorded in the settings. Each chord can use Hyper (⌃⌥⇧⌘ together). A key without modifiers in leader key mode also matches while modifiers are still held.
+- The leader key, the shortcut to turn Tiller on and off, and every key in leader key mode can be recorded in the settings. Each action in leader key mode has an "Exit after" checkbox (variant 1 in `docs/mockups/exit-leader-key-mode.html`). Each chord can use Hyper (⌃⌥⇧⌘ together). A key without modifiers in leader key mode also matches while modifiers are still held.
 
 ## Window behavior
 

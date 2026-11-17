@@ -90,3 +90,33 @@ import Testing
     #expect(read.actions[.turnOff] == nil)
     #expect(read.actions[.toggleFloat] == KeyChord(spec: "q"))
 }
+
+@Test func focusActionsKeepLeaderKeyModeByDefault() {
+    var s = Shortcuts.standard
+    #expect(!s.exits(after: .focusNextWindow))
+    #expect(!s.exits(after: .focusPreviousContainer))
+    #expect(s.exits(after: .layoutFullScreen))
+    s.exitAfter[.focusNextWindow] = true
+    s.exitAfter[.layoutFullScreen] = false
+    s.exitAfter[.turnOff] = false
+    #expect(s.exits(after: .focusNextWindow))
+    #expect(!s.exits(after: .layoutFullScreen))
+    #expect(s.exits(after: .turnOff))
+}
+
+@Test func toggleChordAndExitAfterAfterJSON() throws {
+    var s = Shortcuts.standard
+    #expect(s.toggle == KeyChord(spec: "ctrl+opt+cmd+t"))
+    s.exitAfter[.focusNextWindow] = true
+    s.toggle = nil
+    let read = try JSONDecoder().decode(Shortcuts.self, from: JSONEncoder().encode(s))
+    #expect(read == s)
+    #expect(read.toggle == nil)
+    // Shortcuts saved before `toggle` and `exitAfter` existed.
+    var saved = try JSONSerialization.jsonObject(with: JSONEncoder().encode(Shortcuts.standard)) as! [String: Any]
+    saved["toggle"] = nil
+    saved["exitAfter"] = nil
+    let old = try JSONDecoder().decode(Shortcuts.self, from: JSONSerialization.data(withJSONObject: saved))
+    #expect(old.toggle == KeyChord(spec: "ctrl+opt+cmd+t"))
+    #expect(old.exitAfter.isEmpty)
+}

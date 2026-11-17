@@ -161,7 +161,7 @@ enum KeyGuide {
     struct Entry { let actions: [ActionID]; let label: String; let detail: String }
     struct Section { let title: String; let entries: [Entry] }
 
-    static let sections = [
+    static func sections(_ shortcuts: Shortcuts) -> [Section] { [
         Section(title: "SCREEN", entries: [Entry(actions: [.layoutFullScreen, .layoutVerticalSplit, .layoutLeftTwoThirds, .layoutRightTwoThirds],
                                                  label: "Layout", detail: "Full screen, vertical split, left ⅔, right ⅔")]),
         Section(title: "CONTAINER", entries: [Entry(actions: [.focusPreviousContainer, .focusNextContainer], label: "Focus", detail: "Previous or next container"),
@@ -169,8 +169,9 @@ enum KeyGuide {
         Section(title: "WINDOW", entries: [Entry(actions: [.focusPreviousWindow, .focusNextWindow], label: "Focus", detail: "Previous or next window in the carousel"),
                                            Entry(actions: [.toggleFloat], label: "Float", detail: "Float a tiled window, or tile it again")]),
         Section(title: "APP", entries: [Entry(actions: [.raiseFloating], label: "Raise", detail: "Raise the floating windows of the focused app")]),
-        Section(title: "TILLER", entries: [Entry(actions: [.turnOff], label: "Off", detail: "Turn Tiller off. \(LeaderKey.toggleChord.labels.joined(separator: " ")) turns it on again")]),
-    ]
+        Section(title: "TILLER", entries: [Entry(actions: [.turnOff], label: "Off",
+                                                  detail: shortcuts.toggle.map { "Turn Tiller off. \($0.labels.joined(separator: " ")) turns it on again" } ?? "Turn Tiller off")]),
+    ] }
 
     /// The key cap labels of an entry. An action without a key isn't shown.
     static func labels(_ entry: Entry, _ shortcuts: Shortcuts) -> [String] {
@@ -194,7 +195,7 @@ struct KeyBar: View {
         HStack(spacing: 10) {
             Image(systemName: "line.3.horizontal").rotationEffect(.degrees(90)).foregroundStyle(theme.secondaryText).font(.system(size: 9))
             Text("TILLER").font(.system(size: 10, weight: .bold)).kerning(0.6).foregroundStyle(theme.accent)
-            ForEach(KeyGuide.sections, id: \.title) { section in
+            ForEach(KeyGuide.sections(store.shortcuts), id: \.title) { section in
                 Divider().frame(height: 26)
                 VStack(alignment: .leading, spacing: 3) {
                     SectionTitle(text: section.title)
@@ -227,7 +228,7 @@ struct KeyList: View {
     var body: some View {
         let theme = Theme.current
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(KeyGuide.sections, id: \.title) { section in
+            ForEach(KeyGuide.sections(store.shortcuts), id: \.title) { section in
                 SectionTitle(text: section.title).padding(.top, section.title == "SCREEN" ? 0 : 4)
                 ForEach(section.entries.filter { !KeyGuide.labels($0, store.shortcuts).isEmpty }, id: \.label) { entry in
                     HStack(spacing: 6) {

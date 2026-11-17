@@ -5,6 +5,7 @@ import TillerCore
 /// Which shortcut field records now. Only one field records at a time.
 enum RecordTarget: Equatable {
     case leader
+    case toggle
     case action(ActionID)
 }
 
@@ -32,6 +33,7 @@ final class SettingsModel: ObservableObject {
         if recording == target { cancel() }
         switch target {
         case .leader: store.setLeader(nil)
+        case .toggle: store.setToggle(nil)
         case .action(let id): store.set(nil, for: id)
         }
     }
@@ -46,6 +48,7 @@ final class SettingsModel: ObservableObject {
         guard let chord else { return }
         switch target {
         case .leader: store.setLeader(chord)
+        case .toggle: store.setToggle(chord)
         case .action(let id): store.set(chord, for: id)
         }
     }
@@ -198,7 +201,7 @@ struct MenuSwitchRow: View {
         HStack(spacing: 8) {
             Text("Tiller").fontWeight(.semibold)
             Spacer(minLength: 24)
-            Text(LeaderKey.toggleChord.labels.joined(separator: " ")).foregroundStyle(Theme.current.secondaryText)
+            Text(store.shortcuts.toggle?.labels.joined(separator: " ") ?? "").foregroundStyle(Theme.current.secondaryText)
             // A `Toggle` in a menu is drawn grey, because the app isn't active. This switch keeps the accent color.
             Button { store.enabled.toggle() } label: {
                 Capsule().fill(store.enabled ? Theme.current.accent : Color.primary.opacity(0.18)).frame(width: 30, height: 17)
@@ -249,38 +252,64 @@ struct GeneralPage: View {
     }
 }
 
+/// Variant 1 in `docs/mockups/exit-leader-key-mode.html`: the global shortcuts, then the action keys with an "Exit after" checkbox column.
 struct ShortcutsPage: View {
     @ObservedObject var model: SettingsModel
     @ObservedObject var store: ShortcutStore
 
     var body: some View {
+        let shortcuts = store.shortcuts
         VStack(alignment: .leading, spacing: 6) {
-            SettingsHeader(text: "Leader key")
+            SettingsHeader(text: "Global shortcuts")
             SettingsGroup {
-                SettingsRow(title: "Leader key", showsDivider: false) {
-                    ShortcutField(model: model, target: .leader, chord: store.shortcuts.leader, accessibilityName: "Leader key")
+                SettingsRow(title: "Leader key") {
+                    ShortcutField(model: model, target: .leader, chord: shortcuts.leader, accessibilityName: "Leader key")
                 }
-                Text("Press the leader key, then one key from the lists below. Esc ends leader key mode.")
-                    .font(.system(size: 11)).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12).padding(.bottom, 8)
+                SettingsRow(title: "Turn Tiller on and off", showsDivider: false) {
+                    ShortcutField(model: model, target: .toggle, chord: shortcuts.toggle, accessibilityName: "Turn Tiller on and off")
+                }
+                HelpText(text: "These shortcuts work in every app. The shortcut to turn Tiller on and off works also while Tiller is off.")
                 Divider().padding(.leading, 12)
                 SettingsRow(title: "Show the key bar", showsDivider: false) {
                     Toggle("Show the key bar", isOn: $store.showKeyBar).toggleStyle(.switch).labelsHidden().tint(Theme.current.accent)
                 }
             }
-            ForEach(KeyGuide.sections, id: \.title) { section in
-                SettingsHeader(text: section.title.capitalized)
+            ForEach(KeyGuide.sections(shortcuts), id: \.title) { section in
+                HStack(alignment: .lastTextBaseline) {
+                    SettingsHeader(text: section.title.capitalized)
+                    Spacer()
+                    Text("Exit after").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+                        .frame(width: Self.checkboxColumn).padding(.trailing, 12)
+                }
                 SettingsGroup {
                     let ids = section.entries.flatMap(\.actions)
                     ForEach(Array(ids.enumerated()), id: \.element) { index, id in
                         SettingsRow(title: id.title, showsDivider: index < ids.count - 1) {
-                            ShortcutField(model: model, target: .action(id), chord: store.shortcuts.actions[id], accessibilityName: id.title)
+                            ShortcutField(model: model, target: .action(id), chord: shortcuts.actions[id], accessibilityName: id.title)
+                            Toggle("Exit leader key mode after \(id.title)", isOn: Binding(
+                                get: { store.shortcuts.exits(after: id) }, set: { store.setExitAfter($0, for: id) }))
+                                .toggleStyle(.checkbox).labelsHidden().tint(Theme.current.accent)
+                                .disabled(id == .turnOff)
+                                .help(id == .turnOff ? "Turn Tiller off always exits leader key mode" : "Exit leader key mode after this action")
+                                .frame(width: Self.checkboxColumn)
                         }
                     }
                 }
             }
+            HelpText(text: "A checked action ends leader key mode. With an action unchecked, press more keys, then Esc or the leader key to end leader key mode. Turn Tiller off always ends leader key mode.")
+                .padding(.horizontal, -12)
         }
+    }
+
+    private static let checkboxColumn: CGFloat = 56
+}
+
+private struct HelpText: View {
+    let text: String
+    var body: some View {
+        Text(text).font(.system(size: 11)).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12).padding(.bottom, 8)
     }
 }
 

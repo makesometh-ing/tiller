@@ -80,8 +80,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         leader.isEnabled = { [store] in store.enabled }
         leader.onToggle = { [store] in store.enabled.toggle() }
-        leader.onAction = { [controller, store] action, received in
-            if action == .turnOff { store.enabled = false } else { controller!.perform(action, received: received) }
+        leader.onAction = { [weak self] action, received in
+            guard let self else { return }
+            if action == .turnOff { store.enabled = false; return }
+            controller.perform(action, received: received) { [weak self] in
+                // Leader key mode continues after an action with the "Exit after" setting off.
+                guard let self, leader.isLayerActive else { return }
+                updateOverlay(since: received, syncFocus: false)
+            }
         }
         leader.onCancel = { [weak self] in self?.controller.reportCurrentState(action: "cancel") }
         leader.onKeyList = { [weak self] in
@@ -141,11 +147,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let start = DispatchTime.now()
         overlay.show()
         let barMs = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6
-        controller.overlayScreens { [weak self] screens in
+        updateOverlay(since: start, barMs: barMs)
+    }
+
+    /// Reads the containers and windows, and shows them in the overlay. `start` is the leader key press or the action key press.
+    private func updateOverlay(since start: DispatchTime, barMs: Double? = nil, syncFocus: Bool = true) {
+        controller.overlayScreens(syncFocus: syncFocus) { [weak self] screens in
             guard let self, self.leader.isLayerActive else { return }
             self.overlay.update(screens)
             let ms = Double(DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds) / 1e6
-            Log.write(String(format: "overlay barMs=%.1f containersMs=%.1f screens=%d keyBar=%@", barMs, ms, screens.count, self.store.showKeyBar ? "shown" : "hidden"))
+            if let barMs {
+                Log.write(String(format: "overlay barMs=%.1f containersMs=%.1f screens=%d keyBar=%@", barMs, ms, screens.count, self.store.showKeyBar ? "shown" : "hidden"))
+            } else {
+                Log.write(String(format: "overlay updated after action msSinceKeyPress=%.1f screens=%d", ms, screens.count))
+            }
             if self.reportOverlay {
                 self.reportOverlay = false
                 // Wait for the panels to draw before the proof runner takes a screenshot.
@@ -197,8 +212,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case "leader":
                 self.reportOverlay = true
                 if let leaderChord { Self.post(leaderChord) }
-            case "settings":
-                self.settings.show()
+            case _ where key == "settings" || key.hasPrefix("settings:"):
+                self.settings.show(page: SettingsPage(rawValue: String(key.dropFirst("settings:".count))) ?? .general)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { self.controller.reportCurrentState(action: "settings") }
             case "settings-close":
                 self.settings.close()
@@ -210,13 +225,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case _ where key.hasPrefix("record:"):
                 // The same call as a click on the shortcut field.
                 let name = String(key.dropFirst("record:".count))
-                self.settings.model.record(name == "leader" ? .leader : .action(ActionID(rawValue: name)!))
+                self.settings.model.record(name == "leader" ? .leader : name == "toggle" ? .toggle : .action(ActionID(rawValue: name)!))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.controller.reportCurrentState(action: "recording:\(name)") }
+            case _ where key.hasPrefix("exit-after:"):
+                // The same change as a click on the "Exit after" checkbox of the action.
+                guard let id = ActionID(rawValue: String(key.dropFirst("exit-after:".count))) else { return }
+                self.store.setExitAfter(!self.store.shortcuts.exits(after: id), for: id)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "exitAfter:\(id.rawValue)=\(self.store.shortcuts.exits(after: id))") }
             case _ where key.hasPrefix("chord:") || key.hasPrefix("pass:"):
                 // A key press without the leader key, for example the chord for a field that records.
                 guard let chord = KeyChord(spec: String(key.split(separator: ":", maxSplits: 1)[1])) else { return }
                 Self.post(chord)
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "chord:\(chord.spec) leader=\(self.store.shortcuts.leader?.spec ?? "none") layer=\(self.leader.isLayerActive) enabled=\(self.store.enabled)") }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.controller.reportCurrentState(action: "chord:\(chord.spec) leader=\(self.store.shortcuts.leader?.spec ?? "none") toggle=\(self.store.shortcuts.toggle?.spec ?? "none") layer=\(self.leader.isLayerActive) enabled=\(self.store.enabled)") }
             default:
                 guard let chord = KeyChord(spec: key) else { return }
                 // A key after a `leader` step goes to the layer that the `leader` step started.

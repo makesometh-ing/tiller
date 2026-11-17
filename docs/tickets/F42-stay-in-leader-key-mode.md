@@ -4,7 +4,7 @@
 
 > also, I think as part of the config, we need to decide if a shortcut should exit leader key mode or stay in leader key mode. for switch windows in the container and moving between containers, and moving windows between containers, I think it should stay in leader key mode by default, but there should be a column "exit leader key mode" with a checkbox for each action. what do you think?
 
-Source: [requirements-as-written.md, section 18](../requirements-as-written.md).
+Source: [requirements-as-written.md, section 18](../requirements-as-written.md) and section 19 "Shortcuts page with the "Exit after" column".
 
 ## What exists
 
@@ -14,16 +14,17 @@ Each action ends leader key mode.
 
 The behaviour is described in [PRD.md, section 6 "Leader key mode"](../PRD.md#6-leader-key-mode) and [section 11 "Settings window and menu bar menu"](../PRD.md#11-settings-window-and-menu-bar-menu).
 
-- Make 3 mockups of the Shortcuts page with the "Exit leader key mode" column, in the light and the dark appearance, for approval.
-- Mockups: [exit-leader-key-mode.html](../mockups/exit-leader-key-mode.html).
+- Approved design: variant 1 in [exit-leader-key-mode.html](../mockups/exit-leader-key-mode.html), a checkbox column with the heading "Exit after".
+- The "Global shortcuts" group on the Shortcuts page contains the leader key and the shortcut to turn Tiller on and off. Both can be recorded.
 
 ## Acceptance criteria
 
-- [ ] With the default settings, leader, then `L` three times, moves focus three windows. The overlay stays open between the key presses.
-- [ ] With the default settings, leader, then `1`, applies the layout and ends leader key mode.
-- [ ] A changed checkbox is saved and applied without a relaunch.
-- [ ] `Q` always ends leader key mode. Its checkbox can't be changed.
-- [ ] The overlay is updated after each action in leader key mode, within the latency of the action.
+- [x] With the default settings, leader, then `L` three times, moves focus three windows. The overlay stays open between the key presses.
+- [x] With the default settings, leader, then `1`, applies the layout and ends leader key mode.
+- [x] A changed checkbox is saved and applied without a relaunch.
+- [x] The shortcut to turn Tiller on and off can be recorded. The recorded chord turns Tiller off and on.
+- [x] `Q` always ends leader key mode. Its checkbox can't be changed.
+- [x] The overlay is updated after each action in leader key mode, within the latency of the action.
 
 ## Proof needed
 

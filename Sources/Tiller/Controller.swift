@@ -16,11 +16,13 @@ final class Controller {
 
     init(ax: AXWindows) { self.ax = ax }
 
-    /// Call on the main thread.
-    func perform(_ action: Action, received: DispatchTime) {
+    /// Call on the main thread. `completion` runs on the main thread after the windows are moved and focused. An action that doesn't change a workspace doesn't call it.
+    func perform(_ action: Action, received: DispatchTime, completion: (() -> Void)? = nil) {
         let screens = ScreenInfo.all()
         let mouseScreen = ScreenInfo.underMouse(in: screens)
-        queue.async { self.run(action, received: received, screens: screens, mouseScreen: mouseScreen) }
+        queue.async {
+            self.run(action, received: received, screens: screens, mouseScreen: mouseScreen, completion: completion)
+        }
     }
 
     /// Call on the main thread.
@@ -41,7 +43,8 @@ final class Controller {
 
     /// Reads what the leader key overlay shows. The Accessibility calls run on `overlayQueue`, so they don't delay an action.
     /// Call on the main thread. `completion` runs on the main thread.
-    func overlayScreens(completion: @escaping ([OverlayScreen]) -> Void) {
+    /// After an action, `syncFocus` is false: the other app can apply the focus change after the overlay reads the focused window.
+    func overlayScreens(syncFocus: Bool = true, completion: @escaping ([OverlayScreen]) -> Void) {
         let screens = ScreenInfo.all()
         overlayQueue.async {
             let (workspaces, floated) = self.queue.sync { (self.workspaces, self.floated) }
@@ -57,7 +60,7 @@ final class Controller {
                 var item = OverlayScreen(uuid: screen.uuid, frame: screen.frame, spacing: Spacing.standard.carouselSpacing)
                 if var ws = workspaces[screen.uuid] {
                     Self.removeClosed(&ws, refs: refs)
-                    if let focused { ws.focus(window: focused) }
+                    if syncFocus, let focused { ws.focus(window: focused) }
                     for (i, c) in ws.containers.enumerated() {
                         item.containers.append(.init(id: i, frame: c.frame, axis: c.axis, windowCount: c.windows.count,
                                                      focused: i == ws.focusedContainerIndex))
@@ -122,7 +125,7 @@ final class Controller {
 
     private func isTiled(_ ref: WindowRef) -> Bool { ref.kind == .tiled && !floated.contains(ref.id) }
 
-    private func run(_ action: Action, received: DispatchTime, screens: [ScreenInfo], mouseScreen: ScreenInfo?) {
+    private func run(_ action: Action, received: DispatchTime, screens: [ScreenInfo], mouseScreen: ScreenInfo?, completion: (() -> Void)?) {
         let windows = ax.windows()
         let refs = Dictionary(windows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         floated.formIntersection(refs.keys)
@@ -235,10 +238,13 @@ final class Controller {
             break
         }
 
+        if let completion { DispatchQueue.main.async(execute: completion) }
         guard onReport != nil else { return }
         // Focus changes are applied by the other app after the Accessibility call returns.
-        Thread.sleep(forTimeInterval: 0.15)
-        onReport?(report(name, ws, refs: refs, latencyMs: latencyMs, moved: changed.count, expectedFocused: expectedFocused))
+        // `asyncAfter` keeps `queue` free, so that the overlay update after the action isn't delayed.
+        queue.asyncAfter(deadline: .now() + 0.15) {
+            self.onReport?(self.report(name, ws, refs: refs, latencyMs: latencyMs, moved: changed.count, expectedFocused: expectedFocused))
+        }
     }
 
     private static func removeClosed(_ ws: inout Workspace, refs: [WindowID: WindowRef]) {

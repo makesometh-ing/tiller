@@ -79,7 +79,9 @@
     ['App', [['Raise floating windows', 'R', true]]],
     ['Tiller', [['Turn Tiller off', 'Q', 'fixed']]],
   ];
-  const leader = `<div class="sec">Leader key</div><div class="group"><div class="row"><span class="name">Leader key</span>${field('⌃⌥⇧⌘ L')}</div></div>`;
+  const leader = `<div class="sec">Global shortcuts</div><div class="group"><div class="row"><span class="name">Leader key</span>${field('⌃⌥⇧⌘ L')}</div>
+      <div class="row"><span class="name">Turn Tiller on and off</span>${field('⌃⌥⌘ T')}</div></div>
+      <div class="help">These shortcuts work in every app. The shortcut to turn Tiller on and off works also while Tiller is off.</div>`;
   const cb = v => `<span class="cb ${v ? 'on' : ''} ${v === 'fixed' ? 'dis' : ''}">${v ? '✓' : ''}</span>`;
   const page = (rows, help) => `<div class="win">${lights}${sidebar}<div class="main"><div class="title">Shortcuts</div><div class="content">${leader}${rows}
       <div class="help">${help}</div></div></div></div>`;
