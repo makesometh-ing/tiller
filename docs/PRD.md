@@ -130,7 +130,7 @@ Planned for v1:
 - Container: a teal edge without a fill. The edge of the focused container is brighter.
 - Container chip: a solid pill on the top edge of the container, over the border. Teal for the focused container, grey for the others. It shows the container number, ⇆ or ⇅, a window-stack icon with the window count, and the `V` key. A tooltip on the key shows what the key does.
 - Window pill: small, translucent, at the bottom-right corner of every window, including floating windows. It shows the real app icon, the app name, Tiled or Floating, and the `F` key. The pill of a window behind the focused window in a carousel shows only the app icon, in the visible edge of the window.
-- A pill isn't shown when the area of the pill is behind another window.
+- A pill is shown only over its own window. When a part of the pill area is behind another window, the pill isn't shown.
 - Key bar: draggable, at the bottom center of the screen by default. The keys are in sections with a heading: SCREEN, CONTAINER, WINDOW and APP. `?` and `Esc` are at the right end.
 - Key list: `?` opens it above the key bar. It lists each key with a description.
 - The setting "Show the key bar" is on by default. When it is off, the containers and pills are shown without the key bar.

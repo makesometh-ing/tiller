@@ -42,12 +42,12 @@ public struct WindowTraits: Equatable, Sendable {
     }
 }
 
-/// True when a window in front of the window with `id` contains `point`.
+/// True when a window in front of the window with `id` overlaps a part of `rect`.
 /// `frontToBack` lists the on-screen windows and their frames, front first.
-public func isCovered(_ point: CGPoint, window id: WindowID, frontToBack: [(id: WindowID, frame: CGRect)]) -> Bool {
+public func isCovered(_ rect: CGRect, window id: WindowID, frontToBack: [(id: WindowID, frame: CGRect)]) -> Bool {
     for entry in frontToBack {
         if entry.id == id { return false }
-        if entry.frame.contains(point) { return true }
+        if entry.frame.intersects(rect) { return true }
     }
     return false
 }

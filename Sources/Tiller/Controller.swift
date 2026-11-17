@@ -81,19 +81,25 @@ final class Controller {
                     item.windows.append(.init(id: ref.id, frame: ref.frame, appName: appName(ref.pid), pid: ref.pid,
                                               floating: true, place: .front, axis: .horizontal))
                 }
-                // A pill isn't shown when another window covers the place of the pill, for example a floating window behind a tiled window.
+                // A pill is shown only over its own window. When another window overlaps a part of the pill,
+                // for example a tiled window in front of a floating window, the pill isn't shown.
                 let s = item.spacing
+                let nameFont = [NSAttributedString.Key.font: NSFont.systemFont(ofSize: 10)]
                 item.windows.removeAll { w in
                     let f = w.frame
-                    let point: CGPoint
+                    let edge: CGFloat = 18  // The app icon pill.
+                    let pill: CGRect
                     switch (w.place, w.axis) {
-                    case (.front, _): point = CGPoint(x: f.maxX - 20, y: f.maxY - 15)
-                    case (.startEdge, .horizontal): point = CGPoint(x: f.minX + s / 2, y: f.maxY - 15)
-                    case (.endEdge, .horizontal): point = CGPoint(x: f.maxX - s / 2, y: f.maxY - 15)
-                    case (.startEdge, .vertical): point = CGPoint(x: f.maxX - 15, y: f.minY + s / 2)
-                    case (.endEdge, .vertical): point = CGPoint(x: f.maxX - 15, y: f.maxY - s / 2)
+                    case (.front, _):
+                        // Icon, state, `f` key, spacing and padding: 120 points. The app name is at most 110 points wide.
+                        let width = min((w.appName as NSString).size(withAttributes: nameFont).width, 110) + 120
+                        pill = CGRect(x: f.maxX - 6 - width, y: f.maxY - 6 - 22, width: width, height: 22)
+                    case (.startEdge, .horizontal): pill = CGRect(x: f.minX + (s - edge) / 2, y: f.maxY - 6 - edge, width: edge, height: edge)
+                    case (.endEdge, .horizontal): pill = CGRect(x: f.maxX - (s + edge) / 2, y: f.maxY - 6 - edge, width: edge, height: edge)
+                    case (.startEdge, .vertical): pill = CGRect(x: f.maxX - 6 - edge, y: f.minY + (s - edge) / 2, width: edge, height: edge)
+                    case (.endEdge, .vertical): pill = CGRect(x: f.maxX - 6 - edge, y: f.maxY - (s + edge) / 2, width: edge, height: edge)
                     }
-                    let covered = isCovered(point, window: w.id, frontToBack: order)
+                    let covered = isCovered(pill, window: w.id, frontToBack: order)
                     if covered { hidden += 1 }
                     return covered
                 }

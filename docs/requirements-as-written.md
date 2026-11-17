@@ -470,3 +470,13 @@ On the three Shortcuts page designs in [mockups/exit-leader-key-mode.html](mocku
 During the proof run:
 
 > I already use `hyper + t` on my mac to open raycast translate. you need a different key for testing
+
+## 20. Pill over another window
+
+On a proof screenshot with the floating window "Test Floating" behind the tiled windows "Test 1" and "Test 5", and its pill drawn over "Test 5":
+
+> can't you see in your own testing here that another window appears between the owning window and the window overlay?
+
+> No, I would say that these 2 windows are in a container. There's a floating window with a floating overlay, and there's 2 windows that are in the container, which show between the overlay and the floating window. That's what I'm saying.
+
+> I mean, it doesn't really matter what I mean in my description. Like, can you not see the problem? That there's a window in between one window, 2 windows, doesn't really matter. There's windows in between the overlay and the window that the overlay belongs to.
