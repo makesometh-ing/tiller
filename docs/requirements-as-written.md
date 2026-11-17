@@ -508,3 +508,7 @@ On "F20: Global shortcuts: a second shortcut for each action":
 Written on screenshots of the "Diagnostics" group of variant 2 and the "Log" group of variant 3 in [about-page.html](mockups/about-page.html):
 
 > "Diagnostics" - great, but I also want this part of "Logs"
+
+## 24. Closed Finder window
+
+> I just closed finder with the red x button and the rest of the windows didn' tile

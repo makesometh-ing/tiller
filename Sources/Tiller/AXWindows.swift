@@ -193,10 +193,10 @@ final class AXWindows {
         }
     }
 
-    /// Raises the windows. The last window gets focus.
-    func raise(_ refs: [WindowRef]) {
+    /// Raises the windows. When `activate` is true, the last window gets focus.
+    func raise(_ refs: [WindowRef], activate: Bool = true) {
         for ref in refs { AXUIElementPerformAction(ref.element, kAXRaiseAction as CFString) }
-        if let last = refs.last { Self.activate(last) }
+        if activate, let last = refs.last { Self.activate(last) }
     }
 
     /// Returns the results of the calls, for the log.

@@ -128,6 +128,13 @@ func ring(_ r: ActionReport) -> [WindowID: [Int]] {
 var savedRings: [String: [WindowID: [Int]]] = [:]
 /// The report before an `app:hide:<bundle id>` step, with the bundle id as the key.
 var reportsBeforeHide: [String: ActionReport] = [:]
+/// The system focused window, the focused window of each container and the window server order after each close and minimize step.
+var zOrderLines: [String] = []
+/// On-screen window ids at window layer 0, front to back.
+func frontToBack() -> [WindowID] {
+    let info = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    return info.compactMap { $0[kCGWindowLayer as String] as? Int == 0 ? $0[kCGWindowNumber as String] as? WindowID : nil }
+}
 /// The focused window of the workspace after the last step that reported a tiled focused window.
 var tiledFocus: WindowID?
 for (index, key) in steps.enumerated() {
@@ -176,6 +183,10 @@ for (index, key) in steps.enumerated() {
                     problems.append("\(target) is at \(ring(report)[w.id] ?? []), expected \(savedRings[target]?[w.id] ?? [])")
                 }
             } else { problems.append("\(target) isn't in a carousel") }
+        case ("close", "focused"):
+            // The window that had focus is closed with its close button.
+            if let closed = previous.actualFocused, report.windows.contains(where: { $0.id == closed }) { problems.append("the closed window \(closed) is still in a carousel") }
+            if report.windows.count != previous.windows.count - 1 { problems.append("\(report.windows.count) tiled windows, expected \(previous.windows.count - 1)") }
         case ("app", "hide"):
             if report.windows.contains(where: { $0.bundleID == target }) { problems.append("a window of \(target) is still in a carousel") }
             reportsBeforeHide[target] = previous
@@ -188,6 +199,24 @@ for (index, key) in steps.enumerated() {
             }
         default: break
         }
+    }
+    // After a window is closed or minimized, the focused window of each carousel is in front of the other windows of that carousel.
+    if key.hasPrefix("close:") || key.hasPrefix("window:close:") || key.hasPrefix("window:minimize:") {
+        let order = frontToBack()
+        func title(_ id: WindowID?) -> String {
+            guard let id else { return "none" }
+            return (report.windows + report.floating).first { $0.id == id }?.title ?? "\(id)"
+        }
+        for front in report.fronts ?? [] {
+            guard let c = report.windows.first(where: { $0.id == front })?.container, let f = order.firstIndex(of: front) else { continue }
+            for w in report.windows where w.container == c && w.id != front && (order.firstIndex(of: w.id) ?? .max) < f {
+                problems.append("\(w.title) is in front of \(title(front)), the focused window of container \(c + 1)")
+            }
+        }
+        let tiled = Set(report.windows.map(\.id))
+        zOrderLines.append("\(index + 1) \(key): system focused window \(title(report.actualFocused)), frontmost app \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "none"); "
+            + "focused window of each container: \((report.fronts ?? []).map(title).joined(separator: ", ")); "
+            + "tiled windows front to back: \(order.filter(tiled.contains).map { id in "\(title(id)) (container \((report.windows.first { $0.id == id }?.container ?? -1) + 1))" }.joined(separator: ", "))")
     }
     if let f = report.expectedFocused, report.windows.contains(where: { $0.id == f }) { tiledFocus = f }
     // After `record:leader`, the next `chord:` step must set the leader key.
@@ -278,6 +307,10 @@ summary += "\nKey presses that reached the test windows while the Tiller layer w
 if !passLines.isEmpty { summary += "Chords that must reach the test windows (`pass:` steps): \(passReached ? "all reached (PASS)" : "FAIL")\n" }
 if !clickedKeyLines.isEmpty {
     summary += "Chords after a click that must reach the clicked window: \(clickedKeysReached ? "all reached (PASS)" : "FAIL") (\(clickedKeyLines.map { "`\($0)`" }.joined(separator: ", ")))\n"
+}
+if !zOrderLines.isEmpty {
+    summary += "\n## Window order after each close and minimize step\n\n" + zOrderLines.map { "- \($0)\n" }.joined()
+    try! zOrderLines.joined(separator: "\n").appending("\n").write(to: out.appending(path: "zorder.log"), atomically: true, encoding: .utf8)
 }
 try! summary.write(to: out.appending(path: "summary.md"), atomically: true, encoding: .utf8)
 

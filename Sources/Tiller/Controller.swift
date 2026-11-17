@@ -55,13 +55,17 @@ final class Controller {
 
     /// Removes closed, minimized and hidden windows from their carousels, puts unminimized and shown windows back at their
     /// ring position, and puts each new tiled window into the focused container after the focused window. Then sets the frames of the changed carousels.
+    /// When the focused window of a carousel was removed, the new focused window of that carousel is raised. In the focused container, it gets focus.
     /// A window can be on the screen a short time after its notification. When nothing changed, the windows are read again 0.25 seconds later if `retry` is true.
-    private func syncWindows(trigger: String, notified: DispatchTime, screens: [ScreenInfo], retry: Bool) {
+    /// `windows` is a window list that the caller read.
+    private func syncWindows(trigger: String, notified: DispatchTime, screens: [ScreenInfo], retry: Bool,
+                             windows read: (list: [WindowRef], ms: LogValue)? = nil) {
         guard !workspaces.isEmpty else { return }
         let t = DispatchTime.now()
-        let windows = ax.windows()
-        let windowListMs = Log.ms(since: t)
+        let windows = read?.list ?? ax.windows()
+        let windowListMs = read?.ms ?? Log.ms(since: t)
         let refs = Dictionary(windows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let stored = workspaces
         let before = workspaces.mapValues { $0.windowFrames() }
         let removed = removeGone(refs: refs)
         let focused = ax.focusedWindowID()
@@ -76,9 +80,20 @@ final class Controller {
                     ["sameContainer": .bool(p?.container == saved[id]?.container && p?.layout == saved[id]?.layout)]) { $1 })
             }
         }
+        var newFocus: WindowID?
+        var raise: [WindowID] = []
+        for (uuid, ws) in workspaces {
+            guard let old = stored[uuid] else { continue }
+            let fronts = ws.newFrontWindows(since: old)
+            raise += fronts.raise
+            // With windows removed from two screens, one window gets focus. The other is raised.
+            if let id = fronts.focus { if newFocus == nil { newFocus = id } else { raise.append(id) } }
+        }
         // An unminimized window and the focused window of a shown app usually get focus. Until 1 second after Tiller's
         // last focus call, the system focused window can be the window that had focus before, so it isn't read.
-        if removed + restored.count > 0, DispatchTime.now() >= lastFocusCall + 1.0, let focused,
+        // After the focused window of the focused container is removed, the system focused window is a window of another carousel,
+        // a window that isn't tiled, or none. Focus then goes to the new focused window of that container.
+        if newFocus == nil, removed + restored.count > 0, DispatchTime.now() >= lastFocusCall + 1.0, let focused,
            let uuid = workspaces.first(where: { $0.value.contains(focused) })?.key {
             workspaces[uuid]!.focus(window: focused)
         }
@@ -102,16 +117,26 @@ final class Controller {
         }
         let setFramesMs = ax.setFrames(changed, refs: refs)
         let focusStart = DispatchTime.now()
+        // The other new focused windows are raised first, so that the window that gets focus is the front window.
+        let raised = raise.compactMap { refs[$0] }
+        ax.raise(raised, activate: false)
         // A new window gets focus from its app. Tiller gives it focus when its app doesn't.
-        if let ref = opened.last, ref.id != focused {
-            ax.focus(ref)
+        var target = opened.last ?? newFocus.flatMap { refs[$0] }
+        if target?.id == focused { target = nil }
+        // AXRaise also gives focus to the raised window when its app is the active app. The system focused window then gets focus again.
+        let activePID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        if target == nil, raised.contains(where: { $0.pid == activePID }), let focused { target = refs[focused] }
+        if let target {
+            ax.focus(target)
             lastFocusCall = .now()
         }
+        let focusedWindow = target?.id
         let focusMs = Log.ms(since: focusStart)
         let latencyMs = Double(DispatchTime.now().uptimeNanoseconds - notified.uptimeNanoseconds) / 1e6
         lastWindowChange = (latencyMs, changed.count)
         Self.logAction(["action": "window-change", "trigger": .string(trigger), "opened": .int(opened.count), "restored": .int(restored.count),
                         "removed": .int(removed), "moved": .int(changed.count), "windowListMs": windowListMs, "setFramesMs": setFramesMs,
+                        "raised": .int(raised.count), "focused": focusedWindow.map { .int(Int($0)) } ?? .null,
                         "focusMs": focusMs, "totalMs": .ms(latencyMs)], totalMs: latencyMs)
         checkFrames(changed, refs: refs)
     }
@@ -147,10 +172,17 @@ final class Controller {
             return
         }
         let t = DispatchTime.now()
-        let refs = Dictionary(ax.windows().map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let windows = ax.windows()
+        let refs = Dictionary(windows.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         let windowListMs = Log.ms(since: t)
+        // A closed window, or the window of an app that quit, can give focus to a window of another carousel before the window notification
+        // is handled. The window change then sets the focus, so that focus stays in the container of the closed window.
+        if workspaces.values.contains(where: { $0.containers.contains { $0.windows.contains { refs[$0] == nil } } }) {
+            syncWindows(trigger: "focusChanged", notified: notified, screens: screens, retry: false, windows: (windows, windowListMs))
+            return
+        }
         let before = workspaces[uuid]?.windowFrames() ?? [:]
-        removeGone(refs: refs)
+        known = refs
         guard var ws = workspaces[uuid] else { return }
         ws.focus(window: focused)
         workspaces[uuid] = ws
@@ -185,7 +217,7 @@ final class Controller {
             // After a click, the report gives the latency of the arrangement that the click caused.
             // After a window step, the report gives the latency of the window sync.
             let change = action.hasPrefix("click:") ? self.lastFocusChange
-                : action.hasPrefix("window:") || action.hasPrefix("app:") ? self.lastWindowChange : nil
+                : action.hasPrefix("window:") || action.hasPrefix("app:") || action.hasPrefix("close:") ? self.lastWindowChange : nil
             self.lastFocusChange = nil
             self.lastWindowChange = nil
             self.onReport?(self.report(action, ws, refs: refs, latencyMs: change?.latencyMs ?? latencyMs, moved: change?.moved ?? 0,
@@ -559,7 +591,8 @@ final class Controller {
             ActionReport.Window(id: $0.id, title: $0.title, container: -1, expected: Rect($0.frame), actual: $0.element.frame.map(Rect.init))
         }
         return ActionReport(action: action, latencyMs: latencyMs, movedWindows: moved, layout: ws.layout.rawValue,
-                            expectedFocused: expectedFocused, actualFocused: ax.focusedWindowID(), windows: windows, floating: floating)
+                            expectedFocused: expectedFocused, actualFocused: ax.focusedWindowID(), windows: windows, floating: floating,
+                            fronts: ws.containers.compactMap(\.focusedWindow))
     }
 
     private static func name(_ action: Action) -> String {

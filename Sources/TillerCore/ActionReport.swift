@@ -33,9 +33,11 @@ public struct ActionReport: Codable, Sendable {
     public var windows: [Window]
     /// Floating windows of the managed apps, with their actual frame in `actual`. Tiller must not change these frames.
     public var floating: [Window]
+    /// The focused window of each container that isn't empty, in container order.
+    public var fronts: [WindowID]?
 
     public init(action: String, latencyMs: Double, movedWindows: Int, layout: String?,
-                expectedFocused: WindowID?, actualFocused: WindowID?, windows: [Window], floating: [Window]) {
+                expectedFocused: WindowID?, actualFocused: WindowID?, windows: [Window], floating: [Window], fronts: [WindowID]? = nil) {
         self.action = action
         self.latencyMs = latencyMs
         self.movedWindows = movedWindows
@@ -44,5 +46,6 @@ public struct ActionReport: Codable, Sendable {
         self.actualFocused = actualFocused
         self.windows = windows
         self.floating = floating
+        self.fronts = fronts
     }
 }

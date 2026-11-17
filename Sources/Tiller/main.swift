@@ -292,6 +292,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 DistributedNotificationCenter.default().postNotificationName(.init("com.tiller.testwindows.command"), object: nil,
                                                                              userInfo: ["command": String(key.dropFirst("window:".count))], deliverImmediately: true)
                 self.reportWindowChange(key)
+            case "close:focused":
+                // A click on the close button of the system focused window, as a click on the red button with the mouse.
+                if let app = NSWorkspace.shared.frontmostApplication,
+                   let window = AXUIElementCreateApplication(app.processIdentifier).value(kAXFocusedWindowAttribute),
+                   let button = (window as! AXUIElement).value(kAXCloseButtonAttribute), let frame = (button as! AXUIElement).frame {
+                    for type in [CGEventType.leftMouseDown, .leftMouseUp] {
+                        CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: CGPoint(x: frame.midX, y: frame.midY), mouseButton: .left)?.post(tap: .cghidEventTap)
+                    }
+                }
+                self.reportWindowChange(key)
             case _ where key.hasPrefix("app:hide:") || key.hasPrefix("app:show:"):
                 // `app:hide:<bundle id>` hides the app, as ⌘H does. `app:show:<bundle id>` shows the app again and activates it, as a click on its Dock icon does.
                 for app in NSRunningApplication.runningApplications(withBundleIdentifier: String(key.dropFirst("app:hide:".count))) {

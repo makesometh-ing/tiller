@@ -183,6 +183,19 @@ public struct Workspace: Equatable, Sendable {
         return restored
     }
 
+    /// The new focused window of each container whose focused window was removed after `before`, for example a closed window.
+    /// `focus` is the new focused window of the focused container when the focused window of the workspace was removed.
+    /// `raise` contains the new focused windows of the other containers.
+    public func newFrontWindows(since before: Workspace) -> (focus: WindowID?, raise: [WindowID]) {
+        var focus: WindowID?
+        var raise: [WindowID] = []
+        for (i, c) in containers.enumerated() where before.containers.indices.contains(i) {
+            guard let old = before.containers[i].focusedWindow, !contains(old), let new = c.focusedWindow else { continue }
+            if old == before.focusedWindow { focus = new } else { raise.append(new) }
+        }
+        return (focus, raise)
+    }
+
     public func windowFrames() -> [WindowID: CGRect] {
         containers.reduce(into: [:]) { result, container in
             result.merge(container.windowFrames(spacing: spacing.carouselSpacing)) { $1 }

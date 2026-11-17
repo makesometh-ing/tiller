@@ -208,3 +208,47 @@ func makeWorkspace() -> Workspace {
     #expect(a.containers[0].axis == .vertical)
     #expect(b.containers[0].axis == .horizontal)
 }
+
+@Test func theNewFocusedWindowOfTheFocusedContainerGetsFocusAfterTheFocusedWindowIsRemoved() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5, 6], focused: 1)
+    // Container 1: [1, 3, 5]. Container 2: [2, 4, 6].
+    ws.focusContainer(offset: 1)
+    ws.focusWindow(offset: 1)
+    let before = ws
+    ws.remove(4)
+    #expect(ws.newFrontWindows(since: before) == (6, []))
+    #expect(ws.focusedWindow == 6)
+}
+
+@Test func theNewFocusedWindowOfAnotherContainerIsRaisedAfterItsFocusedWindowIsRemoved() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5, 6], focused: 1)
+    let before = ws
+    ws.removeSavingPositions([2])
+    let fronts = ws.newFrontWindows(since: before)
+    #expect(fronts.focus == nil)
+    #expect(fronts.raise == [4])
+}
+
+@Test func removingAWindowBehindTheFocusedWindowDoesNotChangeTheFrontWindows() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5, 6], focused: 1)
+    let before = ws
+    ws.remove(5)
+    ws.remove(6)
+    let fronts = ws.newFrontWindows(since: before)
+    #expect(fronts.focus == nil)
+    #expect(fronts.raise.isEmpty)
+}
+
+@Test func anEmptyContainerHasNoNewFocusedWindow() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2], focused: 1)
+    let before = ws
+    ws.remove(1)
+    ws.remove(2)
+    let fronts = ws.newFrontWindows(since: before)
+    #expect(fronts.focus == nil)
+    #expect(fronts.raise.isEmpty)
+}
