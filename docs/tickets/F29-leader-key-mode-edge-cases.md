@@ -7,7 +7,7 @@ These problems were found in the audit of the project. There isn't a separate re
 ## What exists
 
 - Leader key mode doesn't have a timeout.
-- It doesn't end on an app switch, a mouse click or a screen lock.
+- It doesn't end on an app switch or a screen lock. A mouse click is part of [F43](F43-click-ends-leader-key-mode.md).
 - If the event tap fails to start, the failure is shown only in the text of the Tiller menu. There isn't a retry.
 - A key up event can be lost after an event tap timeout. Its key code then stays in the list of stopped key codes.
 

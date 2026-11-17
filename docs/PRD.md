@@ -50,7 +50,7 @@ Planned for v1:
 
 - When Tiller is enabled on a screen for the first time, the Full Screen layout is applied. All tiled windows on the screen are put into its one container.
 - When a layout is applied, each window stays in the container with the same number. A new container is empty until a window is moved into it. The windows of a removed container are put into the last container of the new layout.
-- When a layout is applied, the carousel mode of each container number is retained if that number exists in the new layout.
+- The carousel mode of each container is saved for each layout of a screen. When a layout is applied again, each container gets its saved carousel mode. A container without a saved carousel mode is horizontal.
 - The layout, the containers, the carousel modes and the windows of each workspace are saved, with the display UUID as the key.
 - When Tiller is enabled on a screen again, or after a launch, the saved workspace of that screen is restored. Each window that still exists is put back into its saved container.
 - The workspace margin, the container margin and the carousel spacing are settings. A change is applied at once to each workspace.
@@ -85,7 +85,8 @@ Planned for v1:
 - `P`: peek. See section 7 "Windows".
 - `⇧J` and `⇧K` move the focused window to the next or previous container. The moved window becomes the focused window of its new carousel. Focus stays in the old container, on the next window of its carousel. Their "Exit after" setting is off by default.
 - Leader key mode ends 10 seconds after the last key press. It doesn't end while the key list is open.
-- Leader key mode ends on an app switch, a mouse click and a screen lock.
+- Leader key mode ends on an app switch and a screen lock.
+- A click on a window in leader key mode gives the window focus and ends leader key mode. The overlay doesn't stop the click.
 - When the event tap doesn't start, the menu bar menu shows the failure. Tiller starts the event tap again every second until it starts.
 - Key names are read from the current keyboard layout. They are read again when the keyboard layout changes. Chords are stored as key codes. A saved chord stays on the same key after a keyboard layout change.
 
@@ -105,6 +106,7 @@ Planned for v1:
 Planned for v1:
 
 - A new tiled window is put into the focused container, after the focused window. It becomes the focused window.
+- A click on a tiled window behind the focused window of a carousel gives the clicked window focus. It becomes the focused window of the carousel, as with `H` and `L`. The windows of the carousel are arranged again. A click on a window in another container also makes that container the focused container. This applies in leader key mode and out of leader key mode.
 - A closed window is removed from its container at once. The other windows of the carousel are arranged again.
 - A minimized window, or a window of a hidden app, is removed from its carousel. Its container and its position in the ring order are recorded. When the window is shown again, it is put back into the same container, at the same position in the ring order, as the focused window of that container. If that container doesn't exist, the window is put into the focused container.
 - Each native tab group is one window in its carousel. When the visible window id changes at the same frame, the new id replaces the old id in the carousel. A new tab doesn't add a window to the carousel. A closed tab doesn't remove the window of the group from the carousel while another tab of the group is open.
