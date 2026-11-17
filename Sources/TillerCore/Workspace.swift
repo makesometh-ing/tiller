@@ -42,6 +42,8 @@ public struct Workspace: Equatable, Sendable {
     public private(set) var layout: LayoutKind = .fullScreen
     public private(set) var containers: [Container]
     public private(set) var focusedContainerIndex = 0
+    /// The carousel mode of each container, for each layout that had a carousel mode switched. A layout that is applied again gets these modes.
+    public var savedAxes: [LayoutKind: [CarouselAxis]] = [:]
 
     public init(displayID: String, desktop: CGRect, spacing: Spacing = .standard) {
         self.displayID = displayID
@@ -57,7 +59,10 @@ public struct Workspace: Equatable, Sendable {
     /// round-robin, from the second container.
     public mutating func apply(_ layout: LayoutKind, windows: [WindowID], focused: WindowID?) {
         self.layout = layout
-        containers = layout.containerFrames(in: frame, gap: spacing.containerMargin).map { Container(frame: $0) }
+        let axes = savedAxes[layout] ?? []
+        containers = layout.containerFrames(in: frame, gap: spacing.containerMargin).enumerated().map { i, frame in
+            Container(frame: frame, axis: i < axes.count ? axes[i] : .horizontal)
+        }
         focusedContainerIndex = 0
         var next = 0
         if let focused, windows.contains(focused) {
@@ -105,6 +110,7 @@ public struct Workspace: Equatable, Sendable {
     /// Switches the carousel of the focused container between horizontal and vertical.
     public mutating func toggleAxis() {
         containers[focusedContainerIndex].axis = containers[focusedContainerIndex].axis.toggled
+        savedAxes[layout] = containers.map(\.axis)
     }
 
     public func contains(_ window: WindowID) -> Bool {

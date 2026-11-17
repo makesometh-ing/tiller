@@ -44,13 +44,13 @@ Planned for v1:
 - `V` switches the focused container between horizontal and vertical.
 - With SIP enabled, only the focused window of a carousel is raised. The carousel rules require only that window to be on top.
 - Workspace margin: 10 points. Container margin: 10 points. Carousel spacing: 30 points.
-- Built: when a layout key is pressed, the windows on the screen of the focused window are read. Only tiled windows are used. See section 7 "Windows". The focused window is put into container 1. The other windows are put into the containers in turn, from container 2. The carousel mode of each container is set to horizontal.
+- Built: when a layout key is pressed, the windows on the screen of the focused window are read. Only tiled windows are used. See section 7 "Windows". The focused window is put into container 1. The other windows are put into the containers in turn, from container 2.
+- The carousel mode of each container is saved for each layout of a screen. When a layout is applied again, each container gets its saved carousel mode. A container without a saved carousel mode is horizontal. The saved modes are kept until Tiller quits.
 
 Planned for v1:
 
 - When Tiller is enabled on a screen for the first time, the Full Screen layout is applied. All tiled windows on the screen are put into its one container.
 - When a layout is applied, each window stays in the container with the same number. A new container is empty until a window is moved into it. The windows of a removed container are put into the last container of the new layout.
-- The carousel mode of each container is saved for each layout of a screen. When a layout is applied again, each container gets its saved carousel mode. A container without a saved carousel mode is horizontal.
 - The layout, the containers, the carousel modes and the windows of each workspace are saved, with the display UUID as the key.
 - When Tiller is enabled on a screen again, or after a launch, the saved workspace of that screen is restored. Each window that still exists is put back into its saved container.
 - The workspace margin, the container margin and the carousel spacing are settings. A change is applied at once to each workspace.

@@ -113,3 +113,37 @@ func makeWorkspace() -> Workspace {
     let frames = ws.windowFrames()
     #expect(frames[1]!.width == ws.containers[0].frame.width)
 }
+
+@Test func aLayoutAppliedAgainGetsItsSavedCarouselModes() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    ws.toggleAxis()
+    ws.apply(.verticalSplit, windows: [1, 2, 3], focused: 1)
+    #expect(ws.containers.map(\.axis) == [.horizontal, .horizontal])
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    #expect(ws.containers.map(\.axis) == [.vertical])
+}
+
+@Test func carouselModesAreSavedForEachContainer() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3], focused: 1)
+    ws.focusContainer(offset: 1)
+    ws.toggleAxis()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    #expect(ws.containers.map(\.axis) == [.horizontal])
+    ws.apply(.verticalSplit, windows: [1, 2, 3], focused: 1)
+    #expect(ws.containers.map(\.axis) == [.horizontal, .vertical])
+    #expect(ws.windowFrames()[ws.containers[1].windows[0]]?.width == ws.containers[1].frame.width)
+}
+
+@Test func carouselModesOfOneScreenDontChangeAnotherScreen() {
+    var a = makeWorkspace()
+    var b = Workspace(displayID: "screen-b", desktop: CGRect(x: 1200, y: 0, width: 1920, height: 1080))
+    a.apply(.fullScreen, windows: [1, 2], focused: 1)
+    b.apply(.fullScreen, windows: [3, 4], focused: 3)
+    a.toggleAxis()
+    a.apply(.fullScreen, windows: [1, 2], focused: 1)
+    b.apply(.fullScreen, windows: [3, 4], focused: 3)
+    #expect(a.containers[0].axis == .vertical)
+    #expect(b.containers[0].axis == .horizontal)
+}

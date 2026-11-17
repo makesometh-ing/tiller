@@ -152,11 +152,13 @@ final class Controller {
         switch action {
         case .layout(let kind):
             ws = Workspace(displayID: screen.uuid, desktop: screen.desktop)
+            ws.savedAxes = workspaces[screen.uuid]?.savedAxes ?? [:]
             let onScreen = windows.filter { isTiled($0) && screen.frame.contains(CGPoint(x: $0.frame.midX, y: $0.frame.midY)) }
             ws.apply(kind, windows: onScreen.map(\.id), focused: focused)
             before = Dictionary(onScreen.map { ($0.id, $0.frame) }, uniquingKeysWith: { a, _ in a })
             for ref in onScreen where untiledFrames[ref.id] == nil { untiledFrames[ref.id] = ref.frame }
             expectedFocused = ws.focusedWindow
+            note = ws.containers.map(\.axis.rawValue).joined(separator: "-")
         case .focusWindow(let offset), .focusContainer(let offset):
             guard let existing = workspaces[screen.uuid] else { return }
             ws = existing

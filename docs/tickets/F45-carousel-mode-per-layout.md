@@ -8,22 +8,13 @@ Source: [requirements-as-written.md, section 22](../requirements-as-written.md).
 
 ## What exists
 
-A layout key builds a new workspace. The carousel mode of each container is set to horizontal.
-
-## What to build
-
 The behaviour is described in [PRD.md, section 5 "Layouts and carousels"](../PRD.md#5-layouts-and-carousels).
 
-- Save the carousel mode of each container for each layout and screen.
-- When a layout is applied, set the saved carousel mode of each container.
-- Saving the modes across launches is part of [F28](F28-workspace-state.md).
+- `Workspace.savedAxes` in `Sources/TillerCore/Workspace.swift` contains the carousel mode of each container, for each layout. `V` writes the modes of the current layout to it. `Workspace.apply` gives each container its saved mode. A container without a saved mode is horizontal.
+- A layout key builds a new workspace for the screen. The new workspace gets the saved modes of the old workspace of the same screen. Each screen has its own saved modes.
+- The action name of a layout in the log lists the mode of each container, for example `layout:verticalSplit:horizontal-vertical`.
+- The saved modes are kept until Tiller quits. Saving them across launches is part of [F28](F28-workspace-state.md).
 
-## Acceptance criteria
+## Proof
 
-- [ ] `1`, `V`, `2`, `1`: container 1 is a vertical carousel.
-- [ ] `2`, `J`, `V`, `1`, `2`: container 2 is a vertical carousel. Container 1 is horizontal.
-- [ ] The carousel modes of one screen don't change the carousel modes of another screen.
-
-## Proof needed
-
-A `tiller-proof` run with these steps and screenshots of the container chips after each layout key.
+[F45-carousel-mode-per-layout](../../Tests/Proof/F45-carousel-mode-per-layout): a proof run with the steps `1,v,leader,esc,2,leader,esc,1,leader,esc,2,j,v,leader,esc,1,leader,esc,2,leader,esc`. All steps pass. After `1`, `V`, `2`, `1`, the Full Screen container is a vertical carousel. After `2`, `J`, `V`, `1`, `2`, the chip of container 1 shows ⇆ and the chip of container 2 shows ⇅. Unit tests check the saved modes and the separate modes of two screens. Layout latency: 31 to 64 ms.
