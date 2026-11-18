@@ -23,6 +23,9 @@ public struct Container: Equatable, Sendable {
     public var windows: [WindowID] = []
     public var focusedIndex = 0
     public var axis: CarouselAxis = .horizontal
+    /// The windows of the carousel that were the focused window before the current focused window. The last window was the focused window
+    /// just before the current focused window. The current focused window isn't in this list.
+    public internal(set) var focusHistory: [WindowID] = []
 
     public var focusedWindow: WindowID? { windows.isEmpty ? nil : windows[focusedIndex] }
 
@@ -87,6 +90,8 @@ public struct Workspace: Equatable, Sendable {
 
     /// Moves focus by `offset` positions in the ring of the focused container.
     public mutating func focusWindow(offset: Int) {
+        let old = focusedWindows
+        defer { saveFocusHistory(old) }
         let count = containers[focusedContainerIndex].windows.count
         guard count > 0 else { return }
         let index = containers[focusedContainerIndex].focusedIndex
@@ -112,6 +117,8 @@ public struct Workspace: Equatable, Sendable {
     /// Returns the old and the new container index, or nil when the workspace has one container or the focused container is empty.
     @discardableResult
     public mutating func moveFocusedWindow(offset: Int) -> (from: Int, to: Int)? {
+        let old = focusedWindows
+        defer { saveFocusHistory(old) }
         let from = focusedContainerIndex
         let n = containers.count
         guard n > 1, let window = focusedWindow else { return nil }
@@ -131,6 +138,8 @@ public struct Workspace: Equatable, Sendable {
     /// Moves focus to `window`, for example after a click on a window. Returns false if `window` isn't in the workspace.
     @discardableResult
     public mutating func focus(window: WindowID) -> Bool {
+        let old = focusedWindows
+        defer { saveFocusHistory(old) }
         for i in containers.indices {
             guard let index = containers[i].windows.firstIndex(of: window) else { continue }
             focusedContainerIndex = i
@@ -153,6 +162,8 @@ public struct Workspace: Equatable, Sendable {
     /// Puts `window` in the focused container, after the focused window, and focuses it.
     public mutating func insert(_ window: WindowID) {
         guard !contains(window) else { return }
+        let old = focusedWindows
+        defer { saveFocusHistory(old) }
         let i = focusedContainerIndex
         let index = containers[i].windows.isEmpty ? 0 : containers[i].focusedIndex + 1
         containers[i].windows.insert(window, at: index)
@@ -160,13 +171,20 @@ public struct Workspace: Equatable, Sendable {
     }
 
     /// Removes a window that was closed, floated or moved off the workspace.
+    /// When it was the focused window of its carousel, the last window of the focus history becomes the focused window.
+    /// When the focus history is empty, the window at its ring index becomes the focused window, or the window before it when it was the last window.
     public mutating func remove(_ window: WindowID) {
+        let old = focusedWindows
+        defer { saveFocusHistory(old) }
         for i in containers.indices {
             guard let index = containers[i].windows.firstIndex(of: window) else { continue }
             containers[i].windows.remove(at: index)
             let count = containers[i].windows.count
             if index < containers[i].focusedIndex || containers[i].focusedIndex >= count {
                 containers[i].focusedIndex = max(0, containers[i].focusedIndex - 1)
+            }
+            if old[i] == window, let previous = containers[i].focusHistory.last, let j = containers[i].windows.firstIndex(of: previous) {
+                containers[i].focusedIndex = j
             }
         }
     }
@@ -191,6 +209,8 @@ public struct Workspace: Equatable, Sendable {
     /// Returns the windows that had a saved position.
     @discardableResult
     public mutating func restore(_ windows: [WindowID]) -> [WindowID] {
+        let old = focusedWindows
+        defer { saveFocusHistory(old) }
         let saved = windows.compactMap { w in savedPositions[w].map { (w, $0) } }.sorted { $0.1.index < $1.1.index }
         for (window, p) in saved {
             savedPositions[window] = nil
@@ -217,6 +237,21 @@ public struct Workspace: Equatable, Sendable {
             if old == before.focusedWindow { focus = new } else { raise.append(new) }
         }
         return (focus, raise)
+    }
+
+    private var focusedWindows: [WindowID?] { containers.map(\.focusedWindow) }
+
+    /// Adds the focused window of each container in `old` to the focus history of that container, when the window is still
+    /// in the container and isn't the focused window now. Removes the windows that aren't in the container from the focus history.
+    /// When the last window of the focus history isn't in the container, the focus history is cleared. The focused window then
+    /// doesn't have a window that was focused just before it, and the windows focused before that aren't used.
+    private mutating func saveFocusHistory(_ old: [WindowID?]) {
+        for (i, window) in zip(containers.indices, old) {
+            let c = containers[i]
+            if let last = c.focusHistory.last, !c.windows.contains(last) { containers[i].focusHistory = [] }
+            containers[i].focusHistory.removeAll { !c.windows.contains($0) || $0 == c.focusedWindow || $0 == window }
+            if let window, window != c.focusedWindow, c.windows.contains(window) { containers[i].focusHistory.append(window) }
+        }
     }
 
     public func windowFrames() -> [WindowID: CGRect] {

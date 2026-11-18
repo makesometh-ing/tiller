@@ -69,6 +69,8 @@ func makeWorkspace() -> Workspace {
     ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
     ws.focusWindow(offset: 2)
     ws.remove(3)
+    #expect(ws.focusedWindow == 1)
+    ws.remove(1)
     #expect(ws.focusedWindow == 2)
 }
 
@@ -212,13 +214,96 @@ func makeWorkspace() -> Workspace {
 @Test func theNewFocusedWindowOfTheFocusedContainerGetsFocusAfterTheFocusedWindowIsRemoved() {
     var ws = makeWorkspace()
     ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5, 6], focused: 1)
-    // Container 1: [1, 3, 5]. Container 2: [2, 4, 6].
+    // Container 1: [1, 3, 5]. Container 2: [2, 4, 6]. The focus history of container 2 is empty.
     ws.focusContainer(offset: 1)
-    ws.focusWindow(offset: 1)
     let before = ws
-    ws.remove(4)
-    #expect(ws.newFrontWindows(since: before) == (6, []))
-    #expect(ws.focusedWindow == 6)
+    ws.remove(2)
+    #expect(ws.newFrontWindows(since: before) == (4, []))
+    #expect(ws.focusedWindow == 4)
+}
+
+@Test func theWindowThatWasFocusedBeforeANewWindowGetsFocusAfterTheNewWindowIsClosed() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    ws.focus(window: 2)
+    ws.insert(9)
+    #expect(ws.containers[0].windows == [1, 2, 9, 3])
+    let before = ws
+    ws.remove(9)
+    #expect(ws.newFrontWindows(since: before) == (2, []))
+    #expect(ws.focusedWindow == 2)
+}
+
+@Test func theNextWindowGetsFocusWhenTheWindowFocusedBeforeIsClosed() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    ws.focus(window: 2)
+    ws.insert(9)
+    #expect(ws.containers[0].windows == [1, 2, 9, 3])
+    ws.remove(2)
+    #expect(ws.focusedWindow == 9)
+    #expect(ws.containers[0].focusHistory.isEmpty)
+    // 1 was focused before 2, but 2 was focused just before 9, so 3, the window at the ring index of 9, gets focus.
+    ws.remove(9)
+    #expect(ws.focusedWindow == 3)
+}
+
+@Test func closingAnOlderWindowOfTheFocusHistoryKeepsTheLastWindow() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 1)
+    ws.focus(window: 2)
+    ws.insert(9)
+    ws.remove(1)
+    #expect(ws.containers[0].focusHistory == [2])
+    ws.remove(9)
+    #expect(ws.focusedWindow == 2)
+}
+
+@Test func focusHistoryGoesBackThroughNestedNewWindows() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2], focused: 1)
+    ws.insert(8)
+    ws.insert(9)
+    ws.remove(9)
+    #expect(ws.focusedWindow == 8)
+    ws.remove(8)
+    #expect(ws.focusedWindow == 1)
+}
+
+@Test func aMinimizedWindowGivesFocusBackAndGetsItAgainWhenRestored() {
+    var ws = makeWorkspace()
+    ws.apply(.fullScreen, windows: [1, 2, 3], focused: 3)
+    ws.focus(window: 2)
+    ws.removeSavingPositions([2])
+    #expect(ws.focusedWindow == 3)
+    ws.restore([2])
+    #expect(ws.focusedWindow == 2)
+    ws.removeSavingPositions([2])
+    #expect(ws.focusedWindow == 3)
+}
+
+@Test func focusHistoryIsKeptForEachContainer() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5, 6], focused: 1)
+    // Container 1: [1, 3, 5]. Container 2: [2, 4, 6].
+    ws.focus(window: 5)
+    ws.focus(window: 4)
+    let before = ws
+    ws.remove(5)
+    #expect(ws.newFrontWindows(since: before) == (nil, [1]))
+    #expect(ws.containers[1].focusHistory == [2])
+    #expect(ws.focusedWindow == 4)
+}
+
+@Test func moveFocusedWindowStillFocusesTheNextWindowOfTheOldCarousel() {
+    var ws = makeWorkspace()
+    ws.apply(.verticalSplit, windows: [1, 2, 3, 4, 5], focused: 1)
+    // Container 1: [1, 3, 5]. Container 2: [2, 4].
+    ws.focus(window: 5)
+    ws.focus(window: 3)
+    ws.moveFocusedWindow(offset: 1)
+    #expect(ws.containers[0].focusedWindow == 5)
+    #expect(ws.containers[1].focusHistory == [2])
 }
 
 @Test func theNewFocusedWindowOfAnotherContainerIsRaisedAfterItsFocusedWindowIsRemoved() {

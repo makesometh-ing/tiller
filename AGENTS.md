@@ -52,6 +52,7 @@ Tiller is a tiling window manager for macOS. It is a menu bar app.
 - A new floating window doesn't cause a re-layout or a focus change.
 - A new tiled window is put into the focused container, after the focused window, and becomes the focused window.
 - A closed window is removed from its carousel at once. A minimized window and a window of a hidden app are also removed at once. When such a window is shown again, it goes back into the same container at the same ring position, as the focused window of that container. If that container doesn't exist, it goes into the focused container.
+- When the focused window of a carousel is closed, minimized or hidden, the window that was the focused window of that carousel just before it becomes the focused window again. When that window isn't in the carousel, the window at the ring index of the removed window becomes the focused window.
 - Tiller's own frame and focus changes don't cause a second arrangement.
 - When a floating window opens, focus stays on the focused tiled window. The floating windows of an app stay behind its focused window. `r` in leader key mode raises the floating windows of the focused app. The front floating window then gets focus.
 - `f` in leader key mode floats the focused tiled window. The window is returned to its frame before Tiller first tiled it. `f` on that window again puts it back in the focused container.

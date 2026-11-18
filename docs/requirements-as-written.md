@@ -512,3 +512,7 @@ Written on screenshots of the "Diagnostics" group of variant 2 and the "Log" gro
 ## 24. Closed Finder window
 
 > I just closed finder with the red x button and the rest of the windows didn' tile
+
+## 25. Focus after a child window is closed
+
+> When I open a child window from something like wechat, maybe an image, then close it, the focused window is not always its parent, but another window in the same container.

@@ -137,6 +137,8 @@ func frontToBack() -> [WindowID] {
 }
 /// The focused window of the workspace after the last step that reported a tiled focused window.
 var tiledFocus: WindowID?
+/// For each window, the window that was the focused window of the workspace just before it, when that window was still in a carousel.
+var focusedBefore: [WindowID: WindowID] = [:]
 for (index, key) in steps.enumerated() {
     lastResult = nil
     center.postNotificationName(.init("com.tiller.proof.press"), object: nil, userInfo: ["key": key], deliverImmediately: true)
@@ -177,6 +179,15 @@ for (index, key) in steps.enumerated() {
             if report.windows.contains(where: { $0.title == target }) { problems.append("\(target) is still in a carousel") }
             if report.windows.count != previous.windows.count - 1 { problems.append("\(report.windows.count) tiled windows, expected \(previous.windows.count - 1)") }
             if parts[1] == "minimize", let w = previous.windows.first(where: { $0.title == target }) { savedRings[target] = [w.id: ring(previous)[w.id]!] }
+            // After the focused window is removed, the window that was focused just before it gets focus. When that window isn't
+            // in the carousel, the window at the ring index of the removed window gets focus.
+            if let removed = previous.windows.first(where: { $0.title == target })?.id, removed == tiledFocus, let from = ring(previous)[removed] {
+                let left = previous.windows.filter { $0.container == from[0] && $0.id != removed }.map(\.id)
+                let back = focusedBefore[removed].flatMap { left.contains($0) ? $0 : nil }
+                if let expected = back ?? (left.isEmpty ? nil : left[from[1] % left.count]), report.expectedFocused != expected {
+                    problems.append("focus is on \(report.expectedFocused.map(String.init) ?? "none"), expected \(expected) (\(back == nil ? "the next window" : "the window focused before"))")
+                }
+            }
         case ("window", "unminimize"):
             if let w = report.windows.first(where: { $0.title == target }) {
                 if ring(report)[w.id] != savedRings[target]?[w.id] {
@@ -232,7 +243,10 @@ for (index, key) in steps.enumerated() {
             + "focused window of each container: \((report.fronts ?? []).map(title).joined(separator: ", ")); "
             + "tiled windows front to back: \(order.filter(tiled.contains).map { id in "\(title(id)) (container \((report.windows.first { $0.id == id }?.container ?? -1) + 1))" }.joined(separator: ", "))")
     }
-    if let f = report.expectedFocused, report.windows.contains(where: { $0.id == f }) { tiledFocus = f }
+    if let f = report.expectedFocused, report.windows.contains(where: { $0.id == f }) {
+        if let old = tiledFocus, old != f, report.windows.contains(where: { $0.id == old }) { focusedBefore[f] = old }
+        tiledFocus = f
+    }
     // After `record:leader`, the next `chord:` step must set the leader key.
     if key.hasPrefix("chord:"), index > 0, steps[index - 1] == "record:leader", let chord = chordOf(key),
        !report.action.contains("leader=\(chord.spec)") {
